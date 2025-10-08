@@ -1,0 +1,88 @@
+# How to Deploy Your CineStream Application
+
+This guide provides simple, step-by-step instructions to deploy your static React application to the web. Since the project is set up without a complex build step, we can use a straightforward "drag and drop" deployment method.
+
+We will use Netlify Drop as an example because it is one of the easiest ways to get a site live for free.
+
+---
+
+### Prerequisites
+
+1.  **Project Files**: You need all your project files (`index.html`, `index.tsx`, `components/`, `pages/`, etc.) organized in a single folder on your computer.
+2.  **Web Browser**: A modern web browser like Chrome, Firefox, or Edge.
+
+---
+
+### Step-by-Step Deployment Guide (Using Netlify Drop)
+
+#### Step 1: Prepare Your Project Folder
+
+Ensure all the files for your application are in one main folder. The structure should look something like this:
+
+```
+my-cinestream-app/
+├── DEPLOY.txt
+├── index.html
+├── index.tsx
+├── metadata.json
+├── App.tsx
+├── types.ts
+├── constants.ts
+├── components/
+│   ├── Header.tsx
+│   ├── Footer.tsx
+│   └── ...
+├── pages/
+│   ├── HomePage.tsx
+│   └── ...
+├── context/
+│   └── ...
+├── hooks/
+│   └── ...
+└── services/
+    └── ...
+```
+
+#### Step 2: Go to Netlify Drop
+
+Open your web browser and navigate to **https://app.netlify.com/drop**.
+
+You will be asked to log in or sign up. You can create a free account using GitHub, GitLab, Bitbucket, or your email.
+
+#### Step 3: Drag and Drop Your Folder
+
+Once you are logged in, you will see a large area with a dashed border that says "Drag and drop your site folder here".
+
+Simply **drag your entire project folder** (e.g., `my-cinestream-app/`) from your computer and drop it into this area in your browser.
+
+#### Step 4: Deployment in Progress
+
+Netlify will automatically upload your files and deploy your site. This process usually takes less than a minute.
+
+#### Step 5: Your Site is Live!
+
+Once the deployment is complete, Netlify will provide you with a unique, randomly generated URL (e.g., `https://random-name-12345.netlify.app`).
+
+You can click this link to see your live CineStream application! You can also go into the site settings to change the site name to something more memorable.
+
+---
+
+### Important Note on API Keys
+
+In the current project, the TMDB API key is hardcoded in `constants.ts`. For a real-world production application, this is not secure.
+
+**Best Practice:** You should use **Environment Variables**.
+
+For services like Netlify or Vercel, you can set these in your site's dashboard:
+
+1.  Go to **Site settings > Build & deploy > Environment**.
+2.  Add a new variable.
+    *   **Key**: `VITE_TMDB_API_KEY` (The `VITE_` prefix is standard for build tools to expose variables to the frontend).
+    *   **Value**: `c83a22a71ba60632da9d3a91cd5a9274`
+3.  In your code (`constants.ts`), you would then access it like this:
+    ```javascript
+    // constants.ts
+    export const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
+    ```
+
+*Note: Because the current development environment doesn't use a standard build tool like Vite or Create React App, this change won't work out-of-the-box. This is a recommendation for transitioning to a more standard, production-ready setup.*

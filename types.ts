@@ -55,3 +55,24 @@ export interface Metrics {
     totalLinks: number;
     totalDownloads: number;
 }
+
+export interface CastMember {
+  id: number;
+  name: string;
+  character: string;
+  profile_path: string | null;
+}
+
+export interface CreditsResponse {
+  cast: CastMember[];
+}
+
+export interface PersonDetails {
+    id: number;
+    name: string;
+    biography: string;
+    profile_path: string | null;
+    known_for_department: string;
+}
+
+export type PersonCredit = (MovieSummary | TVSummary) & { media_type: 'movie' | 'tv' };

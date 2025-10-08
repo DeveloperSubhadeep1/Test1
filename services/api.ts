@@ -6,6 +6,9 @@ import {
   ContentType,
   StoredMovie,
   Metrics,
+  CreditsResponse,
+  PersonDetails,
+  PersonCredit
 } from '../types';
 import { TMDB_API_KEY, TMDB_API_BASE_URL, MONGO_URI } from '../constants';
 
@@ -37,8 +40,40 @@ export const getTrending = async (type: ContentType, page: number = 1): Promise<
     return tmdbFetch(`/trending/${type}/week`, { page: page.toString() });
 };
 
+export const getDiscover = async (type: ContentType, page: number = 1, sortBy: string = 'popularity.desc'): Promise<{ results: any[] }> => {
+    const params: Record<string, string> = {
+        page: page.toString(),
+        sort_by: sortBy,
+    };
+
+    // Add a vote count threshold for top-rated queries to ensure quality
+    if (sortBy === 'vote_average.desc') {
+        params['vote_count.gte'] = '300';
+    }
+
+    return tmdbFetch(`/discover/${type}`, params);
+};
+
+
 export const getDetails = async (type: ContentType, id: number): Promise<MovieDetail | TVDetail> => {
     return tmdbFetch(`/${type}/${id}`);
+};
+
+export const getCredits = async (type: ContentType, id: number): Promise<CreditsResponse> => {
+    return tmdbFetch(`/${type}/${id}/credits`);
+};
+
+export const getPersonDetails = async (id: number): Promise<PersonDetails> => {
+    return tmdbFetch(`/person/${id}`);
+};
+
+export const getPersonCredits = async (id: number): Promise<{ cast: PersonCredit[] }> => {
+    const data = await tmdbFetch(`/person/${id}/combined_credits`);
+    // Filter out items without posters and sort by popularity for better "Known For" results
+    const filteredCredits = data.cast.filter(
+        (item: any) => (item.media_type === 'movie' || item.media_type === 'tv') && item.poster_path
+    ).sort((a: any, b: any) => b.popularity - a.popularity);
+    return { cast: filteredCredits };
 };
 
 

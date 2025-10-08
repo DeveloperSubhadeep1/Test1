@@ -10,6 +10,7 @@ import DetailsPage from './pages/DetailsPage';
 import SearchResultsPage from './pages/SearchResultsPage';
 import AdminPage from './pages/AdminPage';
 import FavoritesPage from './pages/FavoritesPage';
+import PersonPage from './pages/PersonPage';
 
 const App: React.FC = () => {
   return (
@@ -25,6 +26,7 @@ const App: React.FC = () => {
                 <Route path="/search/:query" element={<SearchResultsPage />} />
                 <Route path="/movie/:id" element={<DetailsPage type="movie" />} />
                 <Route path="/tv/:id" element={<DetailsPage type="tv" />} />
+                <Route path="/person/:id" element={<PersonPage />} />
                 <Route path="/admin" element={<AdminPage />} />
               </Routes>
             </main>

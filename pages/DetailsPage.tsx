@@ -1,12 +1,12 @@
-
 import React, { useEffect, useState, useContext } from 'react';
 import { useParams } from 'react-router-dom';
-import { getDetails, getStoredMovie, incrementDownloadCount } from '../services/api';
-import { ContentType, MovieDetail, StoredMovie, TVDetail, MovieSummary, TVSummary } from '../types';
+import { getDetails, getStoredMovie, incrementDownloadCount, getCredits } from '../services/api';
+import { ContentType, MovieDetail, StoredMovie, TVDetail, MovieSummary, TVSummary, CastMember } from '../types';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
 import { FavoritesContext } from '../context/FavoritesContext';
 import Spinner from '../components/Spinner';
 import AdPlaceholder from '../components/AdPlaceholder';
+import CastCard from '../components/CastCard';
 import { StarIcon, CalendarIcon, ClockIcon, DownloadIcon, HeartIcon } from '../components/Icons';
 
 interface DetailsPageProps {
@@ -16,6 +16,7 @@ interface DetailsPageProps {
 const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   const { id } = useParams<{ id: string }>();
   const [details, setDetails] = useState<MovieDetail | TVDetail | null>(null);
+  const [cast, setCast] = useState<CastMember[]>([]);
   const [storedMovie, setStoredMovie] = useState<StoredMovie | null>(null);
   const [loading, setLoading] = useState(true);
   const { addFavorite, removeFavorite, isFavorite } = useContext(FavoritesContext);
@@ -26,12 +27,14 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
       try {
         setLoading(true);
         const tmdbId = parseInt(id, 10);
-        const [detailsData, storedData] = await Promise.all([
+        const [detailsData, storedData, creditsData] = await Promise.all([
           getDetails(type, tmdbId),
-          getStoredMovie(tmdbId)
+          getStoredMovie(tmdbId),
+          getCredits(type, tmdbId)
         ]);
         setDetails(detailsData);
         setStoredMovie(storedData);
+        setCast(creditsData.cast.slice(0, 18)); // Get top 18 cast members for the grid
       } catch (error) {
         console.error('Failed to fetch details:', error);
       } finally {
@@ -114,6 +117,17 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
         </div>
         <h2 className="text-xl font-semibold mt-6 mb-2">Overview</h2>
         <p className="text-gray-300 leading-relaxed">{details.overview}</p>
+
+        {cast.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-xl font-semibold mb-4">Cast</h2>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+              {cast.map(person => (
+                <CastCard key={person.id} person={person} />
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="mt-8">
           <AdPlaceholder width="w-full" height="h-24" label="In-article Ad" />
