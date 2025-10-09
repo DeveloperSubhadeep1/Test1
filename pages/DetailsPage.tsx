@@ -29,7 +29,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
         const tmdbId = parseInt(id, 10);
         const [detailsData, storedData, creditsData] = await Promise.all([
           getDetails(type, tmdbId),
-          getStoredMovie(tmdbId),
+          getStoredMovie(tmdbId, type),
           getCredits(type, tmdbId)
         ]);
         setDetails(detailsData);
@@ -44,9 +44,9 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
     fetchDetails();
   }, [id, type]);
 
-  const handleDownloadClick = (url: string) => {
+  const handleDownloadClick = async (url: string) => {
     if (storedMovie) {
-      incrementDownloadCount(storedMovie._id);
+      await incrementDownloadCount(storedMovie._id);
       window.open(url, '_blank');
     }
   };

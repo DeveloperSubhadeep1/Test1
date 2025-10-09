@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { getDiscover } from '../services/api';
 import { MovieSummary, TVSummary } from '../types';
 import MovieCard from '../components/MovieCard';
@@ -42,8 +42,10 @@ const HomePage: React.FC = () => {
   const [movieSort, setMovieSort] = useState('popularity.desc');
   const [tvSort, setTvSort] = useState('popularity.desc');
 
-  useEffect(() => {
-    const fetchInitialData = async () => {
+  const movieObserver = useRef<IntersectionObserver>();
+  const tvObserver = useRef<IntersectionObserver>();
+
+  const fetchInitialData = useCallback(async () => {
       try {
         setLoading(true);
         const [movies, tvShows] = await Promise.all([
@@ -59,13 +61,15 @@ const HomePage: React.FC = () => {
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchInitialData();
   }, [movieSort, tvSort]);
 
-  const handleLoadMore = async (type: 'movie' | 'tv') => {
+  useEffect(() => {
+    fetchInitialData();
+  }, [fetchInitialData]);
+
+  const handleLoadMore = useCallback(async (type: 'movie' | 'tv') => {
     if (type === 'movie') {
+      if (loadingMoreMovies) return;
       setLoadingMoreMovies(true);
       try {
         const nextPage = moviePage + 1;
@@ -78,6 +82,7 @@ const HomePage: React.FC = () => {
         setLoadingMoreMovies(false);
       }
     } else {
+      if (loadingMoreTV) return;
       setLoadingMoreTV(true);
       try {
         const nextPage = tvPage + 1;
@@ -90,7 +95,29 @@ const HomePage: React.FC = () => {
         setLoadingMoreTV(false);
       }
     }
-  };
+  }, [loadingMoreMovies, moviePage, movieSort, loadingMoreTV, tvPage, tvSort]);
+
+  const movieLoaderRef = useCallback(node => {
+    if (loadingMoreMovies) return;
+    if (movieObserver.current) movieObserver.current.disconnect();
+    movieObserver.current = new IntersectionObserver(entries => {
+        if (entries[0].isIntersecting) {
+            handleLoadMore('movie');
+        }
+    });
+    if (node) movieObserver.current.observe(node);
+  }, [loadingMoreMovies, handleLoadMore]);
+
+  const tvLoaderRef = useCallback(node => {
+      if (loadingMoreTV) return;
+      if (tvObserver.current) tvObserver.current.disconnect();
+      tvObserver.current = new IntersectionObserver(entries => {
+          if (entries[0].isIntersecting) {
+              handleLoadMore('tv');
+          }
+      });
+      if (node) tvObserver.current.observe(node);
+  }, [loadingMoreTV, handleLoadMore]);
 
   const handleSortChange = (type: 'movie' | 'tv', newSort: string) => {
     if (type === 'movie') {
@@ -120,22 +147,8 @@ const HomePage: React.FC = () => {
             <MovieCard key={movie.id} item={movie} type="movie" />
           ))}
         </div>
-        <div className="text-center mt-8">
-            <button
-                onClick={() => handleLoadMore('movie')}
-                disabled={loadingMoreMovies}
-                className="bg-accent text-white font-bold py-2 px-6 rounded-full hover:bg-blue-500 transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center justify-center mx-auto min-w-[190px]"
-            >
-                {loadingMoreMovies ? (
-                    <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
-                        <span>Loading...</span>
-                    </>
-                ) : (
-                    'Load More Movies'
-                )}
-            </button>
-        </div>
+        <div ref={movieLoaderRef} className="h-10" />
+        {loadingMoreMovies && <Spinner />}
       </section>
       
       <section>
@@ -148,22 +161,8 @@ const HomePage: React.FC = () => {
             <MovieCard key={tv.id} item={tv} type="tv" />
           ))}
         </div>
-        <div className="text-center mt-8">
-            <button
-                onClick={() => handleLoadMore('tv')}
-                disabled={loadingMoreTV}
-                className="bg-accent text-white font-bold py-2 px-6 rounded-full hover:bg-blue-500 transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center justify-center mx-auto min-w-[190px]"
-            >
-                {loadingMoreTV ? (
-                     <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
-                        <span>Loading...</span>
-                    </>
-                ) : (
-                    'Load More TV Shows'
-                )}
-            </button>
-        </div>
+        <div ref={tvLoaderRef} className="h-10" />
+        {loadingMoreTV && <Spinner />}
       </section>
     </div>
   );

@@ -10,7 +10,7 @@ import {
   PersonDetails,
   PersonCredit
 } from '../types';
-import { TMDB_API_KEY, TMDB_API_BASE_URL, MONGO_URI } from '../constants';
+import { TMDB_API_KEY, TMDB_API_BASE_URL } from '../constants';
 
 // --- Live TMDB API ---
 const tmdbFetch = async (endpoint: string, params: Record<string, string> = {}) => {
@@ -77,101 +77,102 @@ export const getPersonCredits = async (id: number): Promise<{ cast: PersonCredit
 };
 
 
-// --- Backend Database Simulation ---
-// NOTE: In a production app, this client would be a real backend server (e.g., Node.js/Express)
-// that securely connects to the MongoDB database using the MONGO_URI. The frontend would
-// then make `fetch` calls to that server's API endpoints.
+// --- Backend Database Service (using browser localStorage) ---
 
-class MockDatabaseClient {
-  private movies: StoredMovie[];
-  private downloadCount: number;
-
-  constructor(uri: string) {
-    console.log(`Simulating connection to database with URI: ${uri}`);
-    // Initialize with some default data
-    this.movies = [
-      {_id: '1', tmdb_id: 550, type: 'movie', title: 'Fight Club', download_links: [{label: '1080p BluRay', url: '#'}, {label: '720p WEB-DL', url: '#'}]},
-      {_id: '2', tmdb_id: 1399, type: 'tv', title: 'Game of Thrones', download_links: [{label: 'S01-S08 Complete', url: '#'}]},
-    ];
-    this.downloadCount = 50;
-    console.log("Mock Database Client connected and initialized.");
-  }
-
-  private simulateDelay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
-  async findMovieByTmdbId(tmdbId: number): Promise<StoredMovie | null> {
-    await this.simulateDelay(100);
-    return this.movies.find(m => m.tmdb_id === tmdbId) || null;
-  }
-
-  async getAllMovies(): Promise<StoredMovie[]> {
-    await this.simulateDelay(400);
-    return [...this.movies].sort((a,b) => a.title.localeCompare(b.title));
-  }
-
-  async saveMovie(movie: Omit<StoredMovie, '_id'>): Promise<StoredMovie> {
-    await this.simulateDelay(500);
-    const existing = this.movies.find(m => m.tmdb_id === movie.tmdb_id);
-    if (existing) {
-        // Update existing movie's links
-        existing.download_links = movie.download_links;
-        return existing;
-    }
-    const newMovie: StoredMovie = {
-        _id: Date.now().toString(),
-        ...movie,
-    };
-    this.movies.push(newMovie);
-    return newMovie;
-  }
-
-  async deleteMovieById(id: string): Promise<void> {
-    await this.simulateDelay(500);
-    this.movies = this.movies.filter(m => m._id !== id);
-  }
-
-  async getMetrics(): Promise<Metrics> {
-    await this.simulateDelay(200);
-    return {
-        totalLinks: this.movies.length,
-        totalDownloads: this.downloadCount,
-    };
-  }
-  
-  incrementDownloads(movieId: string) {
-    // This simulates a backend operation. No delay needed for this simple task.
-    this.downloadCount++;
-    console.log(`Download count incremented for movie ${movieId}. New total: ${this.downloadCount}`);
-  }
+interface DbData {
+    movies: StoredMovie[];
+    downloadCount: number;
 }
 
-// Initialize our mock database client with the URI from constants
-const dbClient = new MockDatabaseClient(MONGO_URI);
+const LOCAL_DB_KEY = 'cineStreamLocalDb';
+
+// Helper to update the entire database content in localStorage
+const updateDbContent = async (data: DbData): Promise<boolean> => {
+    try {
+        localStorage.setItem(LOCAL_DB_KEY, JSON.stringify(data));
+        return true;
+    } catch (error) {
+        console.error("Database write error (localStorage):", error);
+        return false;
+    }
+};
+
+// Helper to fetch the entire database content from localStorage
+const getDbContent = async (): Promise<DbData> => {
+    const defaultData: DbData = { movies: [], downloadCount: 0 };
+    try {
+        const storedData = localStorage.getItem(LOCAL_DB_KEY);
+        if (storedData) {
+            const data = JSON.parse(storedData);
+            // Basic validation to ensure the data structure is correct
+            if (data && Array.isArray(data.movies) && typeof data.downloadCount === 'number') {
+                 return data;
+            }
+        }
+        console.warn("Local database is malformed or empty. Using default structure.");
+        return defaultData;
+    } catch (error) {
+        console.error("Database read error (localStorage):", error);
+        return defaultData;
+    }
+};
 
 // --- Exported API Functions ---
-// These functions are what the rest of our frontend application uses.
-// They call the methods on our `dbClient`, simulating calls to a backend API.
 
-export const getStoredMovie = (tmdbId: number): Promise<StoredMovie | null> => {
-    return dbClient.findMovieByTmdbId(tmdbId);
+export const getStoredMovie = async (tmdbId: number, type: ContentType): Promise<StoredMovie | null> => {
+    const { movies } = await getDbContent();
+    return movies.find(m => m.tmdb_id === tmdbId && m.type === type) || null;
 };
 
-export const getStoredMovies = (): Promise<StoredMovie[]> => {
-    return dbClient.getAllMovies();
+export const getStoredMovies = async (): Promise<StoredMovie[]> => {
+    const { movies } = await getDbContent();
+    return [...movies].sort((a,b) => a.title.localeCompare(b.title));
 };
 
-export const addStoredMovie = (movie: Omit<StoredMovie, '_id'>): Promise<StoredMovie> => {
-    return dbClient.saveMovie(movie);
+export const addStoredMovie = async (movie: Omit<StoredMovie, '_id'>): Promise<StoredMovie | null> => {
+    const db = await getDbContent();
+    const existingIndex = db.movies.findIndex(m => m.tmdb_id === movie.tmdb_id && m.type === movie.type);
+    
+    let savedMovie: StoredMovie;
+
+    if (existingIndex > -1) {
+        // Update existing movie's links
+        db.movies[existingIndex].download_links = movie.download_links;
+        savedMovie = db.movies[existingIndex];
+    } else {
+        // Add new movie
+        const newMovie: StoredMovie = { _id: Date.now().toString(), ...movie };
+        db.movies.push(newMovie);
+        savedMovie = newMovie;
+    }
+    
+    const success = await updateDbContent(db);
+    return success ? savedMovie : null;
 };
 
-export const deleteStoredMovie = (id: string): Promise<void> => {
-    return dbClient.deleteMovieById(id);
+export const deleteStoredMovie = async (id: string): Promise<boolean> => {
+    const db = await getDbContent();
+    const initialLength = db.movies.length;
+    db.movies = db.movies.filter(m => m._id !== id);
+    if (db.movies.length < initialLength) {
+        return await updateDbContent(db);
+    }
+    return false; // Return false if no movie was found with that ID
 };
 
-export const getMetrics = (): Promise<Metrics> => {
-    return dbClient.getMetrics();
+export const getMetrics = async (): Promise<Metrics> => {
+    const db = await getDbContent();
+    return {
+        totalLinks: db.movies.length,
+        totalDownloads: db.downloadCount,
+    };
 };
 
-export const incrementDownloadCount = (movieId: string) => {
-    dbClient.incrementDownloads(movieId);
+export const incrementDownloadCount = async (movieId: string): Promise<void> => {
+    const db = await getDbContent();
+    db.downloadCount++;
+    const success = await updateDbContent(db);
+    if (!success) {
+      console.error(`Failed to increment download count for movie ${movieId}.`);
+    }
 };

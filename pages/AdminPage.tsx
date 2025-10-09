@@ -1,4 +1,3 @@
-
 import React, { useState, useContext, useEffect, useCallback } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { getMetrics, getStoredMovies, addStoredMovie, deleteStoredMovie, searchTMDB } from '../services/api';
@@ -82,8 +81,12 @@ const AdminDashboard: React.FC = () => {
 
     const handleDelete = async (id: string) => {
         if (window.confirm("Are you sure you want to delete this entry?")) {
-            await deleteStoredMovie(id);
-            await refreshData();
+            const success = await deleteStoredMovie(id);
+            if(success) {
+                await refreshData();
+            } else {
+                alert('Error: Could not delete the entry. The database might be temporarily unavailable.');
+            }
         }
     }
 
@@ -135,6 +138,7 @@ const AddMovieForm: React.FC<{onMovieAdded: () => void}> = ({onMovieAdded}) => {
     const [searchResults, setSearchResults] = useState<(MovieSummary | TVSummary)[]>([]);
     const [selectedMovie, setSelectedMovie] = useState<(MovieSummary | TVSummary) | null>(null);
     const [links, setLinks] = useState<DownloadLink[]>([{ label: '', url: '' }]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         const fetchMovies = async () => {
@@ -181,15 +185,24 @@ const AddMovieForm: React.FC<{onMovieAdded: () => void}> = ({onMovieAdded}) => {
             return;
         }
 
+        setIsSubmitting(true);
+
         const newMovie: Omit<StoredMovie, '_id'> = {
             tmdb_id: selectedMovie.id,
             title: 'title' in selectedMovie ? selectedMovie.title : selectedMovie.name,
             type: 'title' in selectedMovie ? 'movie' : 'tv',
             download_links: links.filter(link => link.label && link.url),
         };
-        await addStoredMovie(newMovie);
-        resetForm();
-        onMovieAdded();
+        
+        const result = await addStoredMovie(newMovie);
+        setIsSubmitting(false);
+
+        if (result) {
+            resetForm();
+            onMovieAdded();
+        } else {
+            alert('Error: Could not add the movie. The database might be temporarily unavailable.');
+        }
     };
 
 
@@ -252,7 +265,9 @@ const AddMovieForm: React.FC<{onMovieAdded: () => void}> = ({onMovieAdded}) => {
                     </button>
                 </div>
                 
-                <button type="submit" disabled={!selectedMovie} className="w-full bg-highlight text-white font-bold py-2 px-4 rounded-md hover:bg-green-600 transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed">Add Movie</button>
+                <button type="submit" disabled={!selectedMovie || isSubmitting} className="w-full bg-highlight text-white font-bold py-2 px-4 rounded-md hover:bg-green-600 transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed">
+                    {isSubmitting ? 'Adding...' : 'Add Movie'}
+                </button>
             </form>
         </section>
     );
