@@ -5,6 +5,7 @@ import { SearchIcon, ClockIcon, XIcon } from './Icons';
 import { searchTMDB } from '../services/api';
 import { MovieSummary, TVSummary } from '../types';
 import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
+import { generateSlug } from '../utils';
 
 const RECENT_SEARCHES_KEY = 'cineStreamRecentSearches';
 const MAX_RECENT_SEARCHES = 5;
@@ -155,7 +156,9 @@ const SearchBar: React.FC = () => {
           e.preventDefault();
           const selected = suggestions[activeIndex];
           const type = (selected as any).media_type;
-          navigate(`/${type}/${selected.id}`);
+          const title = type === 'movie' ? (selected as MovieSummary).title : (selected as TVSummary).name;
+          const slug = generateSlug(selected.id, title);
+          navigate(`/${type}/${slug}`);
           setShowSuggestions(false);
         }
       } else if (e.key === 'Escape') {
@@ -240,11 +243,12 @@ const SearchBar: React.FC = () => {
                 const releaseDate = type === 'movie' ? (item as MovieSummary).release_date : (item as TVSummary).first_air_date;
                 const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
                 const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : 'https://picsum.photos/50/75';
+                const slug = generateSlug(item.id, title);
 
                 return (
                   <li key={item.id} className={`${index === activeIndex ? 'bg-primary' : ''}`}>
                     <Link
-                      to={`/${type}/${item.id}`}
+                      to={`/${type}/${slug}`}
                       onClick={clearSuggestions}
                       className="p-3 hover:bg-primary flex items-center space-x-4 cursor-pointer"
                     >

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useContext } from 'react';
 import { useParams } from 'react-router-dom';
 import { getDetails, getStoredMovie, incrementDownloadCount, getCredits } from '../services/api';
@@ -7,6 +6,7 @@ import { TMDB_IMAGE_BASE_URL } from '../constants';
 import { FavoritesContext } from '../context/FavoritesContext';
 import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
+import { getIdFromSlug } from '../utils';
 import Spinner from '../components/Spinner';
 import AdPlaceholder from '../components/AdPlaceholder';
 import CastCard from '../components/CastCard';
@@ -17,7 +17,7 @@ interface DetailsPageProps {
 }
 
 const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const [details, setDetails] = useState<MovieDetail | TVDetail | null>(null);
   const [cast, setCast] = useState<CastMember[]>([]);
   const [storedMovie, setStoredMovie] = useState<StoredMovie | null>(null);
@@ -31,13 +31,16 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   usePageMetadata({
     title: title || 'Loading...',
     description: details?.overview || '',
-    path: `/${type}/${id}`,
+    path: `/${type}/${slug}`,
     imageUrl: posterPath,
   });
 
   useEffect(() => {
     const fetchDetails = async () => {
+      if (!slug) return;
+      const id = getIdFromSlug(slug);
       if (!id) return;
+      
       try {
         setLoading(true);
         const tmdbId = parseInt(id, 10);
@@ -57,7 +60,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
       }
     };
     fetchDetails();
-  }, [id, type, addToast]);
+  }, [slug, type, addToast]);
   
   // Effect for JSON-LD structured data
   useEffect(() => {

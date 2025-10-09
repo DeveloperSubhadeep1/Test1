@@ -1,9 +1,9 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { MovieSummary, TVSummary } from '../types';
 import { TMDB_IMAGE_BASE_URL_MEDIUM } from '../constants';
 import { StarIcon, CalendarIcon } from './Icons';
+import { generateSlug } from '../utils';
 
 interface MovieCardProps {
   item: MovieSummary | TVSummary;
@@ -15,7 +15,8 @@ const MovieCard: React.FC<MovieCardProps> = ({ item, type }) => {
   const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
   const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
   const rating = item.vote_average.toFixed(1);
-  const linkTo = `/${type}/${item.id}`;
+  const slug = generateSlug(item.id, title);
+  const linkTo = `/${type}/${slug}`;
 
   const posterUrl = item.poster_path
     ? `${TMDB_IMAGE_BASE_URL_MEDIUM}${item.poster_path}`

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { getPersonDetails, getPersonCredits } from '../services/api';
@@ -6,12 +5,13 @@ import { PersonDetails, PersonCredit } from '../types';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
 import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
+import { getIdFromSlug } from '../utils';
 import Spinner from '../components/Spinner';
 import MovieCard from '../components/MovieCard';
 import { UserIcon } from '../components/Icons';
 
 const PersonPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const [person, setPerson] = useState<PersonDetails | null>(null);
   const [credits, setCredits] = useState<PersonCredit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,13 +22,16 @@ const PersonPage: React.FC = () => {
   usePageMetadata({
     title: person?.name || 'Loading...',
     description: `View the biography and filmography for ${person?.name || 'this person'}.`,
-    path: `/person/${id}`,
+    path: `/person/${slug}`,
     imageUrl: profilePath,
   });
 
   useEffect(() => {
     const fetchPersonData = async () => {
+      if (!slug) return;
+      const id = getIdFromSlug(slug);
       if (!id) return;
+
       try {
         setLoading(true);
         const personId = parseInt(id, 10);
@@ -47,7 +50,7 @@ const PersonPage: React.FC = () => {
     };
 
     fetchPersonData();
-  }, [id, addToast]);
+  }, [slug, addToast]);
 
   if (loading) return <Spinner />;
   if (!person) return <p>Person not found.</p>;

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
@@ -27,9 +26,9 @@ const App: React.FC = () => {
                   <Route path="/" element={<HomePage />} />
                   <Route path="/favorites" element={<FavoritesPage />} />
                   <Route path="/search/:query" element={<SearchResultsPage />} />
-                  <Route path="/movie/:id" element={<DetailsPage type="movie" />} />
-                  <Route path="/tv/:id" element={<DetailsPage type="tv" />} />
-                  <Route path="/person/:id" element={<PersonPage />} />
+                  <Route path="/movie/:slug" element={<DetailsPage type="movie" />} />
+                  <Route path="/tv/:slug" element={<DetailsPage type="tv" />} />
+                  <Route path="/person/:slug" element={<PersonPage />} />
                   <Route path="/admin" element={<AdminPage />} />
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
