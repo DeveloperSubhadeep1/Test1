@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { getDiscover } from '../services/api';
 import { MovieSummary, TVSummary } from '../types';
@@ -5,7 +6,7 @@ import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import MovieCard from '../components/MovieCard';
 import Spinner from '../components/Spinner';
-import AdPlaceholder from '../components/AdPlaceholder';
+import TelegramPromo from '../components/TelegramPromo';
 
 const SortFilter: React.FC<{
   currentSort: string;
@@ -130,7 +131,7 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="space-y-12">
-      <AdPlaceholder width="w-full max-w-4xl" height="h-24" label="Leaderboard Ad" />
+      <TelegramPromo />
       <section>
         <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-4">
             <h1 className="text-3xl font-bold border-l-4 border-accent pl-4">Discover</h1>

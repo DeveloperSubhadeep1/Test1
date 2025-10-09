@@ -5,7 +5,6 @@ import {
   TVDetail,
   ContentType,
   StoredMovie,
-  SupportTicket,
   Metrics,
   CreditsResponse,
   PersonDetails,
@@ -104,7 +103,6 @@ export const getPersonCredits = async (id: number): Promise<{ cast: PersonCredit
 interface DbData {
     movies: StoredMovie[];
     downloadCount: number;
-    supportTickets: SupportTicket[];
 }
 
 const LOCAL_DB_KEY = 'cineStreamLocalDb';
@@ -121,14 +119,13 @@ const updateDbContent = async (data: DbData): Promise<void> => {
 
 // Helper to fetch the entire database content from localStorage
 const getDbContent = async (): Promise<DbData> => {
-    const defaultData: DbData = { movies: [], downloadCount: 0, supportTickets: [] };
+    const defaultData: DbData = { movies: [], downloadCount: 0 };
     try {
         const storedData = localStorage.getItem(LOCAL_DB_KEY);
         if (storedData) {
             const data = JSON.parse(storedData);
-            // Basic validation to ensure the loaded data has the expected shape
             if (data && Array.isArray(data.movies) && typeof data.downloadCount === 'number') {
-                 return { ...defaultData, ...data };
+                 return data;
             }
         }
         return defaultData;
@@ -184,42 +181,11 @@ export const getMetrics = async (): Promise<Metrics> => {
     return {
         totalLinks: db.movies.length,
         totalDownloads: db.downloadCount,
-        totalSupportTickets: db.supportTickets.length
     };
 };
 
 export const incrementDownloadCount = async (movieId: string): Promise<void> => {
     const db = await getDbContent();
     db.downloadCount++;
-    await updateDbContent(db);
-};
-
-// --- Support Ticket Functions ---
-
-export const addSupportTicket = async (ticketData: Omit<SupportTicket, '_id' | 'timestamp'>): Promise<SupportTicket> => {
-    const db = await getDbContent();
-    const newTicket: SupportTicket = {
-        _id: Date.now().toString(),
-        timestamp: new Date().toISOString(),
-        ...ticketData
-    };
-    db.supportTickets.push(newTicket);
-    await updateDbContent(db);
-    return newTicket;
-};
-
-export const getSupportTickets = async (): Promise<SupportTicket[]> => {
-    const { supportTickets } = await getDbContent();
-    // Return newest tickets first
-    return [...supportTickets].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-};
-
-export const deleteSupportTicket = async (id: string): Promise<void> => {
-    const db = await getDbContent();
-    const initialLength = db.supportTickets.length;
-    db.supportTickets = db.supportTickets.filter(t => t._id !== id);
-    if (db.supportTickets.length === initialLength) {
-        throw new Error("Could not find the support ticket to delete.");
-    }
     await updateDbContent(db);
 };

@@ -4,13 +4,12 @@ import { getDetails, getStoredMovie, incrementDownloadCount, getCredits, findIdB
 import { ContentType, MovieDetail, StoredMovie, TVDetail, MovieSummary, TVSummary, CastMember } from '../types';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
 import { FavoritesContext } from '../context/FavoritesContext';
-import { WatchlistContext } from '../context/WatchlistContext';
 import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import Spinner from '../components/Spinner';
 import AdPlaceholder from '../components/AdPlaceholder';
 import CastCard from '../components/CastCard';
-import { StarIcon, CalendarIcon, ClockIcon, DownloadIcon, HeartIcon, BookmarkIcon } from '../components/Icons';
+import { StarIcon, CalendarIcon, ClockIcon, DownloadIcon, HeartIcon } from '../components/Icons';
 
 interface DetailsPageProps {
   type: ContentType;
@@ -23,7 +22,6 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   const [storedMovie, setStoredMovie] = useState<StoredMovie | null>(null);
   const [loading, setLoading] = useState(true);
   const { addFavorite, removeFavorite, isFavorite } = useContext(FavoritesContext);
-  const { addToWatchlist, removeFromWatchlist, isOnWatchlist } = useContext(WatchlistContext);
   const { addToast } = useToast();
   
   const title = details ? ('title' in details ? details.title : details.name) : '';
@@ -124,7 +122,9 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
 
   const handleFavoriteToggle = () => {
     if (!details) return;
+
     const favoriteItem = { ...details, type: type } as (MovieSummary | TVSummary) & {type: ContentType};
+    
     if (isFavorite(details.id)) {
       removeFavorite(details.id);
     } else {
@@ -132,21 +132,10 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
     }
   };
 
-  const handleWatchlistToggle = () => {
-    if (!details) return;
-    const watchlistItem = { ...details, type: type } as (MovieSummary | TVSummary) & {type: ContentType};
-    if (isOnWatchlist(details.id)) {
-      removeFromWatchlist(details.id);
-    } else {
-      addToWatchlist(watchlistItem);
-    }
-  };
-
   if (loading) return <Spinner />;
   if (!details) return <p>Content not found.</p>;
   
   const isFav = isFavorite(details.id);
-  const onWl = isOnWatchlist(details.id);
   const releaseDate = 'release_date' in details ? details.release_date : details.first_air_date;
   const runtime = 'runtime' in details ? details.runtime : (details.episode_run_time?.[0] || 0);
 
@@ -160,26 +149,16 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
         <img src={posterUrl} alt={title} className="rounded-lg shadow-2xl w-full object-cover aspect-[2/3]" />
       </div>
       <div className="md:w-2/3">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between">
             <h1 className="text-4xl font-bold text-white">{title}</h1>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={handleWatchlistToggle}
-                title={onWl ? 'Remove from watchlist' : 'Add to watchlist'}
-                className="p-2 bg-secondary rounded-full hover:bg-gray-700 transition-colors"
-                aria-label="Toggle Watchlist"
-              >
-                <BookmarkIcon className={`h-6 w-6 transition-all ${onWl ? 'fill-accent stroke-accent' : 'text-muted'}`} />
-              </button>
-              <button
-                onClick={handleFavoriteToggle}
-                title={isFav ? 'Remove from favorites' : 'Add to favorites'}
-                className="p-2 bg-secondary rounded-full hover:bg-gray-700 transition-colors"
-                aria-label="Toggle Favorite"
-              >
-                <HeartIcon className={`h-6 w-6 transition-all ${isFav ? 'fill-red-500 stroke-red-500' : 'text-muted'}`} />
-              </button>
-            </div>
+            <button
+              onClick={handleFavoriteToggle}
+              title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+              className="p-2 bg-secondary rounded-full hover:bg-gray-700 transition-colors"
+              aria-label="Toggle Favorite"
+            >
+              <HeartIcon className={`h-6 w-6 transition-all ${isFav ? 'fill-red-500 stroke-red-500' : 'text-muted'}`} />
+            </button>
         </div>
 
         {details.tagline && <p className="text-muted italic mt-1">"{details.tagline}"</p>}

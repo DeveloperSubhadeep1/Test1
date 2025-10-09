@@ -1,15 +1,10 @@
 
-import React, { useContext } from 'react';
+import React from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import SearchBar from './SearchBar';
-import { FilmIcon, UserIcon } from './Icons';
-import { ProfileContext } from '../context/ProfileContext';
-import { Avatar } from './Avatars';
-
+import { FilmIcon } from './Icons';
 
 const Header: React.FC = () => {
-  const { profile } = useContext(ProfileContext);
-
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
       isActive ? 'bg-secondary text-white' : 'text-muted hover:bg-secondary hover:text-white'
@@ -27,28 +22,11 @@ const Header: React.FC = () => {
             <nav className="hidden md:flex items-center space-x-4">
               <NavLink to="/" className={navLinkClass}>Home</NavLink>
               <NavLink to="/favorites" className={navLinkClass}>Favorites</NavLink>
-              <NavLink to="/watchlist" className={navLinkClass}>Watchlist</NavLink>
               <NavLink to="/admin" className={navLinkClass}>Admin</NavLink>
             </nav>
           </div>
-          <div className="flex items-center space-x-4">
-            <div className="w-full max-w-xs">
-              <SearchBar />
-            </div>
-            <NavLink
-              to="/profile"
-              className={({ isActive }) => `flex items-center gap-2 p-1.5 rounded-full transition-colors ${
-                isActive ? 'bg-secondary' : 'hover:bg-secondary'
-              }`}
-              aria-label="View Profile"
-            >
-              {profile ? (
-                <Avatar avatarId={profile.avatarId} className="h-8 w-8 rounded-full" />
-              ) : (
-                <UserIcon className="h-8 w-8 text-muted" />
-              )}
-              <span className="hidden lg:inline text-white font-medium pr-2">{profile?.username || 'Profile'}</span>
-            </NavLink>
+          <div className="w-full max-w-xs">
+            <SearchBar />
           </div>
         </div>
       </div>

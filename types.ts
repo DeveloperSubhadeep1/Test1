@@ -1,3 +1,4 @@
+
 export interface MovieSummary {
   id: number;
   title: string;
@@ -39,8 +40,6 @@ export type ContentType = 'movie' | 'tv';
 
 export type FavoriteItem = (MovieSummary | TVSummary) & { type: ContentType };
 
-export type WatchlistItem = (MovieSummary | TVSummary) & { type: ContentType };
-
 export interface DownloadLink {
   label: string;
   url: string;
@@ -54,18 +53,9 @@ export interface StoredMovie {
   download_links: DownloadLink[];
 }
 
-export interface SupportTicket {
-  _id: string;
-  subject: string;
-  contentTitle?: string;
-  message: string;
-  timestamp: string; // ISO Date String
-}
-
 export interface Metrics {
     totalLinks: number;
     totalDownloads: number;
-    totalSupportTickets: number;
 }
 
 export interface CastMember {
@@ -88,8 +78,3 @@ export interface PersonDetails {
 }
 
 export type PersonCredit = (MovieSummary | TVSummary) & { media_type: 'movie' | 'tv' };
-
-export interface UserProfile {
-  username: string;
-  avatarId: string;
-}
