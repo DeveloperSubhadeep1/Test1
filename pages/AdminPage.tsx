@@ -1,13 +1,13 @@
-import React, { useState, useContext, useEffect, useCallback } from 'react';
+import React, { useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import { getMetrics, getStoredMovies, addStoredMovie, deleteStoredMovie, searchTMDB } from '../services/api';
-import { StoredMovie, MovieSummary, TVSummary, DownloadLink, Metrics } from '../types';
+import { getMetrics, getStoredMovies, addStoredMovie, deleteStoredMovie, searchTMDB, getSupportTickets, deleteSupportTicket } from '../services/api';
+import { StoredMovie, MovieSummary, TVSummary, DownloadLink, Metrics, SupportTicket } from '../types';
 import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import Spinner from '../components/Spinner';
 import { useDebounce } from '../hooks/useDebounce';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
-import { TrashIcon, PlusCircleIcon } from '../components/Icons';
+import { TrashIcon, PlusCircleIcon, ArrowUpIcon, ArrowDownIcon } from '../components/Icons';
 
 const AdminPage: React.FC = () => {
     const { isAuthenticated, login, logout } = useContext(AuthContext);
@@ -78,21 +78,34 @@ const AdminPage: React.FC = () => {
     );
 };
 
+type SortKey = 'title' | 'links';
+type SortDirection = 'ascending' | 'descending';
+
+interface SortConfig {
+    key: SortKey;
+    direction: SortDirection;
+}
+
+const ITEMS_PER_PAGE = 10;
+
 const AdminDashboard: React.FC = () => {
     const [metrics, setMetrics] = useState<Metrics | null>(null);
     const [storedMovies, setStoredMovies] = useState<StoredMovie[]>([]);
+    const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
     const [loading, setLoading] = useState(true);
     const { addToast } = useToast();
 
     const refreshData = useCallback(async () => {
         setLoading(true);
         try {
-            const [metricsData, moviesData] = await Promise.all([
+            const [metricsData, moviesData, ticketsData] = await Promise.all([
                 getMetrics(),
-                getStoredMovies()
+                getStoredMovies(),
+                getSupportTickets(),
             ]);
             setMetrics(metricsData);
             setStoredMovies(moviesData);
+            setSupportTickets(ticketsData);
         } catch (error) {
             console.error("Failed to load dashboard data", error);
             addToast('Failed to load dashboard data.', 'error');
@@ -105,25 +118,11 @@ const AdminDashboard: React.FC = () => {
         refreshData();
     }, [refreshData]);
 
-    const handleDelete = async (id: string) => {
-        if (window.confirm("Are you sure you want to delete this entry?")) {
-            try {
-                await deleteStoredMovie(id);
-                addToast('Entry deleted successfully.', 'success');
-                await refreshData();
-            } catch (error) {
-                const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-                console.error("Delete failed:", message);
-                addToast(`Error: ${message}`, 'error');
-            }
-        }
-    }
-
     if (loading) return <Spinner />;
 
     return (
         <div className="space-y-8">
-            <section className="grid md:grid-cols-2 gap-6">
+            <section className="grid grid-cols-2 md:grid-cols-3 gap-6">
                 <div className="bg-secondary p-6 rounded-lg">
                     <h3 className="text-lg font-semibold text-muted">Total Links Stored</h3>
                     <p className="text-4xl font-bold">{metrics?.totalLinks}</p>
@@ -132,31 +131,243 @@ const AdminDashboard: React.FC = () => {
                     <h3 className="text-lg font-semibold text-muted">Total Download Clicks</h3>
                     <p className="text-4xl font-bold">{metrics?.totalDownloads}</p>
                 </div>
+                <div className="bg-secondary p-6 rounded-lg">
+                    <h3 className="text-lg font-semibold text-muted">Open Support Tickets</h3>
+                    <p className="text-4xl font-bold">{metrics?.totalSupportTickets}</p>
+                </div>
             </section>
             
             <AddMovieForm onMovieAdded={refreshData} />
 
-            <section className="bg-secondary p-6 rounded-lg">
-                <h2 className="text-2xl font-bold mb-4">Stored Movie Links</h2>
-                <div className="space-y-4">
-                    {storedMovies.length > 0 ? (
-                        storedMovies.map(movie => (
-                            <div key={movie._id} className="bg-primary p-4 rounded-md flex justify-between items-center">
+            <SupportTicketsSection tickets={supportTickets} onTicketDeleted={refreshData} />
+
+            <StoredMoviesSection movies={storedMovies} onMovieDeleted={refreshData} />
+
+        </div>
+    );
+};
+
+const StoredMoviesSection: React.FC<{ movies: StoredMovie[]; onMovieDeleted: () => void; }> = ({ movies, onMovieDeleted }) => {
+    const [currentPage, setCurrentPage] = useState(1);
+    const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'title', direction: 'ascending' });
+    const { addToast } = useToast();
+
+    const handleDelete = async (id: string) => {
+        if (window.confirm("Are you sure you want to delete this entry?")) {
+            try {
+                await deleteStoredMovie(id);
+                addToast('Entry deleted successfully.', 'success');
+                onMovieDeleted();
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+                console.error("Delete failed:", message);
+                addToast(`Error: ${message}`, 'error');
+            }
+        }
+    };
+    
+    const sortedMovies = useMemo(() => {
+        let sortableItems = [...movies];
+        if (sortConfig !== null) {
+            sortableItems.sort((a, b) => {
+                if (sortConfig.key === 'title') {
+                    return a.title.localeCompare(b.title) * (sortConfig.direction === 'ascending' ? 1 : -1);
+                } else { // sort by links
+                    const diff = a.download_links.length - b.download_links.length;
+                    return diff * (sortConfig.direction === 'ascending' ? 1 : -1);
+                }
+            });
+        }
+        return sortableItems;
+    }, [movies, sortConfig]);
+
+    const paginatedMovies = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return sortedMovies.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [sortedMovies, currentPage]);
+
+    const totalPages = Math.ceil(sortedMovies.length / ITEMS_PER_PAGE);
+
+    const requestSort = (key: SortKey) => {
+        let direction: SortDirection = 'ascending';
+        if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+        setCurrentPage(1); // Reset to first page on sort
+    };
+
+    const getSortIndicator = (key: SortKey) => {
+        if (sortConfig.key !== key) return null;
+        return sortConfig.direction === 'ascending' ? <ArrowUpIcon className="h-4 w-4 ml-1" /> : <ArrowDownIcon className="h-4 w-4 ml-1" />;
+    };
+
+    return (
+        <section className="bg-secondary p-6 rounded-lg">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-4">
+                <h2 className="text-2xl font-bold">Stored Movie Links</h2>
+                <div className="flex items-center space-x-4">
+                    <span className="text-sm font-semibold text-muted">Sort by:</span>
+                    <button onClick={() => requestSort('title')} className="flex items-center text-sm font-medium text-accent hover:underline">
+                        Title {getSortIndicator('title')}
+                    </button>
+                    <button onClick={() => requestSort('links')} className="flex items-center text-sm font-medium text-accent hover:underline">
+                        Links {getSortIndicator('links')}
+                    </button>
+                </div>
+            </div>
+            <div className="space-y-4">
+                {paginatedMovies.length > 0 ? (
+                    paginatedMovies.map(movie => (
+                        <div key={movie._id} className="bg-primary p-4 rounded-md flex justify-between items-center">
+                            <div>
+                                <p className="font-bold text-lg">{movie.title} <span className="text-xs uppercase bg-accent text-primary font-bold px-2 py-0.5 rounded-full ml-2">{movie.type}</span></p>
+                                <p className="text-sm text-muted">{movie.download_links.length} link(s)</p>
+                            </div>
+                            <button onClick={() => handleDelete(movie._id)} className="text-red-500 hover:text-red-400 p-2 rounded-full hover:bg-red-500/10">
+                                <TrashIcon className="h-5 w-5" />
+                            </button>
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-muted">No movies have been added yet.</p>
+                )}
+            </div>
+            {totalPages > 1 && (
+                <div className="flex justify-center items-center space-x-1 mt-6">
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="px-3 py-2 bg-primary rounded-md disabled:opacity-50 disabled:cursor-not-allowed text-sm hover:bg-gray-700"
+                    >
+                        Previous
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNumber => (
+                        <button
+                            key={pageNumber}
+                            onClick={() => setCurrentPage(pageNumber)}
+                            className={`px-4 py-2 rounded-md text-sm ${currentPage === pageNumber ? 'bg-accent text-white font-bold' : 'bg-primary hover:bg-gray-700'}`}
+                            aria-current={currentPage === pageNumber ? 'page' : undefined}
+                        >
+                            {pageNumber}
+                        </button>
+                    ))}
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-2 bg-primary rounded-md disabled:opacity-50 disabled:cursor-not-allowed text-sm hover:bg-gray-700"
+                    >
+                        Next
+                    </button>
+                </div>
+            )}
+        </section>
+    );
+};
+
+type TicketSortKey = 'subject' | 'timestamp';
+interface TicketSortConfig {
+    key: TicketSortKey;
+    direction: SortDirection;
+}
+
+const SupportTicketsSection: React.FC<{ tickets: SupportTicket[], onTicketDeleted: () => void }> = ({ tickets, onTicketDeleted }) => {
+    const [currentPage, setCurrentPage] = useState(1);
+    const [sortConfig, setSortConfig] = useState<TicketSortConfig>({ key: 'timestamp', direction: 'descending' });
+    const { addToast } = useToast();
+
+    const handleDelete = async (id: string) => {
+        if (window.confirm("Are you sure you want to delete this support ticket?")) {
+            try {
+                await deleteSupportTicket(id);
+                addToast('Ticket deleted successfully.', 'success');
+                onTicketDeleted();
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+                addToast(`Error: ${message}`, 'error');
+            }
+        }
+    };
+    
+    const sortedTickets = useMemo(() => {
+        return [...tickets].sort((a, b) => {
+            let compareResult = 0;
+            if (sortConfig.key === 'subject') {
+                compareResult = a.subject.localeCompare(b.subject);
+            } else { // timestamp
+                compareResult = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+            }
+            return compareResult * (sortConfig.direction === 'ascending' ? 1 : -1);
+        });
+    }, [tickets, sortConfig]);
+
+    const paginatedTickets = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return sortedTickets.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [sortedTickets, currentPage]);
+    
+    const totalPages = Math.ceil(sortedTickets.length / ITEMS_PER_PAGE);
+
+    const requestSort = (key: TicketSortKey) => {
+        setSortConfig(prevConfig => ({
+            key,
+            direction: prevConfig.key === key && prevConfig.direction === 'descending' ? 'ascending' : 'descending'
+        }));
+        setCurrentPage(1);
+    };
+
+    const getSortIndicator = (key: TicketSortKey) => {
+        if (sortConfig.key !== key) return null;
+        return sortConfig.direction === 'ascending' ? <ArrowUpIcon className="h-4 w-4 ml-1" /> : <ArrowDownIcon className="h-4 w-4 ml-1" />;
+    };
+    
+    return (
+        <section className="bg-secondary p-6 rounded-lg">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-4">
+                <h2 className="text-2xl font-bold">Support Tickets</h2>
+                <div className="flex items-center space-x-4">
+                    <span className="text-sm font-semibold text-muted">Sort by:</span>
+                    <button onClick={() => requestSort('timestamp')} className="flex items-center text-sm font-medium text-accent hover:underline">
+                        Date {getSortIndicator('timestamp')}
+                    </button>
+                    <button onClick={() => requestSort('subject')} className="flex items-center text-sm font-medium text-accent hover:underline">
+                        Subject {getSortIndicator('subject')}
+                    </button>
+                </div>
+            </div>
+            <div className="space-y-4">
+                {paginatedTickets.length > 0 ? (
+                    paginatedTickets.map(ticket => (
+                        <div key={ticket._id} className="bg-primary p-4 rounded-md">
+                            <div className="flex justify-between items-start">
                                 <div>
-                                    <p className="font-bold text-lg">{movie.title} <span className="text-xs uppercase bg-accent text-primary font-bold px-2 py-0.5 rounded-full ml-2">{movie.type}</span></p>
-                                    <p className="text-sm text-muted">{movie.download_links.length} link(s)</p>
+                                    <p className="font-bold text-lg">{ticket.subject}</p>
+                                    <p className="text-xs text-muted">
+                                        {new Date(ticket.timestamp).toLocaleString()}
+                                    </p>
+                                    {ticket.contentTitle && <p className="text-sm mt-1 text-accent">Regarding: {ticket.contentTitle}</p>}
                                 </div>
-                                <button onClick={() => handleDelete(movie._id)} className="text-red-500 hover:text-red-400 p-2 rounded-full hover:bg-red-500/10">
+                                <button onClick={() => handleDelete(ticket._id)} className="text-red-500 hover:text-red-400 p-2 rounded-full hover:bg-red-500/10 flex-shrink-0">
                                     <TrashIcon className="h-5 w-5" />
                                 </button>
                             </div>
-                        ))
-                    ) : (
-                        <p className="text-muted">No movies have been added yet.</p>
-                    )}
+                            <p className="mt-2 text-gray-300 bg-secondary p-3 rounded">{ticket.message}</p>
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-muted">No support tickets found.</p>
+                )}
+            </div>
+            {totalPages > 1 && (
+                <div className="flex justify-center items-center space-x-1 mt-6">
+                    <button onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1} className="px-3 py-2 bg-primary rounded-md disabled:opacity-50 disabled:cursor-not-allowed text-sm hover:bg-gray-700">Prev</button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNumber => (
+                        <button key={pageNumber} onClick={() => setCurrentPage(pageNumber)} className={`px-4 py-2 rounded-md text-sm ${currentPage === pageNumber ? 'bg-accent text-white font-bold' : 'bg-primary hover:bg-gray-700'}`}>{pageNumber}</button>
+                    ))}
+                    <button onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages} className="px-3 py-2 bg-primary rounded-md disabled:opacity-50 disabled:cursor-not-allowed text-sm hover:bg-gray-700">Next</button>
                 </div>
-            </section>
-        </div>
+            )}
+        </section>
     );
 };
 

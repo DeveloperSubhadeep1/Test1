@@ -60,10 +60,13 @@ const SearchBar: React.FC = () => {
             term,
             ...prevSearches.filter(s => s.toLowerCase() !== term.toLowerCase())
         ].slice(0, MAX_RECENT_SEARCHES);
-
-        if (JSON.stringify(newSearches) !== JSON.stringify(prevSearches)) {
-            localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newSearches));
+        
+        // Only update state and localStorage if the list has actually changed.
+        if (JSON.stringify(newSearches) === JSON.stringify(prevSearches)) {
+            return prevSearches;
         }
+
+        localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newSearches));
         return newSearches;
     });
   }, []);
