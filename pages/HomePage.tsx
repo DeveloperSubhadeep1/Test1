@@ -1,12 +1,13 @@
-
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { getDiscover } from '../services/api';
-import { MovieSummary, TVSummary } from '../types';
+import { useLocation, Link } from 'react-router-dom';
+import { getDiscover, getAllGenres } from '../services/api';
+import { MovieSummary, TVSummary, Genre } from '../types';
 import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import MovieCard from '../components/MovieCard';
 import Spinner from '../components/Spinner';
-import TelegramPromo from '../components/TelegramPromo';
+import TelegramAd from '../components/TelegramAd';
+import { XIcon } from '../components/Icons';
 
 const SortFilter: React.FC<{
   currentSort: string;
@@ -14,12 +15,12 @@ const SortFilter: React.FC<{
 }> = ({ currentSort, onSortChange }) => {
   const buttonClass = (sortType: string) => `px-4 py-1 text-sm font-semibold rounded-full transition-colors ${
       currentSort === sortType
-          ? 'bg-accent text-white'
-          : 'bg-secondary text-muted hover:bg-gray-700'
+          ? 'bg-light-accent dark:bg-accent text-white'
+          : 'bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted hover:bg-gray-200 dark:hover:bg-gray-700'
   }`;
 
   return (
-    <div className="flex space-x-2 bg-primary p-1 rounded-full">
+    <div className="flex space-x-2 bg-light-primary dark:bg-primary p-1 rounded-full">
       <button onClick={() => onSortChange('popularity.desc')} className={buttonClass('popularity.desc')}>
         Popular
       </button>
@@ -32,6 +33,10 @@ const SortFilter: React.FC<{
 
 type ContentItem = (MovieSummary | TVSummary) & { type: 'movie' | 'tv' };
 
+const useQuery = () => {
+    return new URLSearchParams(useLocation().search);
+}
+
 const HomePage: React.FC = () => {
   const [content, setContent] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +45,10 @@ const HomePage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [sort, setSort] = useState('popularity.desc');
+  const query = useQuery();
+  const [genre, setGenre] = useState(query.get('genre') || '');
+  const [allGenres, setAllGenres] = useState<Genre[]>([]);
+  const [selectedGenreName, setSelectedGenreName] = useState('');
 
   const observer = useRef<IntersectionObserver | null>(null);
 
@@ -49,6 +58,34 @@ const HomePage: React.FC = () => {
     path: '/',
   });
   
+  // Update genre from URL
+  useEffect(() => {
+    setGenre(query.get('genre') || '');
+  }, [query]);
+
+  // Fetch all genres for mapping ID to name
+  useEffect(() => {
+    const fetchAllGenres = async () => {
+      try {
+        const genresData = await getAllGenres();
+        setAllGenres(genresData);
+      } catch {
+        // Error toast is already handled in the service
+      }
+    };
+    fetchAllGenres();
+  }, []);
+
+  // Update genre name when ID or genre list changes
+  useEffect(() => {
+    if (genre && allGenres.length > 0) {
+      const foundGenre = allGenres.find(g => g.id.toString() === genre);
+      setSelectedGenreName(foundGenre ? foundGenre.name : 'Selected Genre');
+    } else {
+      setSelectedGenreName('');
+    }
+  }, [genre, allGenres]);
+
   const interleave = (arr1: any[], arr2: any[]): any[] => {
     const result = [];
     const len = Math.max(arr1.length, arr2.length);
@@ -62,23 +99,26 @@ const HomePage: React.FC = () => {
   const fetchInitialData = useCallback(async () => {
       try {
         setLoading(true);
-        const [moviesRes, tvShowsRes] = await Promise.all([
-          getDiscover('movie', 1, sort),
-          getDiscover('tv', 1, sort)
-        ]);
+
+        const moviePromise = getDiscover('movie', 1, sort, genre || undefined);
+        const tvPromise = getDiscover('tv', 1, sort, genre || undefined);
         
+        const [moviesRes, tvShowsRes] = await Promise.all([moviePromise, tvPromise]);
+
         const moviesWithType = moviesRes.results.map(m => ({ ...m, type: 'movie' as const }));
         const tvShowsWithType = tvShowsRes.results.map(t => ({ ...t, type: 'tv' as const }));
         
-        setContent(interleave(moviesWithType, tvShowsWithType));
+        const newContent = interleave(moviesWithType, tvShowsWithType);
+
+        setContent(newContent);
         setPage(1);
       } catch (error) {
         console.error('Failed to fetch content:', error);
-        addToast('Could not load content. Please try again later.', 'error');
+        addToast('An unexpected error occurred while loading content.', 'error');
       } finally {
         setLoading(false);
       }
-  }, [sort, addToast]);
+  }, [sort, genre, addToast]);
 
   useEffect(() => {
     fetchInitialData();
@@ -89,28 +129,28 @@ const HomePage: React.FC = () => {
     setLoadingMore(true);
     try {
         const nextPage = page + 1;
-        const [moviesRes, tvShowsRes] = await Promise.all([
-            getDiscover('movie', nextPage, sort),
-            getDiscover('tv', nextPage, sort)
-        ]);
+
+        const moviePromise = getDiscover('movie', nextPage, sort, genre || undefined);
+        const tvPromise = getDiscover('tv', nextPage, sort, genre || undefined);
+
+        const [moviesRes, tvShowsRes] = await Promise.all([moviePromise, tvPromise]);
 
         const moviesWithType = moviesRes.results.map(m => ({ ...m, type: 'movie' as const }));
         const tvShowsWithType = tvShowsRes.results.map(t => ({ ...t, type: 'tv' as const }));
-        
         const newContent = interleave(moviesWithType, tvShowsWithType);
         
         setContent(prev => [...prev, ...newContent]);
         setPage(nextPage);
     } catch (error) {
         console.error('Failed to load more content:', error);
-        addToast('Could not load more content. Please try again.', 'error');
+        addToast('An unexpected error occurred while loading more content.', 'error');
     } finally {
         setLoadingMore(false);
     }
-  }, [loadingMore, page, sort, addToast]);
+  }, [loadingMore, page, sort, genre, addToast]);
 
   const loaderRef = useCallback(node => {
-    if (loadingMore) return;
+    if (loadingMore || content.length === 0) return;
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
         if (entries[0].isIntersecting) {
@@ -118,32 +158,49 @@ const HomePage: React.FC = () => {
         }
     });
     if (node) observer.current.observe(node);
-  }, [loadingMore, handleLoadMore]);
+  }, [loadingMore, handleLoadMore, content.length]);
   
   const handleSortChange = (newSort: string) => {
     if (sort === newSort) return;
     setSort(newSort);
   };
 
-  if (loading) {
-    return <Spinner />;
-  }
-
   return (
-    <div className="space-y-12">
-      <TelegramPromo />
+    <div className="space-y-8">
+      <TelegramAd />
       <section>
         <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-4">
-            <h1 className="text-3xl font-bold border-l-4 border-accent pl-4">Discover</h1>
-            <SortFilter currentSort={sort} onSortChange={handleSortChange} />
+          {selectedGenreName ? (
+            <div className="flex items-center gap-4">
+              <h1 className="text-3xl font-bold border-l-4 border-light-accent dark:border-accent pl-4">
+                {selectedGenreName}
+              </h1>
+              <Link to="/" className="flex items-center gap-1 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-3 py-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-light-text dark:hover:text-white transition-colors" title="Clear genre filter">
+                <XIcon className="h-4 w-4" />
+                <span>Clear</span>
+              </Link>
+            </div>
+          ) : (
+            <h1 className="text-3xl font-bold border-l-4 border-light-accent dark:border-accent pl-4">Discover</h1>
+          )}
+          <SortFilter currentSort={sort} onSortChange={handleSortChange} />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {content.map(item => (
-            <MovieCard key={`${item.type}-${item.id}`} item={item} type={item.type} />
-          ))}
-        </div>
-        <div ref={loaderRef} className="h-10" />
-        {loadingMore && <Spinner />}
+
+        {loading ? (
+            <Spinner />
+        ) : content.length > 0 ? (
+            <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {content.map(item => (
+                    <MovieCard key={`${item.type}-${item.id}`} item={item} type={item.type} />
+                ))}
+                </div>
+                <div ref={loaderRef} className="h-10" />
+                {loadingMore && <Spinner />}
+            </>
+        ) : (
+            <p className="text-center text-light-muted dark:text-muted text-lg mt-10">No results match your current filters.</p>
+        )}
       </section>
     </div>
   );

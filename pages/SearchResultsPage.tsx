@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { searchTMDB } from '../services/api';
@@ -50,14 +49,14 @@ const SearchResultsPage: React.FC = () => {
             const type = (item as any).media_type;
 
             if (type !== 'movie' && type !== 'tv') {
-                return null;
+              return null;
             }
 
             return <MovieCard key={`${type}-${item.id}`} item={item} type={type} />;
           })}
         </div>
       ) : (
-        <p className="text-center text-muted text-lg mt-10">No results found.</p>
+        <p className="text-center text-light-muted dark:text-muted text-lg mt-10">No results found for your search.</p>
       )}
     </div>
   );

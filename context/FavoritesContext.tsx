@@ -1,13 +1,13 @@
 
 import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { FavoriteItem } from '../types';
+import { FavoriteItem, ContentItem } from '../types';
 import { useToast } from '../hooks/useToast';
 
 const FAVORITES_STORAGE_KEY = 'cineStreamFavorites';
 
 interface FavoritesContextType {
   favorites: FavoriteItem[];
-  addFavorite: (item: FavoriteItem) => void;
+  addFavorite: (item: ContentItem) => void;
   removeFavorite: (id: number) => void;
   isFavorite: (id: number) => boolean;
 }
@@ -31,7 +31,11 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
     try {
       const storedFavorites = localStorage.getItem(FAVORITES_STORAGE_KEY);
       if (storedFavorites) {
-        setFavorites(JSON.parse(storedFavorites));
+        const parsedFavorites: FavoriteItem[] = JSON.parse(storedFavorites).map((item: any, index: number) => ({
+            ...item,
+            dateAdded: item.dateAdded || (Date.now() - index * 60000) // Gracefully handle old data
+        }));
+        setFavorites(parsedFavorites);
       }
     } catch (error) {
       console.error("Failed to load favorites from localStorage", error);
@@ -49,12 +53,13 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
     }
   }, [addToast]);
 
-  const addFavorite = useCallback((item: FavoriteItem) => {
+  const addFavorite = useCallback((item: ContentItem) => {
     setFavorites(prevFavorites => {
       if (prevFavorites.some(fav => fav.id === item.id)) {
         return prevFavorites;
       }
-      const newFavorites = [...prevFavorites, item];
+      const newFavorite: FavoriteItem = { ...item, dateAdded: Date.now() };
+      const newFavorites = [...prevFavorites, newFavorite];
       saveFavorites(newFavorites);
       const title = 'title' in item ? item.title : item.name;
       addToast(`Added "${title}" to favorites.`, 'success');

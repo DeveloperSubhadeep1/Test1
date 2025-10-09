@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useDebounce } from '../hooks/useDebounce';
-import { SearchIcon, ClockIcon, XIcon } from './Icons';
+import { SearchIcon, ClockIcon, XIcon, StarIcon, FilmIcon } from './Icons';
 import { searchTMDB } from '../services/api';
 import { MovieSummary, TVSummary } from '../types';
 import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
@@ -60,10 +60,13 @@ const SearchBar: React.FC = () => {
             term,
             ...prevSearches.filter(s => s.toLowerCase() !== term.toLowerCase())
         ].slice(0, MAX_RECENT_SEARCHES);
-
-        if (JSON.stringify(newSearches) !== JSON.stringify(prevSearches)) {
-            localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newSearches));
+        
+        // Only update state and localStorage if the list has actually changed.
+        if (JSON.stringify(newSearches) === JSON.stringify(prevSearches)) {
+            return prevSearches;
         }
+
+        localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newSearches));
         return newSearches;
     });
   }, []);
@@ -197,35 +200,35 @@ const SearchBar: React.FC = () => {
           onKeyDown={handleKeyDown}
           onFocus={() => setShowSuggestions(true)}
           placeholder="Search for movies or TV shows..."
-          className="w-full bg-primary border border-gray-700 rounded-full py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+          className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-full py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent transition-all"
           autoComplete="off"
         />
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <SearchIcon className="h-5 w-5 text-muted" />
+          <SearchIcon className="h-5 w-5 text-light-muted dark:text-muted" />
         </div>
       </form>
       {(showRecentSearches || showLiveSuggestions) && (
-        <div className="absolute z-20 w-full mt-1 bg-secondary border border-gray-700 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+        <div className="absolute z-20 w-full mt-1 bg-light-primary dark:bg-secondary border border-light-border dark:border-gray-700 rounded-lg shadow-lg max-h-96 overflow-y-auto">
           {showRecentSearches && (
             <div>
               <div className="px-4 pt-3 pb-2 flex justify-between items-center">
-                <h4 className="text-sm font-semibold text-muted">Recent Searches</h4>
-                <button onClick={handleClearAllRecent} className="text-xs text-accent hover:underline">Clear All</button>
+                <h4 className="text-sm font-semibold text-light-muted dark:text-muted">Recent Searches</h4>
+                <button onClick={handleClearAllRecent} className="text-xs text-light-accent dark:text-accent hover:underline">Clear All</button>
               </div>
               <ul>
                 {recentSearches.map(term => (
-                  <li key={term} className="group flex items-center justify-between hover:bg-primary">
+                  <li key={term} className="group flex items-center justify-between hover:bg-light-secondary dark:hover:bg-primary">
                     <Link
                       to={`/search/${encodeURIComponent(term)}`}
                       onClick={clearSuggestions}
                       className="flex-grow flex items-center space-x-4 p-3 min-w-0"
                     >
-                      <ClockIcon className="h-4 w-4 text-muted flex-shrink-0" />
-                      <span className="text-white truncate">{term}</span>
+                      <ClockIcon className="h-4 w-4 text-light-muted dark:text-muted flex-shrink-0" />
+                      <span className="text-light-text dark:text-white truncate">{term}</span>
                     </Link>
                     <button
                       onClick={(e) => handleRemoveRecent(e, term)}
-                      className="p-3 text-muted hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                      className="p-3 text-light-muted dark:text-muted hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                       title={`Remove "${term}"`}
                     >
                       <XIcon className="h-4 w-4" />
@@ -242,20 +245,38 @@ const SearchBar: React.FC = () => {
                 const title = type === 'movie' ? (item as MovieSummary).title : (item as TVSummary).name;
                 const releaseDate = type === 'movie' ? (item as MovieSummary).release_date : (item as TVSummary).first_air_date;
                 const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
-                const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : 'https://picsum.photos/50/75';
+                const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : null;
                 const slug = generateSlug(title);
 
                 return (
-                  <li key={item.id} className={`${index === activeIndex ? 'bg-primary' : ''}`}>
+                  <li key={item.id} className={`${index === activeIndex ? 'bg-light-secondary dark:bg-primary' : ''}`}>
                     <Link
                       to={`/${type}/${slug}`}
                       onClick={clearSuggestions}
-                      className="p-3 hover:bg-primary flex items-center space-x-4 cursor-pointer"
+                      className="p-3 hover:bg-light-secondary dark:hover:bg-primary flex items-start space-x-4 cursor-pointer"
                     >
-                      <img src={posterUrl} alt={title} className="w-12 h-auto rounded flex-shrink-0" />
+                      {posterUrl ? (
+                        <img src={posterUrl} alt={title} className="w-14 h-[84px] object-cover rounded flex-shrink-0" />
+                      ) : (
+                        <div className="w-14 h-[84px] bg-light-secondary dark:bg-primary rounded flex items-center justify-center flex-shrink-0">
+                            <FilmIcon className="w-6 h-6 text-light-muted dark:text-muted" />
+                        </div>
+                      )}
                       <div className="flex-grow min-w-0">
-                        <p className="font-semibold text-white truncate">{title}</p>
-                        <p className="text-sm text-muted">{year}</p>
+                        <p className="font-semibold text-light-text dark:text-white truncate">{title}</p>
+                        <div className="flex items-center space-x-2 text-sm text-light-muted dark:text-muted mt-1">
+                          <span>{year}</span>
+                          {item.vote_average > 0 && (
+                            <>
+                                <span className="text-gray-500">·</span>
+                                <div className="flex items-center">
+                                    <StarIcon className="h-4 w-4 mr-1 text-yellow-400"/>
+                                    <span>{item.vote_average.toFixed(1)}</span>
+                                </div>
+                            </>
+                          )}
+                        </div>
+                        <p className="text-xs text-light-muted dark:text-muted mt-1 line-clamp-2">{item.overview}</p>
                       </div>
                     </Link>
                   </li>

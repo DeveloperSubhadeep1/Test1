@@ -37,14 +37,25 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
+        darkMode: 'class',
         theme: {
           extend: {
             colors: {
+              // Dark Theme
               'primary': '#0D1117',
               'secondary': '#161B22',
               'accent': '#58A6FF',
               'highlight': '#238636',
               'muted': '#8B949E',
+              
+              // Light Theme
+              'light-primary': '#FFFFFF',
+              'light-secondary': '#F6F8FA',
+              'light-accent': '#0969DA',
+              'light-highlight': '#1F883D',
+              'light-muted': '#57606A',
+              'light-text': '#1F2328',
+              'light-border': '#D0D7DE',
             },
           },
         },
@@ -61,7 +72,7 @@
 }
 </script>
 </head>
-  <body class="bg-primary text-gray-200">
+  <body class="bg-light-primary text-light-text dark:bg-primary dark:text-gray-200 transition-colors duration-300">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
