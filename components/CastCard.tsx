@@ -14,7 +14,7 @@ const CastCard: React.FC<CastCardProps> = ({ person }) => {
     ? `${TMDB_IMAGE_BASE_URL}${person.profile_path}`
     : null;
 
-  const slug = generateSlug(person.id, person.name);
+  const slug = generateSlug(person.name);
 
   return (
     <Link to={`/person/${slug}`} className="block text-center group">

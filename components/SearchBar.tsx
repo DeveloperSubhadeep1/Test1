@@ -157,7 +157,7 @@ const SearchBar: React.FC = () => {
           const selected = suggestions[activeIndex];
           const type = (selected as any).media_type;
           const title = type === 'movie' ? (selected as MovieSummary).title : (selected as TVSummary).name;
-          const slug = generateSlug(selected.id, title);
+          const slug = generateSlug(title);
           navigate(`/${type}/${slug}`);
           setShowSuggestions(false);
         }
@@ -243,7 +243,7 @@ const SearchBar: React.FC = () => {
                 const releaseDate = type === 'movie' ? (item as MovieSummary).release_date : (item as TVSummary).first_air_date;
                 const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
                 const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : 'https://picsum.photos/50/75';
-                const slug = generateSlug(item.id, title);
+                const slug = generateSlug(title);
 
                 return (
                   <li key={item.id} className={`${index === activeIndex ? 'bg-primary' : ''}`}>

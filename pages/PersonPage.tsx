@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getPersonDetails, getPersonCredits } from '../services/api';
+import { getPersonDetails, getPersonCredits, findPersonIdBySlug } from '../services/api';
 import { PersonDetails, PersonCredit } from '../types';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
 import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
-import { getIdFromSlug } from '../utils';
 import Spinner from '../components/Spinner';
 import MovieCard from '../components/MovieCard';
 import { UserIcon } from '../components/Icons';
@@ -29,12 +28,18 @@ const PersonPage: React.FC = () => {
   useEffect(() => {
     const fetchPersonData = async () => {
       if (!slug) return;
-      const id = getIdFromSlug(slug);
-      if (!id) return;
 
       try {
         setLoading(true);
-        const personId = parseInt(id, 10);
+        const personId = await findPersonIdBySlug(slug);
+
+        if (!personId) {
+          addToast("Person not found.", "error");
+          setPerson(null);
+          setLoading(false);
+          return;
+        }
+
         const [personData, creditsData] = await Promise.all([
           getPersonDetails(personId),
           getPersonCredits(personId),

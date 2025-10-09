@@ -1,4 +1,3 @@
-
 import {
   MovieSummary,
   TVSummary,
@@ -37,6 +36,26 @@ export const searchTMDB = async (query: string): Promise<{ results: (MovieSummar
     );
     return { results: filteredResults };
 };
+
+export const findIdBySlug = async (type: ContentType, slug: string): Promise<number | null> => {
+    const query = slug.replace(/-/g, ' ');
+    const data = await tmdbFetch(`/search/${type}`, { query });
+    if (data.results && data.results.length > 0) {
+        // Assume the first result is the best match
+        return data.results[0].id;
+    }
+    return null;
+}
+
+export const findPersonIdBySlug = async (slug: string): Promise<number | null> => {
+    const query = slug.replace(/-/g, ' ');
+    const data = await tmdbFetch('/search/person', { query });
+    if (data.results && data.results.length > 0) {
+        // Assume the first result is the best match
+        return data.results[0].id;
+    }
+    return null;
+}
 
 export const getTrending = async (type: ContentType, page: number = 1): Promise<{ results: any[] }> => {
     return tmdbFetch(`/trending/${type}/week`, { page: page.toString() });

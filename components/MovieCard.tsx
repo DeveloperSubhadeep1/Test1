@@ -15,7 +15,7 @@ const MovieCard: React.FC<MovieCardProps> = ({ item, type }) => {
   const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
   const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
   const rating = item.vote_average.toFixed(1);
-  const slug = generateSlug(item.id, title);
+  const slug = generateSlug(title);
   const linkTo = `/${type}/${slug}`;
 
   const posterUrl = item.poster_path

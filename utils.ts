@@ -11,10 +11,6 @@ export const slugify = (text: string): string => {
     .replace(/-+$/, ''); // trim - from end of text
 };
 
-export const generateSlug = (id: number, title: string): string => {
-    return `${id}-${slugify(title)}`;
-}
-
-export const getIdFromSlug = (slug: string): string | undefined => {
-    return slug?.split('-')[0];
+export const generateSlug = (title: string): string => {
+    return slugify(title);
 }

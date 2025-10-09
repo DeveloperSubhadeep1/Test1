@@ -1,12 +1,11 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { useParams } from 'react-router-dom';
-import { getDetails, getStoredMovie, incrementDownloadCount, getCredits } from '../services/api';
+import { getDetails, getStoredMovie, incrementDownloadCount, getCredits, findIdBySlug } from '../services/api';
 import { ContentType, MovieDetail, StoredMovie, TVDetail, MovieSummary, TVSummary, CastMember } from '../types';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
 import { FavoritesContext } from '../context/FavoritesContext';
 import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
-import { getIdFromSlug } from '../utils';
 import Spinner from '../components/Spinner';
 import AdPlaceholder from '../components/AdPlaceholder';
 import CastCard from '../components/CastCard';
@@ -38,12 +37,18 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   useEffect(() => {
     const fetchDetails = async () => {
       if (!slug) return;
-      const id = getIdFromSlug(slug);
-      if (!id) return;
       
       try {
         setLoading(true);
-        const tmdbId = parseInt(id, 10);
+        const tmdbId = await findIdBySlug(type, slug);
+
+        if (!tmdbId) {
+          addToast('Content not found.', 'error');
+          setDetails(null);
+          setLoading(false);
+          return;
+        }
+        
         const [detailsData, storedData, creditsData] = await Promise.all([
           getDetails(type, tmdbId),
           getStoredMovie(tmdbId, type),
