@@ -1,0 +1,8 @@
+# See https://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file
+#
+# Allow all ethical crawlers to access the site.
+
+User-agent: *
+Disallow:
+
+Sitemap: /sitemap.xml

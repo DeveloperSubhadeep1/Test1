@@ -2,7 +2,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { MovieSummary, TVSummary } from '../types';
-import { TMDB_IMAGE_BASE_URL } from '../constants';
+import { TMDB_IMAGE_BASE_URL_MEDIUM } from '../constants';
 import { StarIcon, CalendarIcon } from './Icons';
 
 interface MovieCardProps {
@@ -18,7 +18,7 @@ const MovieCard: React.FC<MovieCardProps> = ({ item, type }) => {
   const linkTo = `/${type}/${item.id}`;
 
   const posterUrl = item.poster_path
-    ? `${TMDB_IMAGE_BASE_URL}${item.poster_path}`
+    ? `${TMDB_IMAGE_BASE_URL_MEDIUM}${item.poster_path}`
     : 'https://picsum.photos/500/750';
 
   return (

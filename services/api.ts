@@ -1,3 +1,4 @@
+
 import {
   MovieSummary,
   TVSummary,
@@ -21,8 +22,9 @@ const tmdbFetch = async (endpoint: string, params: Record<string, string> = {}) 
     const url = `${TMDB_API_BASE_URL}${endpoint}?${urlParams.toString()}`;
     const response = await fetch(url);
     if (!response.ok) {
-        console.error(`TMDB API request failed for ${url}: ${response.statusText}`);
-        throw new Error(`TMDB API request failed: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({ status_message: response.statusText }));
+        console.error(`TMDB API request failed for ${url}: ${errorData.status_message}`);
+        throw new Error(errorData.status_message || `TMDB API request failed`);
     }
     return response.json();
 }
@@ -87,13 +89,12 @@ interface DbData {
 const LOCAL_DB_KEY = 'cineStreamLocalDb';
 
 // Helper to update the entire database content in localStorage
-const updateDbContent = async (data: DbData): Promise<boolean> => {
+const updateDbContent = async (data: DbData): Promise<void> => {
     try {
         localStorage.setItem(LOCAL_DB_KEY, JSON.stringify(data));
-        return true;
     } catch (error) {
         console.error("Database write error (localStorage):", error);
-        return false;
+        throw new Error('Failed to write to local database. Storage may be full.');
     }
 };
 
@@ -104,16 +105,14 @@ const getDbContent = async (): Promise<DbData> => {
         const storedData = localStorage.getItem(LOCAL_DB_KEY);
         if (storedData) {
             const data = JSON.parse(storedData);
-            // Basic validation to ensure the data structure is correct
             if (data && Array.isArray(data.movies) && typeof data.downloadCount === 'number') {
                  return data;
             }
         }
-        console.warn("Local database is malformed or empty. Using default structure.");
         return defaultData;
     } catch (error) {
         console.error("Database read error (localStorage):", error);
-        return defaultData;
+        throw new Error("Failed to read local database. It might be corrupted.");
     }
 };
 
@@ -129,35 +128,33 @@ export const getStoredMovies = async (): Promise<StoredMovie[]> => {
     return [...movies].sort((a,b) => a.title.localeCompare(b.title));
 };
 
-export const addStoredMovie = async (movie: Omit<StoredMovie, '_id'>): Promise<StoredMovie | null> => {
+export const addStoredMovie = async (movie: Omit<StoredMovie, '_id'>): Promise<StoredMovie> => {
     const db = await getDbContent();
     const existingIndex = db.movies.findIndex(m => m.tmdb_id === movie.tmdb_id && m.type === movie.type);
     
     let savedMovie: StoredMovie;
 
     if (existingIndex > -1) {
-        // Update existing movie's links
         db.movies[existingIndex].download_links = movie.download_links;
         savedMovie = db.movies[existingIndex];
     } else {
-        // Add new movie
         const newMovie: StoredMovie = { _id: Date.now().toString(), ...movie };
         db.movies.push(newMovie);
         savedMovie = newMovie;
     }
     
-    const success = await updateDbContent(db);
-    return success ? savedMovie : null;
+    await updateDbContent(db);
+    return savedMovie;
 };
 
-export const deleteStoredMovie = async (id: string): Promise<boolean> => {
+export const deleteStoredMovie = async (id: string): Promise<void> => {
     const db = await getDbContent();
     const initialLength = db.movies.length;
     db.movies = db.movies.filter(m => m._id !== id);
-    if (db.movies.length < initialLength) {
-        return await updateDbContent(db);
+    if (db.movies.length === initialLength) {
+        throw new Error("Could not find the movie to delete.");
     }
-    return false; // Return false if no movie was found with that ID
+    await updateDbContent(db);
 };
 
 export const getMetrics = async (): Promise<Metrics> => {
@@ -171,8 +168,5 @@ export const getMetrics = async (): Promise<Metrics> => {
 export const incrementDownloadCount = async (movieId: string): Promise<void> => {
     const db = await getDbContent();
     db.downloadCount++;
-    const success = await updateDbContent(db);
-    if (!success) {
-      console.error(`Failed to increment download count for movie ${movieId}.`);
-    }
+    await updateDbContent(db);
 };

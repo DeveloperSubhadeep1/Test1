@@ -1,8 +1,11 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { getPersonDetails, getPersonCredits } from '../services/api';
 import { PersonDetails, PersonCredit } from '../types';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
+import { useToast } from '../hooks/useToast';
+import { usePageMetadata } from '../hooks/usePageMetadata';
 import Spinner from '../components/Spinner';
 import MovieCard from '../components/MovieCard';
 import { UserIcon } from '../components/Icons';
@@ -12,6 +15,16 @@ const PersonPage: React.FC = () => {
   const [person, setPerson] = useState<PersonDetails | null>(null);
   const [credits, setCredits] = useState<PersonCredit[]>([]);
   const [loading, setLoading] = useState(true);
+  const { addToast } = useToast();
+
+  const profilePath = person?.profile_path ? `${TMDB_IMAGE_BASE_URL}${person.profile_path}` : undefined;
+
+  usePageMetadata({
+    title: person?.name || 'Loading...',
+    description: `View the biography and filmography for ${person?.name || 'this person'}.`,
+    path: `/person/${id}`,
+    imageUrl: profilePath,
+  });
 
   useEffect(() => {
     const fetchPersonData = async () => {
@@ -24,16 +37,17 @@ const PersonPage: React.FC = () => {
           getPersonCredits(personId),
         ]);
         setPerson(personData);
-        setCredits(creditsData.cast.slice(0, 18)); // Limit to a reasonable number for the grid
+        setCredits(creditsData.cast.slice(0, 18));
       } catch (error) {
         console.error('Failed to fetch person data:', error);
+        addToast("Could not load the person's details. Please try again.", 'error');
       } finally {
         setLoading(false);
       }
     };
 
     fetchPersonData();
-  }, [id]);
+  }, [id, addToast]);
 
   if (loading) return <Spinner />;
   if (!person) return <p>Person not found.</p>;

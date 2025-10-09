@@ -1,15 +1,16 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { getDiscover } from '../services/api';
 import { MovieSummary, TVSummary } from '../types';
+import { useToast } from '../hooks/useToast';
+import { usePageMetadata } from '../hooks/usePageMetadata';
 import MovieCard from '../components/MovieCard';
 import Spinner from '../components/Spinner';
 import AdPlaceholder from '../components/AdPlaceholder';
 
 const SortFilter: React.FC<{
-  type: 'movie' | 'tv';
   currentSort: string;
-  onSortChange: (type: 'movie' | 'tv', newSort: string) => void;
-}> = ({ type, currentSort, onSortChange }) => {
+  onSortChange: (newSort: string) => void;
+}> = ({ currentSort, onSortChange }) => {
   const buttonClass = (sortType: string) => `px-4 py-1 text-sm font-semibold rounded-full transition-colors ${
       currentSort === sortType
           ? 'bg-accent text-white'
@@ -18,117 +19,110 @@ const SortFilter: React.FC<{
 
   return (
     <div className="flex space-x-2 bg-primary p-1 rounded-full">
-      <button onClick={() => onSortChange(type, 'popularity.desc')} className={buttonClass('popularity.desc')}>
+      <button onClick={() => onSortChange('popularity.desc')} className={buttonClass('popularity.desc')}>
         Popular
       </button>
-      <button onClick={() => onSortChange(type, 'vote_average.desc')} className={buttonClass('vote_average.desc')}>
+      <button onClick={() => onSortChange('vote_average.desc')} className={buttonClass('vote_average.desc')}>
         Top Rated
       </button>
     </div>
   );
 };
 
+type ContentItem = (MovieSummary | TVSummary) & { type: 'movie' | 'tv' };
 
 const HomePage: React.FC = () => {
-  const [trendingMovies, setTrendingMovies] = useState<MovieSummary[]>([]);
-  const [trendingTV, setTrendingTV] = useState<TVSummary[]>([]);
+  const [content, setContent] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const { addToast } = useToast();
 
-  const [moviePage, setMoviePage] = useState(1);
-  const [tvPage, setTvPage] = useState(1);
-  const [loadingMoreMovies, setLoadingMoreMovies] = useState(false);
-  const [loadingMoreTV, setLoadingMoreTV] = useState(false);
+  const [page, setPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [sort, setSort] = useState('popularity.desc');
 
-  const [movieSort, setMovieSort] = useState('popularity.desc');
-  const [tvSort, setTvSort] = useState('popularity.desc');
+  const observer = useRef<IntersectionObserver | null>(null);
 
-  const movieObserver = useRef<IntersectionObserver>();
-  const tvObserver = useRef<IntersectionObserver>();
+  usePageMetadata({
+    title: 'Discover Movies & TV Shows',
+    description: 'Explore and discover the latest and greatest movies and TV shows. Find popular, top-rated content and get download links.',
+    path: '/',
+  });
+  
+  const interleave = (arr1: any[], arr2: any[]): any[] => {
+    const result = [];
+    const len = Math.max(arr1.length, arr2.length);
+    for (let i = 0; i < len; i++) {
+        if (arr1[i]) result.push(arr1[i]);
+        if (arr2[i]) result.push(arr2[i]);
+    }
+    return result;
+  };
 
   const fetchInitialData = useCallback(async () => {
       try {
         setLoading(true);
-        const [movies, tvShows] = await Promise.all([
-          getDiscover('movie', 1, movieSort),
-          getDiscover('tv', 1, tvSort)
+        const [moviesRes, tvShowsRes] = await Promise.all([
+          getDiscover('movie', 1, sort),
+          getDiscover('tv', 1, sort)
         ]);
-        setTrendingMovies(movies.results);
-        setTrendingTV(tvShows.results);
-        setMoviePage(1);
-        setTvPage(1);
+        
+        const moviesWithType = moviesRes.results.map(m => ({ ...m, type: 'movie' as const }));
+        const tvShowsWithType = tvShowsRes.results.map(t => ({ ...t, type: 'tv' as const }));
+        
+        setContent(interleave(moviesWithType, tvShowsWithType));
+        setPage(1);
       } catch (error) {
         console.error('Failed to fetch content:', error);
+        addToast('Could not load content. Please try again later.', 'error');
       } finally {
         setLoading(false);
       }
-  }, [movieSort, tvSort]);
+  }, [sort, addToast]);
 
   useEffect(() => {
     fetchInitialData();
   }, [fetchInitialData]);
 
-  const handleLoadMore = useCallback(async (type: 'movie' | 'tv') => {
-    if (type === 'movie') {
-      if (loadingMoreMovies) return;
-      setLoadingMoreMovies(true);
-      try {
-        const nextPage = moviePage + 1;
-        const data = await getDiscover('movie', nextPage, movieSort);
-        setTrendingMovies(prev => [...prev, ...data.results]);
-        setMoviePage(nextPage);
-      } catch (error) {
-        console.error('Failed to load more movies:', error);
-      } finally {
-        setLoadingMoreMovies(false);
-      }
-    } else {
-      if (loadingMoreTV) return;
-      setLoadingMoreTV(true);
-      try {
-        const nextPage = tvPage + 1;
-        const data = await getDiscover('tv', nextPage, tvSort);
-        setTrendingTV(prev => [...prev, ...data.results]);
-        setTvPage(nextPage);
-      } catch (error) {
-        console.error('Failed to load more TV shows:', error);
-      } finally {
-        setLoadingMoreTV(false);
-      }
-    }
-  }, [loadingMoreMovies, moviePage, movieSort, loadingMoreTV, tvPage, tvSort]);
+  const handleLoadMore = useCallback(async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    try {
+        const nextPage = page + 1;
+        const [moviesRes, tvShowsRes] = await Promise.all([
+            getDiscover('movie', nextPage, sort),
+            getDiscover('tv', nextPage, sort)
+        ]);
 
-  const movieLoaderRef = useCallback(node => {
-    if (loadingMoreMovies) return;
-    if (movieObserver.current) movieObserver.current.disconnect();
-    movieObserver.current = new IntersectionObserver(entries => {
+        const moviesWithType = moviesRes.results.map(m => ({ ...m, type: 'movie' as const }));
+        const tvShowsWithType = tvShowsRes.results.map(t => ({ ...t, type: 'tv' as const }));
+        
+        const newContent = interleave(moviesWithType, tvShowsWithType);
+        
+        setContent(prev => [...prev, ...newContent]);
+        setPage(nextPage);
+    } catch (error) {
+        console.error('Failed to load more content:', error);
+        addToast('Could not load more content. Please try again.', 'error');
+    } finally {
+        setLoadingMore(false);
+    }
+  }, [loadingMore, page, sort, addToast]);
+
+  const loaderRef = useCallback(node => {
+    if (loadingMore) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
         if (entries[0].isIntersecting) {
-            handleLoadMore('movie');
+            handleLoadMore();
         }
     });
-    if (node) movieObserver.current.observe(node);
-  }, [loadingMoreMovies, handleLoadMore]);
-
-  const tvLoaderRef = useCallback(node => {
-      if (loadingMoreTV) return;
-      if (tvObserver.current) tvObserver.current.disconnect();
-      tvObserver.current = new IntersectionObserver(entries => {
-          if (entries[0].isIntersecting) {
-              handleLoadMore('tv');
-          }
-      });
-      if (node) tvObserver.current.observe(node);
-  }, [loadingMoreTV, handleLoadMore]);
-
-  const handleSortChange = (type: 'movie' | 'tv', newSort: string) => {
-    if (type === 'movie') {
-      if (movieSort === newSort) return;
-      setMovieSort(newSort);
-    } else {
-      if (tvSort === newSort) return;
-      setTvSort(newSort);
-    }
+    if (node) observer.current.observe(node);
+  }, [loadingMore, handleLoadMore]);
+  
+  const handleSortChange = (newSort: string) => {
+    if (sort === newSort) return;
+    setSort(newSort);
   };
-
 
   if (loading) {
     return <Spinner />;
@@ -139,30 +133,16 @@ const HomePage: React.FC = () => {
       <AdPlaceholder width="w-full max-w-4xl" height="h-24" label="Leaderboard Ad" />
       <section>
         <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-4">
-            <h2 className="text-2xl font-bold border-l-4 border-accent pl-4">Movies</h2>
-            <SortFilter type="movie" currentSort={movieSort} onSortChange={handleSortChange} />
+            <h2 className="text-2xl font-bold border-l-4 border-accent pl-4">Discover</h2>
+            <SortFilter currentSort={sort} onSortChange={handleSortChange} />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {trendingMovies.map(movie => (
-            <MovieCard key={movie.id} item={movie} type="movie" />
+          {content.map(item => (
+            <MovieCard key={`${item.type}-${item.id}`} item={item} type={item.type} />
           ))}
         </div>
-        <div ref={movieLoaderRef} className="h-10" />
-        {loadingMoreMovies && <Spinner />}
-      </section>
-      
-      <section>
-        <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-4">
-            <h2 className="text-2xl font-bold border-l-4 border-accent pl-4">TV Shows</h2>
-            <SortFilter type="tv" currentSort={tvSort} onSortChange={handleSortChange} />
-        </div>
-         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {trendingTV.map(tv => (
-            <MovieCard key={tv.id} item={tv} type="tv" />
-          ))}
-        </div>
-        <div ref={tvLoaderRef} className="h-10" />
-        {loadingMoreTV && <Spinner />}
+        <div ref={loaderRef} className="h-10" />
+        {loadingMore && <Spinner />}
       </section>
     </div>
   );

@@ -4,7 +4,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { SearchIcon, ClockIcon, XIcon } from './Icons';
 import { searchTMDB } from '../services/api';
 import { MovieSummary, TVSummary } from '../types';
-import { TMDB_IMAGE_BASE_URL } from '../constants';
+import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
 
 const RECENT_SEARCHES_KEY = 'cineStreamRecentSearches';
 const MAX_RECENT_SEARCHES = 5;
@@ -239,7 +239,7 @@ const SearchBar: React.FC = () => {
                 const title = type === 'movie' ? (item as MovieSummary).title : (item as TVSummary).name;
                 const releaseDate = type === 'movie' ? (item as MovieSummary).release_date : (item as TVSummary).first_air_date;
                 const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
-                const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE_URL}${item.poster_path}` : 'https://picsum.photos/50/75';
+                const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : 'https://picsum.photos/50/75';
 
                 return (
                   <li key={item.id} className={`${index === activeIndex ? 'bg-primary' : ''}`}>

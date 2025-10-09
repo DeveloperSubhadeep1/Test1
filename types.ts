@@ -26,12 +26,14 @@ export interface MovieDetail extends MovieSummary {
   genres: Genre[];
   runtime: number;
   tagline: string;
+  vote_count: number;
 }
 
 export interface TVDetail extends TVSummary {
     genres: Genre[];
     episode_run_time: number[];
     tagline: string;
+    vote_count: number;
 }
 
 export type ContentType = 'movie' | 'tv';
@@ -69,7 +71,7 @@ export interface CreditsResponse {
 
 export interface PersonDetails {
     id: number;
-    name: string;
+    name:string;
     biography: string;
     profile_path: string | null;
     known_for_department: string;

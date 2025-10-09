@@ -3,6 +3,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { searchTMDB } from '../services/api';
 import { MovieSummary, TVSummary } from '../types';
+import { useToast } from '../hooks/useToast';
+import { usePageMetadata } from '../hooks/usePageMetadata';
 import MovieCard from '../components/MovieCard';
 import Spinner from '../components/Spinner';
 
@@ -10,6 +12,13 @@ const SearchResultsPage: React.FC = () => {
   const { query } = useParams<{ query: string }>();
   const [results, setResults] = useState<(MovieSummary | TVSummary)[]>([]);
   const [loading, setLoading] = useState(true);
+  const { addToast } = useToast();
+
+  usePageMetadata({
+    title: `Search results for "${query || ''}"`,
+    description: `Find movies and TV shows matching your search for "${query || ''}".`,
+    path: `/search/${query || ''}`,
+  });
 
   useEffect(() => {
     const fetchResults = async () => {
@@ -20,12 +29,13 @@ const SearchResultsPage: React.FC = () => {
         setResults(searchRes.results);
       } catch (error) {
         console.error('Failed to fetch search results:', error);
+        addToast('Failed to perform search. Please try again.', 'error');
       } finally {
         setLoading(false);
       }
     };
     fetchResults();
-  }, [query]);
+  }, [query, addToast]);
 
   if (loading) {
     return <Spinner />;
@@ -37,12 +47,8 @@ const SearchResultsPage: React.FC = () => {
       {results.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {results.map(item => {
-            // The multi-search API provides a `media_type` field which is the most reliable
-            // way to determine if the item is a movie or a TV show.
-            // We cast to `any` to access this property as it's not in the base types.
             const type = (item as any).media_type;
 
-            // The api.ts filter should prevent other types, but as a safeguard:
             if (type !== 'movie' && type !== 'tv') {
                 return null;
             }

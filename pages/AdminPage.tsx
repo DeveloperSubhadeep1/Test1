@@ -1,7 +1,10 @@
+
 import React, { useState, useContext, useEffect, useCallback } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { getMetrics, getStoredMovies, addStoredMovie, deleteStoredMovie, searchTMDB } from '../services/api';
-import { StoredMovie, MovieSummary, TVSummary, ContentType, DownloadLink, Metrics } from '../types';
+import { StoredMovie, MovieSummary, TVSummary, DownloadLink, Metrics } from '../types';
+import { useToast } from '../hooks/useToast';
+import { usePageMetadata } from '../hooks/usePageMetadata';
 import Spinner from '../components/Spinner';
 import { useDebounce } from '../hooks/useDebounce';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
@@ -12,6 +15,28 @@ const AdminPage: React.FC = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+
+    usePageMetadata({
+      title: 'Admin Dashboard',
+      description: 'Admin login and dashboard for CineStream.',
+      path: '/admin',
+    });
+
+    useEffect(() => {
+        // Prevent admin page from being indexed by search engines
+        const meta = document.createElement('meta');
+        meta.name = 'robots';
+        meta.content = 'noindex, nofollow';
+        document.head.appendChild(meta);
+    
+        return () => {
+            // Cleanup on unmount
+            const metaTag = document.querySelector('meta[name="robots"]');
+            if (metaTag) {
+                metaTag.remove();
+            }
+        };
+    }, []);
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -58,6 +83,7 @@ const AdminDashboard: React.FC = () => {
     const [metrics, setMetrics] = useState<Metrics | null>(null);
     const [storedMovies, setStoredMovies] = useState<StoredMovie[]>([]);
     const [loading, setLoading] = useState(true);
+    const { addToast } = useToast();
 
     const refreshData = useCallback(async () => {
         setLoading(true);
@@ -70,10 +96,11 @@ const AdminDashboard: React.FC = () => {
             setStoredMovies(moviesData);
         } catch (error) {
             console.error("Failed to load dashboard data", error);
+            addToast('Failed to load dashboard data.', 'error');
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [addToast]);
 
     useEffect(() => {
         refreshData();
@@ -81,11 +108,14 @@ const AdminDashboard: React.FC = () => {
 
     const handleDelete = async (id: string) => {
         if (window.confirm("Are you sure you want to delete this entry?")) {
-            const success = await deleteStoredMovie(id);
-            if(success) {
+            try {
+                await deleteStoredMovie(id);
+                addToast('Entry deleted successfully.', 'success');
                 await refreshData();
-            } else {
-                alert('Error: Could not delete the entry. The database might be temporarily unavailable.');
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+                console.error("Delete failed:", message);
+                addToast(`Error: ${message}`, 'error');
             }
         }
     }
@@ -139,18 +169,24 @@ const AddMovieForm: React.FC<{onMovieAdded: () => void}> = ({onMovieAdded}) => {
     const [selectedMovie, setSelectedMovie] = useState<(MovieSummary | TVSummary) | null>(null);
     const [links, setLinks] = useState<DownloadLink[]>([{ label: '', url: '' }]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const { addToast } = useToast();
 
     useEffect(() => {
         const fetchMovies = async () => {
             if (debouncedTitle.length > 2 && !selectedMovie) {
-                const res = await searchTMDB(debouncedTitle);
-                setSearchResults(res.results.slice(0, 5));
+                try {
+                    const res = await searchTMDB(debouncedTitle);
+                    setSearchResults(res.results.slice(0, 5));
+                } catch (error) {
+                    console.error("Search failed:", error);
+                    addToast('Could not perform search.', 'error');
+                }
             } else {
                 setSearchResults([]);
             }
         };
         fetchMovies();
-    }, [debouncedTitle, selectedMovie]);
+    }, [debouncedTitle, selectedMovie, addToast]);
 
     const handleSelectMovie = (movie: MovieSummary | TVSummary) => {
         setSelectedMovie(movie);
@@ -181,27 +217,32 @@ const AddMovieForm: React.FC<{onMovieAdded: () => void}> = ({onMovieAdded}) => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedMovie) {
-            alert("Please select a movie from the search results.");
+            addToast("Please select a movie from the search results.", "error");
+            return;
+        }
+        if (links.every(link => !link.label || !link.url)) {
+            addToast("Please add at least one valid download link.", "error");
             return;
         }
 
         setIsSubmitting(true);
-
-        const newMovie: Omit<StoredMovie, '_id'> = {
-            tmdb_id: selectedMovie.id,
-            title: 'title' in selectedMovie ? selectedMovie.title : selectedMovie.name,
-            type: 'title' in selectedMovie ? 'movie' : 'tv',
-            download_links: links.filter(link => link.label && link.url),
-        };
-        
-        const result = await addStoredMovie(newMovie);
-        setIsSubmitting(false);
-
-        if (result) {
+        try {
+            const newMovie: Omit<StoredMovie, '_id'> = {
+                tmdb_id: selectedMovie.id,
+                title: 'title' in selectedMovie ? selectedMovie.title : selectedMovie.name,
+                type: 'title' in selectedMovie ? 'movie' : 'tv',
+                download_links: links.filter(link => link.label && link.url),
+            };
+            await addStoredMovie(newMovie);
+            addToast('Movie added successfully!', 'success');
             resetForm();
             onMovieAdded();
-        } else {
-            alert('Error: Could not add the movie. The database might be temporarily unavailable.');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+            console.error("Add movie failed:", message);
+            addToast(`Error: ${message}`, 'error');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -230,7 +271,7 @@ const AddMovieForm: React.FC<{onMovieAdded: () => void}> = ({onMovieAdded}) => {
                                     <div>
                                         <p>{'title' in movie ? movie.title : movie.name}</p>
                                         <p className="text-xs text-muted">
-                                            {'release_date' in movie ? movie.release_date.split('-')[0] : movie.first_air_date.split('-')[0]}
+                                            {'release_date' in movie ? movie.release_date?.split('-')[0] : movie.first_air_date?.split('-')[0]}
                                         </p>
                                     </div>
                                 </div>

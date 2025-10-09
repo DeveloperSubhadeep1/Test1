@@ -2,11 +2,18 @@
 import React, { useContext } from 'react';
 import { Link } from 'react-router-dom';
 import { FavoritesContext } from '../context/FavoritesContext';
+import { usePageMetadata } from '../hooks/usePageMetadata';
 import MovieCard from '../components/MovieCard';
 import { HeartIcon } from '../components/Icons';
 
 const FavoritesPage: React.FC = () => {
   const { favorites } = useContext(FavoritesContext);
+  
+  usePageMetadata({
+    title: 'Your Favorites',
+    description: 'View your saved favorite movies and TV shows on CineStream.',
+    path: '/favorites',
+  });
 
   return (
     <div>

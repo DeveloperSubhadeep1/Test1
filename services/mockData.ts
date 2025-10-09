@@ -21,12 +21,15 @@ export const MOCK_TV: { results: TVSummary[] } = {
 };
 
 export const MOCK_MOVIE_DETAILS: MovieDetail[] = [
-    { ...MOCK_MOVIES.results[0], genres: [{id: 18, name: "Drama"}], runtime: 139, tagline: "Mischief. Mayhem. Soap." },
-    { ...MOCK_MOVIES.results[1], genres: [{id: 28, name: "Action"}, {id: 878, name: "Science Fiction"}], runtime: 148, tagline: "Your mind is the scene of the crime." },
+    // FIX: Added missing vote_count property
+    { ...MOCK_MOVIES.results[0], genres: [{id: 18, name: "Drama"}], runtime: 139, tagline: "Mischief. Mayhem. Soap.", vote_count: 24000 },
+    // FIX: Added missing vote_count property
+    { ...MOCK_MOVIES.results[1], genres: [{id: 28, name: "Action"}, {id: 878, name: "Science Fiction"}], runtime: 148, tagline: "Your mind is the scene of the crime.", vote_count: 30000 },
 ];
 
 export const MOCK_TV_DETAILS: TVDetail[] = [
-    { ...MOCK_TV.results[0], genres: [{id: 10765, name: "Sci-Fi & Fantasy"}, {id: 18, name: "Drama"}], episode_run_time: [60], tagline: "Winter is coming." },
-    { ...MOCK_TV.results[2], genres: [{id: 10765, name: "Sci-Fi & Fantasy"}, {id: 9648, name: "Mystery"}], episode_run_time: [50], tagline: "The world is turning upside down." },
+    // FIX: Added missing vote_count property
+    { ...MOCK_TV.results[0], genres: [{id: 10765, name: "Sci-Fi & Fantasy"}, {id: 18, name: "Drama"}], episode_run_time: [60], tagline: "Winter is coming.", vote_count: 20000 },
+    // FIX: Added missing vote_count property
+    { ...MOCK_TV.results[2], genres: [{id: 10765, name: "Sci-Fi & Fantasy"}, {id: 9648, name: "Mystery"}], episode_run_time: [50], tagline: "The world is turning upside down.", vote_count: 15000 },
 ];
-

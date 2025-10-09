@@ -1,9 +1,12 @@
+
 import React, { useEffect, useState, useContext } from 'react';
 import { useParams } from 'react-router-dom';
 import { getDetails, getStoredMovie, incrementDownloadCount, getCredits } from '../services/api';
 import { ContentType, MovieDetail, StoredMovie, TVDetail, MovieSummary, TVSummary, CastMember } from '../types';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
 import { FavoritesContext } from '../context/FavoritesContext';
+import { useToast } from '../hooks/useToast';
+import { usePageMetadata } from '../hooks/usePageMetadata';
 import Spinner from '../components/Spinner';
 import AdPlaceholder from '../components/AdPlaceholder';
 import CastCard from '../components/CastCard';
@@ -20,6 +23,17 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   const [storedMovie, setStoredMovie] = useState<StoredMovie | null>(null);
   const [loading, setLoading] = useState(true);
   const { addFavorite, removeFavorite, isFavorite } = useContext(FavoritesContext);
+  const { addToast } = useToast();
+  
+  const title = details ? ('title' in details ? details.title : details.name) : '';
+  const posterPath = details?.poster_path ? `${TMDB_IMAGE_BASE_URL}${details.poster_path}` : undefined;
+
+  usePageMetadata({
+    title: title || 'Loading...',
+    description: details?.overview || '',
+    path: `/${type}/${id}`,
+    imageUrl: posterPath,
+  });
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -34,19 +48,66 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
         ]);
         setDetails(detailsData);
         setStoredMovie(storedData);
-        setCast(creditsData.cast.slice(0, 18)); // Get top 18 cast members for the grid
+        setCast(creditsData.cast.slice(0, 18));
       } catch (error) {
         console.error('Failed to fetch details:', error);
+        addToast('Failed to load details. Please try again.', 'error');
       } finally {
         setLoading(false);
       }
     };
     fetchDetails();
-  }, [id, type]);
+  }, [id, type, addToast]);
+  
+  // Effect for JSON-LD structured data
+  useEffect(() => {
+    if (details) {
+      const title = 'title' in details ? details.title : details.name;
+      const releaseDate = 'release_date' in details ? details.release_date : details.first_air_date;
+      const posterUrl = details.poster_path ? `${TMDB_IMAGE_BASE_URL}${details.poster_path}` : '';
+
+      const schema = {
+        "@context": "https://schema.org",
+        "@type": type === 'movie' ? "Movie" : "TVSeries",
+        "name": title,
+        "description": details.overview,
+        "image": posterUrl,
+        "datePublished": releaseDate,
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": details.vote_average.toFixed(1),
+          "bestRating": "10",
+          "ratingCount": details.vote_count
+        }
+      };
+
+      // FIX: Correctly type the script element to avoid type errors when setting `type`.
+      let script = document.getElementById('json-ld-schema') as HTMLScriptElement | null;
+      if (!script) {
+        script = document.createElement('script');
+        script.id = 'json-ld-schema';
+        document.head.appendChild(script);
+      }
+      script.type = 'application/ld+json';
+      script.innerHTML = JSON.stringify(schema);
+    }
+    
+    return () => {
+      const script = document.getElementById('json-ld-schema');
+      if(script) {
+          script.remove();
+      }
+    }
+  }, [details, type]);
 
   const handleDownloadClick = async (url: string) => {
     if (storedMovie) {
-      await incrementDownloadCount(storedMovie._id);
+      try {
+        await incrementDownloadCount(storedMovie._id);
+      } catch (error) {
+        console.error("Failed to increment download count", error);
+        addToast('Could not track download click.', 'info');
+      }
       window.open(url, '_blank');
     }
   };
@@ -67,7 +128,6 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   if (!details) return <p>Content not found.</p>;
   
   const isFav = isFavorite(details.id);
-  const title = 'title' in details ? details.title : details.name;
   const releaseDate = 'release_date' in details ? details.release_date : details.first_air_date;
   const runtime = 'runtime' in details ? details.runtime : (details.episode_run_time?.[0] || 0);
 
@@ -78,7 +138,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   return (
     <div className="flex flex-col md:flex-row gap-8">
       <div className="md:w-1/3 flex-shrink-0">
-        <img src={posterUrl} alt={title} className="rounded-lg shadow-2xl w-full" />
+        <img src={posterUrl} alt={title} className="rounded-lg shadow-2xl w-full object-cover aspect-[2/3]" />
       </div>
       <div className="md:w-2/3">
         <div className="flex items-start justify-between">
