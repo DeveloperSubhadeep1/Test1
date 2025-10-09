@@ -133,7 +133,7 @@ const HomePage: React.FC = () => {
       <AdPlaceholder width="w-full max-w-4xl" height="h-24" label="Leaderboard Ad" />
       <section>
         <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-4 gap-4">
-            <h2 className="text-2xl font-bold border-l-4 border-accent pl-4">Discover</h2>
+            <h1 className="text-3xl font-bold border-l-4 border-accent pl-4">Discover</h1>
             <SortFilter currentSort={sort} onSortChange={handleSortChange} />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">

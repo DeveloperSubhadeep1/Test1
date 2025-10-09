@@ -1,4 +1,3 @@
-
 import React, { useState, useContext, useEffect, useCallback } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { getMetrics, getStoredMovies, addStoredMovie, deleteStoredMovie, searchTMDB } from '../services/api';
@@ -265,24 +264,27 @@ const AddMovieForm: React.FC<{onMovieAdded: () => void}> = ({onMovieAdded}) => {
                     />
                     {searchResults.length > 0 && (
                         <div className="absolute z-10 w-full bg-primary border border-gray-700 rounded-md mt-1 shadow-lg max-h-60 overflow-y-auto">
-                            {searchResults.map(movie => (
+                            {searchResults.map(movie => {
+                                const movieTitle = 'title' in movie ? movie.title : movie.name;
+                                return (
                                 <div key={movie.id} onClick={() => handleSelectMovie(movie)} className="p-3 hover:bg-secondary cursor-pointer flex items-center space-x-4">
-                                    <img src={movie.poster_path ? `${TMDB_IMAGE_BASE_URL}${movie.poster_path}` : 'https://picsum.photos/50/75'} alt="" className="w-10 h-auto rounded"/>
+                                    <img src={movie.poster_path ? `${TMDB_IMAGE_BASE_URL}${movie.poster_path}` : 'https://picsum.photos/50/75'} alt={movieTitle} className="w-10 h-auto rounded"/>
                                     <div>
-                                        <p>{'title' in movie ? movie.title : movie.name}</p>
+                                        <p>{movieTitle}</p>
                                         <p className="text-xs text-muted">
                                             {'release_date' in movie ? movie.release_date?.split('-')[0] : movie.first_air_date?.split('-')[0]}
                                         </p>
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
 
                 {selectedMovie && (
                      <div className="bg-primary p-4 rounded-md flex items-center space-x-4">
-                        <img src={selectedMovie.poster_path ? `${TMDB_IMAGE_BASE_URL}${selectedMovie.poster_path}` : 'https://picsum.photos/100/150'} alt="" className="w-20 h-auto rounded"/>
+                        <img src={selectedMovie.poster_path ? `${TMDB_IMAGE_BASE_URL}${selectedMovie.poster_path}` : 'https://picsum.photos/100/150'} alt={'title' in selectedMovie ? selectedMovie.title : selectedMovie.name} className="w-20 h-auto rounded"/>
                         <div>
                             <p className="font-bold text-lg">Selected: {'title' in selectedMovie ? selectedMovie.title : selectedMovie.name}</p>
                             <p className="text-sm text-muted">TMDB ID: {selectedMovie.id}</p>
