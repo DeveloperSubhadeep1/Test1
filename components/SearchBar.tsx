@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useDebounce } from '../hooks/useDebounce';
-import { SearchIcon, ClockIcon, XIcon, StarIcon, FilmIcon } from './Icons';
+import { SearchIcon, ClockIcon, XIcon, StarIcon, FilmIcon, InfoIcon } from './Icons';
 import { searchTMDB } from '../services/api';
 import { MovieSummary, TVSummary } from '../types';
 import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
@@ -32,11 +32,11 @@ const SearchBar: React.FC = () => {
 
   const [suggestions, setSuggestions] = useState<(MovieSummary | TVSummary)[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   
-  // Load recent searches from localStorage on initial render
   useEffect(() => {
     try {
         const stored = localStorage.getItem(RECENT_SEARCHES_KEY);
@@ -61,7 +61,6 @@ const SearchBar: React.FC = () => {
             ...prevSearches.filter(s => s.toLowerCase() !== term.toLowerCase())
         ].slice(0, MAX_RECENT_SEARCHES);
         
-        // Only update state and localStorage if the list has actually changed.
         if (JSON.stringify(newSearches) === JSON.stringify(prevSearches)) {
             return prevSearches;
         }
@@ -80,7 +79,6 @@ const SearchBar: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getQueryFromPath]);
   
-  // Effect to add a search term to history when the user lands on a search page
   useEffect(() => {
     const queryFromPath = getQueryFromPath();
     if (location.pathname.startsWith('/search/') && queryFromPath) {
@@ -91,6 +89,7 @@ const SearchBar: React.FC = () => {
   useEffect(() => {
     const fetchSuggestions = async () => {
       if (debouncedQuery.trim().length > 1) {
+        setIsLoading(true);
         try {
           const res = await searchTMDB(debouncedQuery);
           setSuggestions(res.results.slice(0, 5));
@@ -99,11 +98,14 @@ const SearchBar: React.FC = () => {
         } catch (error) {
           console.error("Failed to fetch search suggestions", error);
           setSuggestions([]);
+        } finally {
+          setIsLoading(false);
         }
       } else {
+        setIsLoading(false);
         setSuggestions([]);
         if (query.trim().length === 0) {
-            setShowSuggestions(true); // Show recent searches if input is empty
+            setShowSuggestions(true);
         } else {
             setShowSuggestions(false);
         }
@@ -146,27 +148,60 @@ const SearchBar: React.FC = () => {
     }
   };
 
+  const showDropdown = showSuggestions && (query.trim().length > 0 || recentSearches.length > 0);
+  const showRecentSearches = showSuggestions && query.trim().length === 0 && recentSearches.length > 0;
+  const showLiveSuggestions = showSuggestions && query.trim().length > 0 && suggestions.length > 0;
+  const showNoResults = showSuggestions && query.trim().length > 0 && !isLoading && suggestions.length === 0;
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (showSuggestions && suggestions.length > 0) {
-      if (e.key === 'ArrowDown') {
+    if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      return;
+    }
+
+    const isShowingLive = showLiveSuggestions;
+    const isShowingRecent = showRecentSearches;
+
+    if (!isShowingLive && !isShowingRecent) return;
+    
+    const activeList = isShowingLive ? suggestions : recentSearches;
+    const listLength = activeList.length + (isShowingLive ? 1 : 0);
+
+    if (listLength === 0) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
         e.preventDefault();
-        setActiveIndex(prevIndex => (prevIndex + 1) % suggestions.length);
-      } else if (e.key === 'ArrowUp') {
+        setActiveIndex(prevIndex => (prevIndex + 1) % listLength);
+        break;
+      case 'ArrowUp':
         e.preventDefault();
-        setActiveIndex(prevIndex => (prevIndex - 1 + suggestions.length) % suggestions.length);
-      } else if (e.key === 'Enter') {
+        setActiveIndex(prevIndex => (prevIndex - 1 + listLength) % listLength);
+        break;
+      case 'Enter':
         if (activeIndex >= 0) {
           e.preventDefault();
-          const selected = suggestions[activeIndex];
-          const type = (selected as any).media_type;
-          const title = type === 'movie' ? (selected as MovieSummary).title : (selected as TVSummary).name;
-          const slug = generateSlug(title);
-          navigate(`/${type}/${slug}`);
           setShowSuggestions(false);
+
+          if (isShowingLive) {
+            if (activeIndex === suggestions.length) {
+              navigate(`/search/${encodeURIComponent(query.trim())}`);
+            } else {
+              const item = suggestions[activeIndex];
+              const type = (item as any).media_type;
+              const title = type === 'movie' ? (item as MovieSummary).title : (item as TVSummary).name;
+              const slug = generateSlug(title);
+              navigate(`/${type}/${slug}`);
+            }
+          } else if (isShowingRecent) {
+            const term = recentSearches[activeIndex];
+            setQuery(term);
+            navigate(`/search/${encodeURIComponent(term)}`);
+          }
         }
-      } else if (e.key === 'Escape') {
-        setShowSuggestions(false);
-      }
+        break;
+      default:
+        break;
     }
   };
 
@@ -187,8 +222,7 @@ const SearchBar: React.FC = () => {
       setShowSuggestions(false);
   };
 
-  const showRecentSearches = showSuggestions && query.trim().length === 0 && recentSearches.length > 0;
-  const showLiveSuggestions = showSuggestions && query.trim().length > 0 && suggestions.length > 0;
+  const activeClass = 'bg-light-accent/20 dark:bg-accent/20';
 
   return (
     <div className="relative" ref={searchContainerRef}>
@@ -199,16 +233,16 @@ const SearchBar: React.FC = () => {
           onChange={handleQueryChange}
           onKeyDown={handleKeyDown}
           onFocus={() => setShowSuggestions(true)}
-          placeholder="Search for movies or TV shows..."
-          className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-full py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent transition-all"
+          placeholder="Search movies, TV shows..."
+          className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-full py-2 lg:py-2.5 pl-10 lg:pl-12 pr-4 lg:pr-6 text-sm lg:text-base focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent transition-all"
           autoComplete="off"
         />
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <div className="absolute inset-y-0 left-0 pl-3 lg:pl-4 flex items-center pointer-events-none">
           <SearchIcon className="h-5 w-5 text-light-muted dark:text-muted" />
         </div>
       </form>
-      {(showRecentSearches || showLiveSuggestions) && (
-        <div className="absolute z-20 w-full mt-1 bg-light-primary dark:bg-secondary border border-light-border dark:border-gray-700 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+      {showDropdown && (
+        <div className="absolute z-20 w-full mt-1 bg-light-primary dark:bg-secondary border border-light-border dark:border-gray-700 rounded-lg shadow-lg max-h-96 overflow-y-auto hidden lg:block">
           {showRecentSearches && (
             <div>
               <div className="px-4 pt-3 pb-2 flex justify-between items-center">
@@ -216,8 +250,12 @@ const SearchBar: React.FC = () => {
                 <button onClick={handleClearAllRecent} className="text-xs text-light-accent dark:text-accent hover:underline">Clear All</button>
               </div>
               <ul>
-                {recentSearches.map(term => (
-                  <li key={term} className="group flex items-center justify-between hover:bg-light-secondary dark:hover:bg-primary">
+                {recentSearches.map((term, index) => (
+                  <li 
+                    key={term}
+                    className={`group flex items-center justify-between transition-colors ${index === activeIndex ? activeClass : 'hover:bg-light-secondary dark:hover:bg-primary'}`}
+                    onMouseEnter={() => setActiveIndex(index)}
+                  >
                     <Link
                       to={`/search/${encodeURIComponent(term)}`}
                       onClick={clearSuggestions}
@@ -238,6 +276,17 @@ const SearchBar: React.FC = () => {
               </ul>
             </div>
           )}
+
+          {isLoading && <div className="p-4 text-center text-light-muted dark:text-muted">Loading...</div>}
+          
+          {showNoResults && (
+            <div className="p-6 flex flex-col items-center justify-center text-center text-light-muted dark:text-muted">
+              <InfoIcon className="h-10 w-10 mb-3" />
+              <p className="font-semibold text-lg text-light-text dark:text-white">No Results Found</p>
+              <p className="text-sm">We couldn't find anything for "{query}"</p>
+            </div>
+          )}
+
           {showLiveSuggestions && (
             <ul>
               {suggestions.map((item, index) => {
@@ -249,20 +298,24 @@ const SearchBar: React.FC = () => {
                 const slug = generateSlug(title);
 
                 return (
-                  <li key={item.id} className={`${index === activeIndex ? 'bg-light-secondary dark:bg-primary' : ''}`}>
+                  <li 
+                    key={item.id}
+                    className={`transition-colors ${index === activeIndex ? activeClass : 'hover:bg-light-secondary dark:hover:bg-primary'}`}
+                    onMouseEnter={() => setActiveIndex(index)}
+                  >
                     <Link
                       to={`/${type}/${slug}`}
                       onClick={clearSuggestions}
-                      className="p-3 hover:bg-light-secondary dark:hover:bg-primary flex items-start space-x-4 cursor-pointer"
+                      className="p-3 flex items-start space-x-4 cursor-pointer"
                     >
                       {posterUrl ? (
-                        <img src={posterUrl} alt={title} className="w-14 h-[84px] object-cover rounded flex-shrink-0" />
+                        <img src={posterUrl} alt={title} className="w-16 h-24 object-cover rounded flex-shrink-0 bg-light-secondary dark:bg-primary" />
                       ) : (
-                        <div className="w-14 h-[84px] bg-light-secondary dark:bg-primary rounded flex items-center justify-center flex-shrink-0">
-                            <FilmIcon className="w-6 h-6 text-light-muted dark:text-muted" />
+                        <div className="w-16 h-24 bg-light-secondary dark:bg-primary rounded flex items-center justify-center flex-shrink-0">
+                            <FilmIcon className="w-8 h-8 text-light-muted dark:text-muted" />
                         </div>
                       )}
-                      <div className="flex-grow min-w-0">
+                      <div className="flex-grow min-w-0 pt-1">
                         <p className="font-semibold text-light-text dark:text-white truncate">{title}</p>
                         <div className="flex items-center space-x-2 text-sm text-light-muted dark:text-muted mt-1">
                           <span>{year}</span>
@@ -276,12 +329,24 @@ const SearchBar: React.FC = () => {
                             </>
                           )}
                         </div>
-                        <p className="text-xs text-light-muted dark:text-muted mt-1 line-clamp-2">{item.overview}</p>
+                        <p className="text-xs text-light-muted dark:text-muted mt-2 line-clamp-2">{item.overview}</p>
                       </div>
                     </Link>
                   </li>
                 );
               })}
+              <li 
+                className={`transition-colors ${suggestions.length === activeIndex ? activeClass : 'hover:bg-light-secondary dark:hover:bg-primary'}`}
+                onMouseEnter={() => setActiveIndex(suggestions.length)}
+              >
+                  <Link
+                    to={`/search/${encodeURIComponent(query.trim())}`}
+                    onClick={clearSuggestions}
+                    className="p-3 text-center block w-full text-sm font-semibold text-light-accent dark:text-accent"
+                  >
+                    View all results for "{query.trim()}"
+                  </Link>
+              </li>
             </ul>
           )}
         </div>

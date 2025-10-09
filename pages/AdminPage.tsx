@@ -499,6 +499,7 @@ const AddMovieForm: React.FC<{onMovieAdded: () => void}> = ({onMovieAdded}) => {
                         <div>
                             <p className="font-bold text-lg">Selected: {'title' in selectedMovie ? selectedMovie.title : selectedMovie.name}</p>
                             <p className="text-sm text-light-muted dark:text-muted">TMDB ID: {selectedMovie.id}</p>
+                            <p className="text-sm text-light-muted dark:text-muted">Year: {'release_date' in selectedMovie ? selectedMovie.release_date?.split('-')[0] : selectedMovie.first_air_date?.split('-')[0] || 'N/A'}</p>
                              <button type="button" onClick={() => { setSelectedMovie(null); setTitle(''); }} className="text-xs text-red-500 hover:underline mt-1">Clear Selection</button>
                         </div>
                      </div>

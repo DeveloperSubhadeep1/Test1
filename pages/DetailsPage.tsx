@@ -10,7 +10,7 @@ import { usePageMetadata } from '../hooks/usePageMetadata';
 import Spinner from '../components/Spinner';
 import TelegramAd from '../components/TelegramAd';
 import CastCard from '../components/CastCard';
-import { StarIcon, CalendarIcon, ClockIcon, DownloadIcon, HeartIcon, BookmarkIcon } from '../components/Icons';
+import { StarIcon, CalendarIcon, ClockIcon, DownloadIcon, HeartIcon, BookmarkIcon, ShareIcon } from '../components/Icons';
 
 interface DetailsPageProps {
   type: ContentType;
@@ -141,6 +141,44 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
       addToWatchlist(watchlistItem);
     }
   };
+  
+  const handleShare = async () => {
+    if (!details) return;
+
+    // Manually construct the URL to ensure it's absolute and well-formed for the Web Share API.
+    // This avoids issues where window.location.href might be ambiguous or invalid.
+    const path = `/${type}/${slug}`;
+    const cleanPathname = window.location.pathname.replace(/index\.html$/, '');
+    const shareUrl = `${window.location.origin}${cleanPathname}#${path}`;
+
+    const shareTitle = title;
+    const shareText = `Check out ${title} on CineStream! Find download links and more.`;
+
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: shareTitle,
+                text: shareText,
+                url: shareUrl,
+            });
+        } catch (error) {
+            // Don't show an error if the user cancels the share action
+            if ((error as DOMException).name !== 'AbortError') {
+                 console.error('Error sharing:', error);
+                 addToast('Could not share content.', 'error');
+            }
+        }
+    } else {
+        // Fallback for browsers that don't support the Web Share API
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            addToast('Link copied to clipboard!', 'info');
+        } catch (error) {
+            console.error('Failed to copy link:', error);
+            addToast('Could not copy link to clipboard.', 'error');
+        }
+    }
+  };
 
   if (loading) return <Spinner />;
   if (!details) return <p>Content not found.</p>;
@@ -163,6 +201,14 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
         <div className="flex items-start justify-between gap-4">
             <h1 className="text-4xl font-bold text-light-text dark:text-white">{title}</h1>
             <div className="flex items-center gap-2 flex-shrink-0">
+               <button
+                onClick={handleShare}
+                title="Share this content"
+                className="p-2 bg-light-secondary dark:bg-secondary rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                aria-label="Share"
+              >
+                <ShareIcon className="h-6 w-6 text-light-muted dark:text-muted" />
+              </button>
               <button
                 onClick={handleWatchlistToggle}
                 title={onWl ? 'Remove from watchlist' : 'Add to watchlist'}

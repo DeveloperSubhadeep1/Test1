@@ -24,8 +24,9 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   return (
     <header className="bg-light-secondary/80 dark:bg-secondary/80 backdrop-blur-sm sticky top-0 z-40 border-b border-light-border dark:border-gray-800">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <div className="flex items-center">
+        <div className="flex items-center h-16">
+          {/* Left Section */}
+          <div className="flex items-center flex-1">
             {/* Mobile Menu Button */}
             <button
               onClick={onMenuClick}
@@ -51,12 +52,15 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             </nav>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-4">
-            {/* Search Bar */}
-            <div className="flex-1 max-w-xs lg:max-w-sm">
+          {/* Center Section: Search Bar */}
+          <div className="flex justify-center flex-1 px-4">
+            <div className="w-full max-w-xs lg:max-w-lg">
                 <SearchBar />
             </div>
+          </div>
 
+          {/* Right Section */}
+          <div className="flex items-center justify-end flex-1 gap-2 sm:gap-4">
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
