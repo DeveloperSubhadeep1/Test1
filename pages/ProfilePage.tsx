@@ -1,13 +1,13 @@
 import React, { useContext, useState, useEffect } from 'react';
-import { ProfileContext } from '../context/ProfileContext';
+import { AuthContext } from '../context/AuthContext';
 import { usePageMetadata } from '../hooks/usePageMetadata';
-import { UserProfile } from '../types';
 import { Avatar, AVATAR_OPTIONS } from '../components/Avatars';
 
 const ProfilePage: React.FC = () => {
-  const { profile, saveProfile } = useContext(ProfileContext);
+  const { currentUser, updateProfile } = useContext(AuthContext);
   const [username, setUsername] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState('avatar1');
+  const [loading, setLoading] = useState(false);
 
   usePageMetadata({
     title: 'Your Profile',
@@ -16,22 +16,21 @@ const ProfilePage: React.FC = () => {
   });
 
   useEffect(() => {
-    if (profile) {
-      setUsername(profile.username);
-      setSelectedAvatar(profile.avatarId);
+    if (currentUser) {
+      setUsername(currentUser.username);
+      setSelectedAvatar(currentUser.avatarId);
     }
-  }, [profile]);
+  }, [currentUser]);
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmedUsername = username.trim();
-    if (trimmedUsername) {
-      const newProfile: UserProfile = {
-        username: trimmedUsername,
-        avatarId: selectedAvatar,
-      };
-      saveProfile(newProfile);
+    if (!currentUser || selectedAvatar === currentUser.avatarId) {
+      return; // No changes to save
     }
+
+    setLoading(true);
+    await updateProfile({ avatarId: selectedAvatar });
+    setLoading(false);
   };
 
   return (
@@ -47,11 +46,10 @@ const ProfilePage: React.FC = () => {
               id="username"
               type="text"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
               className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent"
-              required
-              maxLength={20}
+              disabled // Username changes are complex and not supported in this setup for simplicity.
             />
+             <p className="text-xs text-light-muted dark:text-muted mt-1">Username cannot be changed.</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-light-muted dark:text-muted mb-2">
@@ -67,6 +65,7 @@ const ProfilePage: React.FC = () => {
                     selectedAvatar === avatarId ? 'ring-2 ring-light-accent dark:ring-accent' : 'ring-2 ring-transparent hover:ring-light-muted dark:hover:ring-muted'
                   }`}
                   aria-label={`Select avatar ${avatarId}`}
+                  disabled={loading}
                 >
                   <Avatar avatarId={avatarId} className="h-16 w-16" />
                 </button>
@@ -76,9 +75,10 @@ const ProfilePage: React.FC = () => {
           <div className="pt-4">
             <button
               type="submit"
-              className="w-full bg-light-accent dark:bg-accent text-white font-bold py-3 px-4 rounded-md hover:bg-blue-500 transition-colors"
+              className="w-full bg-light-accent dark:bg-accent text-white font-bold py-3 px-4 rounded-md hover:bg-blue-500 transition-colors disabled:bg-gray-500"
+              disabled={loading || (currentUser && selectedAvatar === currentUser.avatarId)}
             >
-              Save Profile
+              {loading ? 'Saving...' : 'Save Profile'}
             </button>
           </div>
         </form>

@@ -40,9 +40,9 @@ export type ContentType = 'movie' | 'tv';
 
 export type ContentItem = (MovieSummary | TVSummary) & { type: ContentType };
 
-export type FavoriteItem = ContentItem & { dateAdded: number };
+export type FavoriteItem = ContentItem & { _id?: string; dateAdded: number; };
 
-export type WatchlistItem = ContentItem & { dateAdded: number };
+export type WatchlistItem = ContentItem & { _id?: string; dateAdded: number; };
 
 export interface DownloadLink {
   label: string;
@@ -55,6 +55,7 @@ export interface StoredMovie {
   type: ContentType;
   title: string;
   download_links: DownloadLink[];
+  download_count: number;
 }
 
 export interface SupportTicket {
@@ -93,6 +94,7 @@ export interface PersonDetails {
 export type PersonCredit = (MovieSummary | TVSummary) & { media_type: 'movie' | 'tv' };
 
 export interface UserProfile {
+  _id: string;
   username: string;
   avatarId: string;
 }

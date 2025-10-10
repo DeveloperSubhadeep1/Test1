@@ -8,15 +8,12 @@ import { usePageMetadata } from '../hooks/usePageMetadata';
 import Spinner from '../components/Spinner';
 import { useDebounce } from '../hooks/useDebounce';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
-import { TrashIcon, PlusCircleIcon, ArrowUpIcon, ArrowDownIcon, MenuIcon } from '../components/Icons';
+import { TrashIcon, PlusCircleIcon, ArrowUpIcon, ArrowDownIcon, MenuIcon, UserCogIcon } from '../components/Icons';
 import ConfirmationModal from '../components/ConfirmationModal';
 
 const AdminPage: React.FC = () => {
-    const { isAuthenticated, login, logout } = useContext(AuthContext);
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-
+    const { isAuthenticated, isAdmin, login, logout } = useContext(AuthContext);
+    
     usePageMetadata({
       title: 'Admin Dashboard',
       description: 'Admin login and dashboard for CineStream.',
@@ -24,47 +21,26 @@ const AdminPage: React.FC = () => {
     });
 
     useEffect(() => {
-        // Prevent admin page from being indexed by search engines
         const meta = document.createElement('meta');
         meta.name = 'robots';
         meta.content = 'noindex, nofollow';
         document.head.appendChild(meta);
-    
         return () => {
-            // Cleanup on unmount
             const metaTag = document.querySelector('meta[name="robots"]');
-            if (metaTag) {
-                metaTag.remove();
-            }
+            if (metaTag) metaTag.remove();
         };
     }, []);
 
-    const handleLogin = (e: React.FormEvent) => {
-        e.preventDefault();
-        const success = login(username, password);
-        if (!success) {
-            setError('Invalid credentials');
-        }
-    };
-
     if (!isAuthenticated) {
+        return <AdminLoginForm onLogin={login} />;
+    }
+
+    if (!isAdmin) {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="w-full max-w-md bg-light-secondary dark:bg-secondary p-8 rounded-lg shadow-lg">
-                    <h1 className="text-2xl font-bold text-center mb-6">Admin Login</h1>
-                    <form onSubmit={handleLogin} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-light-muted dark:text-muted">Username</label>
-                            <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md p-2 mt-1 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-light-muted dark:text-muted">Password</label>
-                            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md p-2 mt-1 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent" />
-                        </div>
-                        {error && <p className="text-red-500 text-sm">{error}</p>}
-                        <button type="submit" className="w-full bg-light-accent dark:bg-accent text-white font-bold py-2 px-4 rounded-md hover:bg-blue-500 transition-colors">Login</button>
-                    </form>
-                </div>
+            <div className="text-center py-20">
+                <UserCogIcon className="h-24 w-24 mx-auto text-light-muted dark:text-muted mb-4" />
+                <h1 className="text-4xl font-bold text-red-500">Access Denied</h1>
+                <p className="text-light-muted dark:text-muted mt-2">You do not have permission to view this page.</p>
             </div>
         );
     }
@@ -79,6 +55,44 @@ const AdminPage: React.FC = () => {
         </div>
     );
 };
+
+const AdminLoginForm: React.FC<{onLogin: (u: string, p: string) => Promise<boolean>}> = ({ onLogin }) => {
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        const success = await onLogin(username, password);
+        if (!success) {
+            setError('Invalid credentials');
+        }
+    };
+    
+    return (
+        <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="w-full max-w-md bg-light-secondary dark:bg-secondary p-8 rounded-lg shadow-lg">
+                <h1 className="text-2xl font-bold text-center mb-6">Admin Login</h1>
+                <form onSubmit={handleLogin} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-light-muted dark:text-muted">Username</label>
+                        <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md p-2 mt-1 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-light-muted dark:text-muted">Password</label>
+                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md p-2 mt-1 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent" />
+                    </div>
+                    {error && <p className="text-red-500 text-sm">{error}</p>}
+                    <button type="submit" className="w-full bg-light-accent dark:bg-accent text-white font-bold py-2 px-4 rounded-md hover:bg-blue-500 transition-colors">Login</button>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+// ... The rest of the AdminDashboard, StoredMoviesSection, etc. components remain unchanged ...
+// So I will just copy them from the original file.
 
 type SortKey = 'title' | 'links';
 type SortDirection = 'ascending' | 'descending';
@@ -464,12 +478,12 @@ const AddMovieForm: React.FC<{onMovieAdded: () => void}> = ({onMovieAdded}) => {
                 title: 'title' in selectedMovie ? selectedMovie.title : selectedMovie.name,
                 type: 'title' in selectedMovie ? 'movie' : 'tv',
                 download_links: links.filter(link => link.label && link.url),
+                download_count: 0,
             };
             await addStoredMovie(newMovie);
             addToast('Movie added successfully!', 'success');
             resetForm();
             onMovieAdded();
-// FIX: Corrected invalid `catch` syntax from `catch (error) => {` to `catch (error) {`. This fixes this and several subsequent cascading errors.
         } catch (error) {
             const message = error instanceof Error ? error.message : 'An unknown error occurred.';
             console.error("Add movie failed:", message);

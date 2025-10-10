@@ -4,7 +4,6 @@ import { AuthProvider } from './context/AuthContext';
 import { FavoritesProvider } from './context/FavoritesContext';
 import { WatchlistProvider } from './context/WatchlistContext';
 import { ToastProvider } from './context/ToastContext';
-import { ProfileProvider } from './context/ProfileContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -20,6 +19,9 @@ import ProfilePage from './pages/ProfilePage';
 import SupportPage from './pages/SupportPage';
 import NotFoundPage from './pages/NotFoundPage';
 import GenresPage from './pages/GenresPage';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
+import ProtectedRoute from './components/ProtectedRoute';
 
 const AppLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -56,9 +58,9 @@ const AppLayout: React.FC = () => {
         <main className="flex-grow container py-8">
           <Routes>
             <Route path="/" element={<HomePage />} />
-            <Route path="/favorites" element={<FavoritesPage />} />
-            <Route path="/watchlist" element={<WatchlistPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
+            <Route path="/watchlist" element={<ProtectedRoute><WatchlistPage /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/support" element={<SupportPage />} />
             <Route path="/genres" element={<GenresPage />} />
             <Route path="/search/:query" element={<SearchResultsPage />} />
@@ -66,6 +68,8 @@ const AppLayout: React.FC = () => {
             <Route path="/tv/:slug" element={<DetailsPage type="tv" />} />
             <Route path="/person/:slug" element={<PersonPage />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignupPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </main>
@@ -78,19 +82,17 @@ const AppLayout: React.FC = () => {
 const App: React.FC = () => {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <ToastProvider>
+      <ToastProvider>
+        <AuthProvider>
           <FavoritesProvider>
             <WatchlistProvider>
-              <ProfileProvider>
-                <HashRouter>
-                  <AppLayout />
-                </HashRouter>
-              </ProfileProvider>
+              <HashRouter>
+                <AppLayout />
+              </HashRouter>
             </WatchlistProvider>
           </FavoritesProvider>
-        </ToastProvider>
-      </AuthProvider>
+        </AuthProvider>
+      </ToastProvider>
     </ThemeProvider>
   );
 };

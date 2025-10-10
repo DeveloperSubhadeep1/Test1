@@ -1,9 +1,8 @@
-
-import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useState, useEffect, ReactNode, useCallback, useContext } from 'react';
 import { WatchlistItem, ContentItem } from '../types';
 import { useToast } from '../hooks/useToast';
-
-const WATCHLIST_STORAGE_KEY = 'cineStreamWatchlist';
+import { AuthContext } from './AuthContext';
+import { getWatchlist, addToWatchlist as apiAddToWatchlist, removeFromWatchlist as apiRemoveFromWatchlist } from '../services/api';
 
 interface WatchlistContextType {
   watchlist: WatchlistItem[];
@@ -24,61 +23,61 @@ interface WatchlistProviderProps {
 }
 
 export const WatchlistProvider: React.FC<WatchlistProviderProps> = ({ children }) => {
+  const { currentUser } = useContext(AuthContext);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const { addToast } = useToast();
 
   useEffect(() => {
-    try {
-      const storedWatchlist = localStorage.getItem(WATCHLIST_STORAGE_KEY);
-      if (storedWatchlist) {
-        const parsedWatchlist: WatchlistItem[] = JSON.parse(storedWatchlist).map((item: any, index: number) => ({
-            ...item,
-            dateAdded: item.dateAdded || (Date.now() - index * 60000) // Gracefully handle old data
-        }));
-        setWatchlist(parsedWatchlist);
-      }
-    } catch (error) {
-      console.error("Failed to load watchlist from localStorage", error);
-      addToast('Could not load your watchlist from local storage.', 'error');
+    const fetchWatchlist = async () => {
+        if (currentUser) {
+            try {
+                const userWatchlist = await getWatchlist();
+                setWatchlist(userWatchlist);
+            } catch (error) {
+                console.error("Failed to fetch watchlist", error);
+                addToast("Could not load your watchlist.", 'error');
+            }
+        } else {
+            setWatchlist([]);
+        }
+    };
+    fetchWatchlist();
+  }, [currentUser, addToast]);
+
+  const addToWatchlist = useCallback(async (item: ContentItem) => {
+    if (!currentUser) {
+      addToast('You must be logged in to add to your watchlist.', 'error');
+      return;
     }
-  }, [addToast]);
+    if (watchlist.some(watch => watch.id === item.id)) return;
 
-  const saveWatchlist = useCallback((items: WatchlistItem[]) => {
     try {
-      localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(items));
-      setWatchlist(items);
-    } catch (error) {
-      console.error("Failed to save watchlist to localStorage", error);
-      addToast('Could not save your changes. Your browser storage might be full.', 'error');
-    }
-  }, [addToast]);
-
-  const addToWatchlist = useCallback((item: ContentItem) => {
-    setWatchlist(prevWatchlist => {
-      if (prevWatchlist.some(watch => watch.id === item.id)) {
-        return prevWatchlist;
-      }
-      const newWatchlistItem: WatchlistItem = { ...item, dateAdded: Date.now() };
-      const newWatchlist = [...prevWatchlist, newWatchlistItem];
-      saveWatchlist(newWatchlist);
-      const title = 'title' in item ? item.title : item.name;
-      addToast(`Added "${title}" to your watchlist.`, 'success');
-      return newWatchlist;
-    });
-  }, [saveWatchlist, addToast]);
-
-  const removeFromWatchlist = useCallback((id: number) => {
-    setWatchlist(prevWatchlist => {
-      const item = prevWatchlist.find(watch => watch.id === id);
-      const newWatchlist = prevWatchlist.filter(watch => watch.id !== id);
-      saveWatchlist(newWatchlist);
-      if (item) {
+        const newWatchlistItem = await apiAddToWatchlist(item);
+        setWatchlist(prev => [...prev, newWatchlistItem]);
         const title = 'title' in item ? item.title : item.name;
+        addToast(`Added "${title}" to your watchlist.`, 'success');
+    } catch (error) {
+        console.error("Failed to add to watchlist", error);
+        addToast("Could not add to watchlist.", 'error');
+    }
+  }, [currentUser, watchlist, addToast]);
+
+  const removeFromWatchlist = useCallback(async (tmdbId: number) => {
+    if (!currentUser) return;
+    
+    const itemToRemove = watchlist.find(watch => watch.id === tmdbId);
+    if (!itemToRemove || !itemToRemove._id) return;
+    
+    try {
+        await apiRemoveFromWatchlist(itemToRemove._id);
+        setWatchlist(prev => prev.filter(watch => watch.id !== tmdbId));
+        const title = 'title' in itemToRemove ? itemToRemove.title : itemToRemove.name;
         addToast(`Removed "${title}" from your watchlist.`, 'info');
-      }
-      return newWatchlist;
-    });
-  }, [saveWatchlist, addToast]);
+    } catch (error) {
+        console.error("Failed to remove from watchlist", error);
+        addToast("Could not remove from watchlist.", 'error');
+    }
+  }, [currentUser, watchlist, addToast]);
 
   const isOnWatchlist = useCallback((id: number): boolean => {
     return watchlist.some(watch => watch.id === id);

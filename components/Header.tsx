@@ -1,8 +1,9 @@
 import React, { useContext } from 'react';
-import { NavLink, Link } from 'react-router-dom';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
 import SearchBar from './SearchBar';
-import { FilmIcon, MenuIcon, SunIcon, MoonIcon } from './Icons';
-import { ProfileContext } from '../context/ProfileContext';
+// FIX: Removed LogOutIcon from this import as it's defined below.
+import { FilmIcon, MenuIcon, SunIcon, MoonIcon, UserIcon } from './Icons';
+import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { Avatar } from './Avatars';
 
@@ -10,9 +11,20 @@ interface HeaderProps {
   onMenuClick: () => void;
 }
 
+// Added LogOutIcon to Icons.tsx, but will embed it here for simplicity of change
+const LogOutIcon: React.FC<{className?: string}> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+);
+
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
-  const { profile } = useContext(ProfileContext);
+  const { currentUser, logout } = useContext(AuthContext);
   const { theme, toggleTheme } = useContext(ThemeContext);
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
 
   return (
     <header className="bg-light-secondary/80 dark:bg-secondary/80 backdrop-blur-sm sticky top-0 z-40 border-b border-light-border dark:border-gray-800">
@@ -52,19 +64,37 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 <SunIcon className="h-5 w-5" />
               )}
             </button>
-
-            <NavLink
-              to="/profile"
-              className={({ isActive }) => `flex items-center gap-2 p-1.5 rounded-full transition-colors ${
-                isActive ? 'bg-light-secondary dark:bg-primary' : 'hover:bg-light-secondary dark:hover:bg-primary'
-              }`}
-              aria-label="View Profile"
-            >
-              {profile && (
-                <Avatar avatarId={profile.avatarId} className="h-8 w-8 rounded-full" />
-              )}
-              <span className="hidden lg:inline text-light-text dark:text-white font-medium pr-2">{profile?.username || 'Profile'}</span>
-            </NavLink>
+            
+            {currentUser ? (
+              <>
+                <NavLink
+                  to="/profile"
+                  className={({ isActive }) => `flex items-center gap-2 p-1.5 rounded-full transition-colors ${
+                    isActive ? 'bg-light-secondary dark:bg-primary' : 'hover:bg-light-secondary dark:hover:bg-primary'
+                  }`}
+                  aria-label="View Profile"
+                >
+                  <Avatar avatarId={currentUser.avatarId} className="h-8 w-8 rounded-full" />
+                  <span className="hidden lg:inline text-light-text dark:text-white font-medium pr-2">{currentUser.username}</span>
+                </NavLink>
+                <button
+                  onClick={handleLogout}
+                  className="p-2 rounded-full text-light-muted dark:text-gray-400 hover:text-light-text dark:hover:text-white hover:bg-light-secondary dark:hover:bg-primary transition-colors"
+                  aria-label="Logout"
+                >
+                    <LogOutIcon className="h-5 w-5" />
+                </button>
+              </>
+            ) : (
+              <div className="hidden sm:flex items-center gap-2">
+                <Link to="/login" className="px-4 py-1.5 text-sm font-semibold rounded-full bg-light-secondary dark:bg-secondary hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                    Log In
+                </Link>
+                <Link to="/signup" className="px-4 py-1.5 text-sm font-semibold rounded-full bg-light-accent dark:bg-accent text-white hover:opacity-90 transition-opacity">
+                    Sign Up
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -1,0 +1,81 @@
+import React, { useState, useContext } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
+import { usePageMetadata } from '../hooks/usePageMetadata';
+import { FilmIcon } from '../components/Icons';
+
+const LoginPage: React.FC = () => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { login } = useContext(AuthContext);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from?.pathname || "/";
+
+  usePageMetadata({
+    title: 'Login',
+    description: 'Log in to your CineStream account.',
+    path: '/login',
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const success = await login(username, password);
+    setLoading(false);
+    if (success) {
+      navigate(from, { replace: true });
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="w-full max-w-md bg-light-secondary dark:bg-secondary p-8 rounded-lg shadow-lg">
+        <div className="text-center mb-6">
+            <FilmIcon className="h-12 w-12 mx-auto text-light-accent dark:text-accent" />
+            <h1 className="text-2xl font-bold mt-2">Log in to CineStream</h1>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-light-muted dark:text-muted">Username</label>
+            <input
+              type="text"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md p-2 mt-1 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent"
+              required
+              disabled={loading}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-light-muted dark:text-muted">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md p-2 mt-1 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent"
+              required
+              disabled={loading}
+            />
+          </div>
+          <button
+            type="submit"
+            className="w-full bg-light-accent dark:bg-accent text-white font-bold py-2 px-4 rounded-md hover:bg-blue-500 transition-colors disabled:bg-gray-500"
+            disabled={loading}
+          >
+            {loading ? 'Logging in...' : 'Log In'}
+          </button>
+        </form>
+        <p className="text-center text-sm text-light-muted dark:text-muted mt-6">
+          Don't have an account?{' '}
+          <Link to="/signup" className="font-semibold text-light-accent dark:text-accent hover:underline">
+            Sign up
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default LoginPage;
