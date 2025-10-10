@@ -24,7 +24,7 @@ router.post('/auth/login', async (req, res) => {
     try {
         const { username, password } = req.body;
         // Special admin case
-        if (username === 'admin' && password === 'password') {
+        if (username === 'admin' && password === 'devils2@2006') {
             return res.json({ _id: 'admin_user', username: 'admin', avatarId: 'avatar4' });
         }
 
