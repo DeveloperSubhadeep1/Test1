@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useDebounce } from '../hooks/useDebounce';
-import { SearchIcon, ClockIcon, XIcon, StarIcon, FilmIcon, InfoIcon } from './Icons';
+import { SearchIcon, ClockIcon, XIcon, InfoIcon, FilmIcon } from './Icons';
 import { searchTMDB } from '../services/api';
 import { MovieSummary, TVSummary } from '../types';
 import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
@@ -92,7 +92,7 @@ const SearchBar: React.FC = () => {
         setIsLoading(true);
         try {
           const res = await searchTMDB(debouncedQuery);
-          setSuggestions(res.results.slice(0, 5));
+          setSuggestions(res.results.slice(0, 7));
           setShowSuggestions(true);
           setActiveIndex(-1);
         } catch (error) {
@@ -161,47 +161,60 @@ const SearchBar: React.FC = () => {
 
     const isShowingLive = showLiveSuggestions;
     const isShowingRecent = showRecentSearches;
-
-    if (!isShowingLive && !isShowingRecent) return;
     
-    const activeList = isShowingLive ? suggestions : recentSearches;
-    const listLength = activeList.length + (isShowingLive ? 1 : 0);
-
-    if (listLength === 0) return;
-
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        setActiveIndex(prevIndex => (prevIndex + 1) % listLength);
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        setActiveIndex(prevIndex => (prevIndex - 1 + listLength) % listLength);
-        break;
-      case 'Enter':
-        if (activeIndex >= 0) {
+    if (isShowingLive) {
+        const listLength = suggestions.length + 1; // N suggestions + "View All" link
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                setActiveIndex(prevIndex => (prevIndex + 1) % listLength);
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                setActiveIndex(prevIndex => (prevIndex - 1 + listLength) % listLength);
+                break;
+            case 'Enter':
+                if (activeIndex >= 0) {
+                    e.preventDefault();
+                    setShowSuggestions(false);
+                    if (activeIndex < suggestions.length) {
+                        const item = suggestions[activeIndex];
+                        const type = 'title' in item ? 'movie' : 'tv';
+                        const title = 'title' in item ? item.title : item.name;
+                        const slug = generateSlug(title);
+                        navigate(`/${type}/${slug}`);
+                    } else {
+                        navigate(`/search/${encodeURIComponent(query.trim())}`);
+                    }
+                }
+                break;
+            default:
+                break;
+        }
+    } else if (isShowingRecent) {
+      const listLength = recentSearches.length;
+      if (listLength === 0) return;
+      switch (e.key) {
+        case 'ArrowDown':
           e.preventDefault();
-          setShowSuggestions(false);
-
-          if (isShowingLive) {
-            if (activeIndex === suggestions.length) {
-              navigate(`/search/${encodeURIComponent(query.trim())}`);
-            } else {
-              const item = suggestions[activeIndex];
-              const type = (item as any).media_type;
-              const title = type === 'movie' ? (item as MovieSummary).title : (item as TVSummary).name;
-              const slug = generateSlug(title);
-              navigate(`/${type}/${slug}`);
-            }
-          } else if (isShowingRecent) {
+          setActiveIndex(prevIndex => (prevIndex + 1) % listLength);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setActiveIndex(prevIndex => (prevIndex - 1 + listLength) % listLength);
+          break;
+        case 'Enter':
+          if (activeIndex >= 0) {
+            e.preventDefault();
+            setShowSuggestions(false);
             const term = recentSearches[activeIndex];
             setQuery(term);
             navigate(`/search/${encodeURIComponent(term)}`);
           }
-        }
-        break;
-      default:
-        break;
+          break;
+        default:
+          break;
+      }
     }
   };
 
@@ -242,9 +255,9 @@ const SearchBar: React.FC = () => {
         </div>
       </form>
       {showDropdown && (
-        <div className="absolute z-20 w-full mt-1 bg-light-primary dark:bg-secondary border border-light-border dark:border-gray-700 rounded-lg shadow-lg max-h-96 overflow-y-auto hidden lg:block">
+        <div className="absolute z-20 w-full mt-2 bg-light-primary dark:bg-secondary border border-light-border dark:border-gray-700 rounded-lg shadow-lg flex flex-col max-h-[80vh]">
           {showRecentSearches && (
-            <div>
+            <div className="overflow-y-auto">
               <div className="px-4 pt-3 pb-2 flex justify-between items-center">
                 <h4 className="text-sm font-semibold text-light-muted dark:text-muted">Recent Searches</h4>
                 <button onClick={handleClearAllRecent} className="text-xs text-light-accent dark:text-accent hover:underline">Clear All</button>
@@ -288,66 +301,62 @@ const SearchBar: React.FC = () => {
           )}
 
           {showLiveSuggestions && (
-            <ul>
-              {suggestions.map((item, index) => {
-                const type = (item as any).media_type;
-                const title = type === 'movie' ? (item as MovieSummary).title : (item as TVSummary).name;
-                const releaseDate = type === 'movie' ? (item as MovieSummary).release_date : (item as TVSummary).first_air_date;
-                const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
-                const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : null;
-                const slug = generateSlug(title);
+            <>
+              <div className="overflow-y-auto">
+                <div className="px-4 pt-3 pb-2">
+                    <h4 className="text-sm font-semibold text-light-muted dark:text-muted">Top Results</h4>
+                </div>
+                <ul>
+                    {suggestions.map((item, index) => {
+                        const type = 'title' in item ? 'movie' : 'tv';
+                        const title = type === 'movie' ? (item as MovieSummary).title : (item as TVSummary).name;
+                        const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
+                        const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
+                        const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : null;
+                        const slug = generateSlug(title);
 
-                return (
-                  <li 
-                    key={item.id}
-                    className={`transition-colors ${index === activeIndex ? activeClass : 'hover:bg-light-secondary dark:hover:bg-primary'}`}
-                    onMouseEnter={() => setActiveIndex(index)}
-                  >
-                    <Link
-                      to={`/${type}/${slug}`}
-                      onClick={clearSuggestions}
-                      className="p-3 flex items-start space-x-4 cursor-pointer"
-                    >
-                      {posterUrl ? (
-                        <img src={posterUrl} alt={title} className="w-16 h-24 object-cover rounded flex-shrink-0 bg-light-secondary dark:bg-primary" />
-                      ) : (
-                        <div className="w-16 h-24 bg-light-secondary dark:bg-primary rounded flex items-center justify-center flex-shrink-0">
-                            <FilmIcon className="w-8 h-8 text-light-muted dark:text-muted" />
-                        </div>
-                      )}
-                      <div className="flex-grow min-w-0 pt-1">
-                        <p className="font-semibold text-light-text dark:text-white truncate">{title}</p>
-                        <div className="flex items-center space-x-2 text-sm text-light-muted dark:text-muted mt-1">
-                          <span>{year}</span>
-                          {item.vote_average > 0 && (
-                            <>
-                                <span className="text-gray-500">·</span>
-                                <div className="flex items-center">
-                                    <StarIcon className="h-4 w-4 mr-1 text-yellow-400"/>
-                                    <span>{item.vote_average.toFixed(1)}</span>
-                                </div>
-                            </>
-                          )}
-                        </div>
-                        <p className="text-xs text-light-muted dark:text-muted mt-2 line-clamp-2">{item.overview}</p>
-                      </div>
-                    </Link>
-                  </li>
-                );
-              })}
-              <li 
-                className={`transition-colors ${suggestions.length === activeIndex ? activeClass : 'hover:bg-light-secondary dark:hover:bg-primary'}`}
-                onMouseEnter={() => setActiveIndex(suggestions.length)}
-              >
-                  <Link
-                    to={`/search/${encodeURIComponent(query.trim())}`}
-                    onClick={clearSuggestions}
-                    className="p-3 text-center block w-full text-sm font-semibold text-light-accent dark:text-accent"
-                  >
-                    View all results for "{query.trim()}"
-                  </Link>
-              </li>
-            </ul>
+                        return (
+                            <li
+                                key={item.id}
+                                className={`transition-colors ${index === activeIndex ? activeClass : 'hover:bg-light-secondary dark:hover:bg-primary'}`}
+                                onMouseEnter={() => setActiveIndex(index)}
+                            >
+                                <Link
+                                    to={`/${type}/${slug}`}
+                                    onClick={clearSuggestions}
+                                    className="flex items-center space-x-4 p-3 min-w-0"
+                                >
+                                    <div className="w-10 h-14 flex-shrink-0 bg-light-secondary dark:bg-primary rounded overflow-hidden">
+                                        {posterUrl ? (
+                                            <img src={posterUrl} alt={title} className="w-full h-full object-cover" loading="lazy" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center">
+                                            <FilmIcon className="w-5 h-5 text-light-muted dark:text-muted" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex-grow min-w-0">
+                                        <p className="text-light-text dark:text-white truncate font-semibold">{title}</p>
+
+                                        <p className="text-sm text-light-muted dark:text-muted">{year}</p>
+                                    </div>
+                                </Link>
+                            </li>
+                        );
+                    })}
+                </ul>
+              </div>
+              <div className="flex-shrink-0 border-t border-light-border dark:border-gray-700">
+                <Link
+                  to={`/search/${encodeURIComponent(query.trim())}`}
+                  onClick={clearSuggestions}
+                  className={`block p-3 text-center w-full text-sm font-semibold text-light-accent dark:text-accent transition-colors ${activeIndex === suggestions.length ? activeClass : 'hover:bg-light-secondary dark:hover:bg-primary'}`}
+                  onMouseEnter={() => setActiveIndex(suggestions.length)}
+                >
+                  View all results for "{query.trim()}"
+                </Link>
+              </div>
+            </>
           )}
         </div>
       )}

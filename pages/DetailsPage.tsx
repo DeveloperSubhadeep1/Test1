@@ -11,6 +11,7 @@ import Spinner from '../components/Spinner';
 import TelegramAd from '../components/TelegramAd';
 import CastCard from '../components/CastCard';
 import { StarIcon, CalendarIcon, ClockIcon, DownloadIcon, HeartIcon, BookmarkIcon, ShareIcon } from '../components/Icons';
+import ExpandableText from '../components/ExpandableText';
 
 interface DetailsPageProps {
   type: ContentType;
@@ -251,7 +252,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
           ))}
         </div>
         <h2 className="text-xl font-semibold mt-6 mb-2">Overview</h2>
-        <p className="text-light-text dark:text-gray-300 leading-relaxed">{details.overview}</p>
+        <ExpandableText text={details.overview} />
 
         {cast.length > 0 && (
           <div className="mt-8">

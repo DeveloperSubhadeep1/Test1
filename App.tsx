@@ -35,9 +35,9 @@ const AppLayout: React.FC = () => {
 
   return (
     <div className="bg-light-primary dark:bg-primary text-light-text dark:text-gray-200">
-      {/* Mobile Sidebar (Off-canvas) */}
+      {/* Sidebar (Off-canvas) */}
       <div
-        className={`fixed inset-0 z-50 transform transition-transform duration-300 ease-in-out md:hidden ${
+        className={`fixed inset-0 z-50 transform transition-transform duration-300 ease-in-out ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         role="dialog"
@@ -46,14 +46,14 @@ const AppLayout: React.FC = () => {
       >
         <div className="absolute inset-0 bg-black/60" onClick={() => setIsSidebarOpen(false)} aria-hidden="true"></div>
         <div className="relative h-full">
-          <Sidebar onLinkClick={() => setIsSidebarOpen(false)} />
+          <Sidebar onLinkClick={() => setIsSidebarOpen(false)} onClose={() => setIsSidebarOpen(false)} />
         </div>
       </div>
       
       {/* Main Content Wrapper */}
       <div className="flex flex-col min-h-screen">
         <Header onMenuClick={() => setIsSidebarOpen(true)} />
-        <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="flex-grow container py-8">
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/favorites" element={<FavoritesPage />} />

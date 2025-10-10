@@ -14,54 +14,33 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const { profile } = useContext(ProfileContext);
   const { theme, toggleTheme } = useContext(ThemeContext);
 
-  const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-      isActive
-        ? 'bg-light-accent text-white dark:bg-accent'
-        : 'text-light-muted dark:text-gray-300 hover:bg-light-secondary dark:hover:bg-secondary hover:text-light-text dark:hover:text-white'
-    }`;
-
   return (
     <header className="bg-light-secondary/80 dark:bg-secondary/80 backdrop-blur-sm sticky top-0 z-40 border-b border-light-border dark:border-gray-800">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center h-16">
+      <div className="container">
+        <div className="flex items-center h-16 gap-4">
           {/* Left Section */}
-          <div className="flex items-center flex-1">
-            {/* Mobile Menu Button */}
+          <div className="flex flex-1 items-center justify-start">
             <button
               onClick={onMenuClick}
-              className="p-2 mr-2 rounded-md text-light-muted dark:text-gray-400 hover:text-light-text dark:hover:text-white hover:bg-light-secondary dark:hover:bg-primary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-light-accent dark:focus:ring-white md:hidden"
+              className="p-2 mr-2 rounded-md text-light-muted dark:text-gray-400 hover:text-light-text dark:hover:text-white hover:bg-light-secondary dark:hover:bg-primary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-light-accent dark:focus:ring-white"
               aria-label="Open navigation menu"
             >
               <MenuIcon className="h-6 w-6" />
             </button>
             
-            {/* Logo */}
             <Link to="/" className="flex-shrink-0 flex items-center space-x-2 text-light-text dark:text-white text-xl font-bold">
               <FilmIcon className="h-8 w-8 text-light-accent dark:text-accent" />
               <span className="hidden sm:inline">CineStream</span>
             </Link>
-
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex md:items-center md:space-x-4 md:ml-10">
-              <NavLink to="/" className={navLinkClass} end>Home</NavLink>
-              <NavLink to="/genres" className={navLinkClass}>Genres</NavLink>
-              <NavLink to="/favorites" className={navLinkClass}>Favorites</NavLink>
-              <NavLink to="/watchlist" className={navLinkClass}>Watchlist</NavLink>
-              <NavLink to="/admin" className={navLinkClass}>Admin</NavLink>
-            </nav>
           </div>
 
           {/* Center Section: Search Bar */}
-          <div className="flex justify-center flex-1 px-4">
-            <div className="w-full max-w-xs lg:max-w-lg">
-                <SearchBar />
-            </div>
+          <div className="w-full max-w-2xl">
+            <SearchBar />
           </div>
 
           {/* Right Section */}
-          <div className="flex items-center justify-end flex-1 gap-2 sm:gap-4">
-            {/* Theme Toggle */}
+          <div className="flex flex-1 items-center justify-end gap-2">
             <button
               onClick={toggleTheme}
               className="p-2 rounded-full text-light-muted dark:text-gray-400 hover:text-light-text dark:hover:text-white hover:bg-light-secondary dark:hover:bg-primary transition-colors"
@@ -74,7 +53,6 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               )}
             </button>
 
-            {/* Profile */}
             <NavLink
               to="/profile"
               className={({ isActive }) => `flex items-center gap-2 p-1.5 rounded-full transition-colors ${

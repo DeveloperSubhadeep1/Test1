@@ -176,128 +176,101 @@ export const getAllGenres = async (): Promise<Genre[]> => {
     }
 };
 
+// --- Local Storage Database Service ---
 
-// --- Backend Database Service (using browser localStorage) ---
+const STORED_MOVIES_KEY = 'cineStreamStoredMovies';
+const SUPPORT_TICKETS_KEY = 'cineStreamSupportTickets';
+const DOWNLOAD_COUNTS_KEY = 'cineStreamDownloadCounts';
 
-interface DbData {
-    movies: StoredMovie[];
-    downloadCount: number;
-    supportTickets: SupportTicket[];
-}
-
-const LOCAL_DB_KEY = 'cineStreamLocalDb';
-
-// Helper to update the entire database content in localStorage
-const updateDbContent = async (data: DbData): Promise<void> => {
+const getFromStorage = <T,>(key: string, defaultValue: T): T => {
     try {
-        localStorage.setItem(LOCAL_DB_KEY, JSON.stringify(data));
+        const item = localStorage.getItem(key);
+        return item ? JSON.parse(item) : defaultValue;
     } catch (error) {
-        console.error("Database write error (localStorage):", error);
-        throw new Error('Failed to write to local database. Storage may be full.');
+        console.error(`Failed to parse ${key} from localStorage`, error);
+        return defaultValue;
     }
 };
 
-// Helper to fetch the entire database content from localStorage
-const getDbContent = async (): Promise<DbData> => {
-    const defaultData: DbData = { movies: [], downloadCount: 0, supportTickets: [] };
+const saveToStorage = <T,>(key: string, value: T): void => {
     try {
-        const storedData = localStorage.getItem(LOCAL_DB_KEY);
-        if (storedData) {
-            const data = JSON.parse(storedData);
-            // Basic validation to ensure the loaded data has the expected shape
-            if (data && Array.isArray(data.movies) && typeof data.downloadCount === 'number') {
-                 return { ...defaultData, ...data };
-            }
-        }
-        return defaultData;
+        localStorage.setItem(key, JSON.stringify(value));
     } catch (error) {
-        console.error("Database read error (localStorage):", error);
-        throw new Error("Failed to read local database. It might be corrupted.");
+        console.error(`Failed to save ${key} to localStorage`, error);
     }
 };
 
-// --- Exported API Functions ---
 
 export const getStoredMovie = async (tmdbId: number, type: ContentType): Promise<StoredMovie | null> => {
-    const { movies } = await getDbContent();
-    return movies.find(m => m.tmdb_id === tmdbId && m.type === type) || null;
+    const movies = getFromStorage<StoredMovie[]>(STORED_MOVIES_KEY, []);
+    const foundMovie = movies.find(movie => movie.tmdb_id === tmdbId && movie.type === type) || null;
+    return Promise.resolve(foundMovie);
 };
 
 export const getStoredMovies = async (): Promise<StoredMovie[]> => {
-    const { movies } = await getDbContent();
-    return [...movies].sort((a,b) => a.title.localeCompare(b.title));
+    return Promise.resolve(getFromStorage<StoredMovie[]>(STORED_MOVIES_KEY, []));
 };
 
 export const addStoredMovie = async (movie: Omit<StoredMovie, '_id'>): Promise<StoredMovie> => {
-    const db = await getDbContent();
-    const existingIndex = db.movies.findIndex(m => m.tmdb_id === movie.tmdb_id && m.type === movie.type);
-    
-    let savedMovie: StoredMovie;
-
-    if (existingIndex > -1) {
-        db.movies[existingIndex].download_links = movie.download_links;
-        savedMovie = db.movies[existingIndex];
-    } else {
-        const newMovie: StoredMovie = { _id: Date.now().toString(), ...movie };
-        db.movies.push(newMovie);
-        savedMovie = newMovie;
-    }
-    
-    await updateDbContent(db);
-    return savedMovie;
+    const movies = getFromStorage<StoredMovie[]>(STORED_MOVIES_KEY, []);
+    const newMovie: StoredMovie = {
+        ...movie,
+        _id: `${Date.now()}-${Math.random()}`,
+    };
+    movies.push(newMovie);
+    saveToStorage(STORED_MOVIES_KEY, movies);
+    return Promise.resolve(newMovie);
 };
 
 export const deleteStoredMovie = async (id: string): Promise<void> => {
-    const db = await getDbContent();
-    const initialLength = db.movies.length;
-    db.movies = db.movies.filter(m => m._id !== id);
-    if (db.movies.length === initialLength) {
-        throw new Error("Could not find the movie to delete.");
-    }
-    await updateDbContent(db);
+    let movies = getFromStorage<StoredMovie[]>(STORED_MOVIES_KEY, []);
+    movies = movies.filter(movie => movie._id !== id);
+    saveToStorage(STORED_MOVIES_KEY, movies);
+    return Promise.resolve();
 };
 
 export const getMetrics = async (): Promise<Metrics> => {
-    const db = await getDbContent();
-    return {
-        totalLinks: db.movies.length,
-        totalDownloads: db.downloadCount,
-        totalSupportTickets: db.supportTickets.length
-    };
+    const movies = getFromStorage<StoredMovie[]>(STORED_MOVIES_KEY, []);
+    const tickets = getFromStorage<SupportTicket[]>(SUPPORT_TICKETS_KEY, []);
+    const counts = getFromStorage<Record<string, number>>(DOWNLOAD_COUNTS_KEY, {});
+
+    const totalLinks = movies.reduce((sum, movie) => sum + movie.download_links.length, 0);
+    const totalDownloads = Object.values(counts).reduce((sum, count) => sum + count, 0);
+    const totalSupportTickets = tickets.length;
+
+    return Promise.resolve({
+        totalLinks,
+        totalDownloads,
+        totalSupportTickets,
+    });
 };
 
 export const incrementDownloadCount = async (movieId: string): Promise<void> => {
-    const db = await getDbContent();
-    db.downloadCount++;
-    await updateDbContent(db);
+    const counts = getFromStorage<Record<string, number>>(DOWNLOAD_COUNTS_KEY, {});
+    counts[movieId] = (counts[movieId] || 0) + 1;
+    saveToStorage(DOWNLOAD_COUNTS_KEY, counts);
+    return Promise.resolve();
 };
 
-// --- Support Ticket Functions ---
-
 export const addSupportTicket = async (ticketData: Omit<SupportTicket, '_id' | 'timestamp'>): Promise<SupportTicket> => {
-    const db = await getDbContent();
+    const tickets = getFromStorage<SupportTicket[]>(SUPPORT_TICKETS_KEY, []);
     const newTicket: SupportTicket = {
-        _id: Date.now().toString(),
+        ...ticketData,
+        _id: `${Date.now()}-${Math.random()}`,
         timestamp: new Date().toISOString(),
-        ...ticketData
     };
-    db.supportTickets.push(newTicket);
-    await updateDbContent(db);
-    return newTicket;
+    tickets.push(newTicket);
+    saveToStorage(SUPPORT_TICKETS_KEY, tickets);
+    return Promise.resolve(newTicket);
 };
 
 export const getSupportTickets = async (): Promise<SupportTicket[]> => {
-    const { supportTickets } = await getDbContent();
-    // Return newest tickets first
-    return [...supportTickets].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return Promise.resolve(getFromStorage<SupportTicket[]>(SUPPORT_TICKETS_KEY, []));
 };
 
 export const deleteSupportTicket = async (id: string): Promise<void> => {
-    const db = await getDbContent();
-    const initialLength = db.supportTickets.length;
-    db.supportTickets = db.supportTickets.filter(t => t._id !== id);
-    if (db.supportTickets.length === initialLength) {
-        throw new Error("Could not find the support ticket to delete.");
-    }
-    await updateDbContent(db);
+    let tickets = getFromStorage<SupportTicket[]>(SUPPORT_TICKETS_KEY, []);
+    tickets = tickets.filter(ticket => ticket._id !== id);
+    saveToStorage(SUPPORT_TICKETS_KEY, tickets);
+    return Promise.resolve();
 };

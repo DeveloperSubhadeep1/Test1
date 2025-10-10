@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { MovieSummary, TVSummary } from '../types';
 import { TMDB_IMAGE_BASE_URL_MEDIUM } from '../constants';
 import { WatchlistContext } from '../context/WatchlistContext';
-import { StarIcon, CalendarIcon, BookmarkIcon } from './Icons';
+import { StarIcon, CalendarIcon, BookmarkIcon, FilmIcon, TvIcon } from './Icons';
 import { generateSlug } from '../utils';
 
 interface MovieCardProps {
@@ -42,6 +42,16 @@ const MovieCard: React.FC<MovieCardProps> = ({ item, type }) => {
       <div className="relative">
         <img src={posterUrl} alt={title} className="w-full h-auto object-cover aspect-[2/3]" loading="lazy"/>
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+        <div 
+          className="absolute top-2 left-2 z-10 p-1.5 bg-black/60 backdrop-blur-sm rounded-full text-white"
+          title={type === 'movie' ? 'Movie' : 'TV Show'}
+        >
+          {type === 'movie' ? (
+            <FilmIcon className="h-4 w-4" />
+          ) : (
+            <TvIcon className="h-4 w-4" />
+          )}
+        </div>
         <button
           onClick={handleWatchlistToggle}
           className="absolute top-2 right-2 z-10 p-1.5 bg-black/60 backdrop-blur-sm rounded-full text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-300 hover:bg-light-accent/80 dark:hover:bg-accent/80"

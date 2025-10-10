@@ -1,4 +1,5 @@
-import React, { useState, useContext, useEffect, useCallback, useMemo } from 'react';
+
+import React, { useState, useContext, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { getMetrics, getStoredMovies, addStoredMovie, deleteStoredMovie, searchTMDB, getSupportTickets, deleteSupportTicket } from '../services/api';
 import { StoredMovie, MovieSummary, TVSummary, DownloadLink, Metrics, SupportTicket } from '../types';
@@ -7,7 +8,8 @@ import { usePageMetadata } from '../hooks/usePageMetadata';
 import Spinner from '../components/Spinner';
 import { useDebounce } from '../hooks/useDebounce';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
-import { TrashIcon, PlusCircleIcon, ArrowUpIcon, ArrowDownIcon } from '../components/Icons';
+import { TrashIcon, PlusCircleIcon, ArrowUpIcon, ArrowDownIcon, MenuIcon } from '../components/Icons';
+import ConfirmationModal from '../components/ConfirmationModal';
 
 const AdminPage: React.FC = () => {
     const { isAuthenticated, login, logout } = useContext(AuthContext);
@@ -95,6 +97,8 @@ const AdminDashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const { addToast } = useToast();
 
+    const [modalState, setModalState] = useState<{ isOpen: boolean; id: string | null; type: 'movie' | 'ticket' | null }>({ isOpen: false, id: null, type: null });
+
     const refreshData = useCallback(async () => {
         setLoading(true);
         try {
@@ -118,10 +122,41 @@ const AdminDashboard: React.FC = () => {
         refreshData();
     }, [refreshData]);
 
+    const handleDeleteRequest = (id: string, type: 'movie' | 'ticket') => {
+        setModalState({ isOpen: true, id, type });
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!modalState.id || !modalState.type) return;
+        
+        try {
+            if (modalState.type === 'movie') {
+                await deleteStoredMovie(modalState.id);
+                addToast('Entry deleted successfully.', 'success');
+            } else if (modalState.type === 'ticket') {
+                await deleteSupportTicket(modalState.id);
+                addToast('Ticket deleted successfully.', 'success');
+            }
+            refreshData();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+            addToast(`Error: ${message}`, 'error');
+        } finally {
+            setModalState({ isOpen: false, id: null, type: null });
+        }
+    };
+
     if (loading) return <Spinner />;
 
     return (
         <div className="space-y-8">
+            <ConfirmationModal
+                isOpen={modalState.isOpen}
+                onClose={() => setModalState({ isOpen: false, id: null, type: null })}
+                onConfirm={handleConfirmDelete}
+                title="Confirm Deletion"
+                message="Are you sure you want to delete this item? This action cannot be undone."
+            />
             <section className="grid grid-cols-2 md:grid-cols-3 gap-6">
                 <div className="bg-light-secondary dark:bg-secondary p-6 rounded-lg">
                     <h3 className="text-lg font-semibold text-light-muted dark:text-muted">Total Links Stored</h3>
@@ -139,33 +174,18 @@ const AdminDashboard: React.FC = () => {
             
             <AddMovieForm onMovieAdded={refreshData} />
 
-            <SupportTicketsSection tickets={supportTickets} onTicketDeleted={refreshData} />
+            <SupportTicketsSection tickets={supportTickets} onDeleteRequest={(id) => handleDeleteRequest(id, 'ticket')} />
 
-            <StoredMoviesSection movies={storedMovies} onMovieDeleted={refreshData} />
+            <StoredMoviesSection movies={storedMovies} onDeleteRequest={(id) => handleDeleteRequest(id, 'movie')} />
 
         </div>
     );
 };
 
-const StoredMoviesSection: React.FC<{ movies: StoredMovie[]; onMovieDeleted: () => void; }> = ({ movies, onMovieDeleted }) => {
+const StoredMoviesSection: React.FC<{ movies: StoredMovie[]; onDeleteRequest: (id: string) => void; }> = ({ movies, onDeleteRequest }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'title', direction: 'ascending' });
-    const { addToast } = useToast();
 
-    const handleDelete = async (id: string) => {
-        if (window.confirm("Are you sure you want to delete this entry?")) {
-            try {
-                await deleteStoredMovie(id);
-                addToast('Entry deleted successfully.', 'success');
-                onMovieDeleted();
-            } catch (error) {
-                const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-                console.error("Delete failed:", message);
-                addToast(`Error: ${message}`, 'error');
-            }
-        }
-    };
-    
     const sortedMovies = useMemo(() => {
         let sortableItems = [...movies];
         if (sortConfig !== null) {
@@ -224,7 +244,7 @@ const StoredMoviesSection: React.FC<{ movies: StoredMovie[]; onMovieDeleted: () 
                                 <p className="font-bold text-lg">{movie.title} <span className="text-xs uppercase bg-light-accent dark:bg-accent text-white dark:text-primary font-bold px-2 py-0.5 rounded-full ml-2">{movie.type}</span></p>
                                 <p className="text-sm text-light-muted dark:text-muted">{movie.download_links.length} link(s)</p>
                             </div>
-                            <button onClick={() => handleDelete(movie._id)} className="text-red-500 hover:text-red-400 p-2 rounded-full hover:bg-red-500/10">
+                            <button onClick={() => onDeleteRequest(movie._id)} className="text-red-500 hover:text-red-400 p-2 rounded-full hover:bg-red-500/10">
                                 <TrashIcon className="h-5 w-5" />
                             </button>
                         </div>
@@ -271,23 +291,9 @@ interface TicketSortConfig {
     direction: SortDirection;
 }
 
-const SupportTicketsSection: React.FC<{ tickets: SupportTicket[], onTicketDeleted: () => void }> = ({ tickets, onTicketDeleted }) => {
+const SupportTicketsSection: React.FC<{ tickets: SupportTicket[], onDeleteRequest: (id: string) => void }> = ({ tickets, onDeleteRequest }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [sortConfig, setSortConfig] = useState<TicketSortConfig>({ key: 'timestamp', direction: 'descending' });
-    const { addToast } = useToast();
-
-    const handleDelete = async (id: string) => {
-        if (window.confirm("Are you sure you want to delete this support ticket?")) {
-            try {
-                await deleteSupportTicket(id);
-                addToast('Ticket deleted successfully.', 'success');
-                onTicketDeleted();
-            } catch (error) {
-                const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-                addToast(`Error: ${message}`, 'error');
-            }
-        }
-    };
     
     const sortedTickets = useMemo(() => {
         return [...tickets].sort((a, b) => {
@@ -347,7 +353,7 @@ const SupportTicketsSection: React.FC<{ tickets: SupportTicket[], onTicketDelete
                                     </p>
                                     {ticket.contentTitle && <p className="text-sm mt-1 text-light-accent dark:text-accent">Regarding: {ticket.contentTitle}</p>}
                                 </div>
-                                <button onClick={() => handleDelete(ticket._id)} className="text-red-500 hover:text-red-400 p-2 rounded-full hover:bg-red-500/10 flex-shrink-0">
+                                <button onClick={() => onDeleteRequest(ticket._id)} className="text-red-500 hover:text-red-400 p-2 rounded-full hover:bg-red-500/10 flex-shrink-0">
                                     <TrashIcon className="h-5 w-5" />
                                 </button>
                             </div>
@@ -380,6 +386,10 @@ const AddMovieForm: React.FC<{onMovieAdded: () => void}> = ({onMovieAdded}) => {
     const [links, setLinks] = useState<DownloadLink[]>([{ label: '', url: '' }]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { addToast } = useToast();
+
+    // Drag and drop state
+    const dragItem = useRef<number | null>(null);
+    const dragOverItem = useRef<number | null>(null);
 
     useEffect(() => {
         const fetchMovies = async () => {
@@ -417,6 +427,18 @@ const AddMovieForm: React.FC<{onMovieAdded: () => void}> = ({onMovieAdded}) => {
         newLinks[index][field] = value;
         setLinks(newLinks);
     };
+
+    const handleDragSort = () => {
+        if (dragItem.current === null || dragOverItem.current === null || dragItem.current === dragOverItem.current) {
+            return;
+        }
+        const newLinks = [...links];
+        const draggedItemContent = newLinks.splice(dragItem.current, 1)[0];
+        newLinks.splice(dragOverItem.current, 0, draggedItemContent);
+        dragItem.current = null;
+        dragOverItem.current = null;
+        setLinks(newLinks);
+    };
     
     const resetForm = () => {
         setTitle('');
@@ -447,6 +469,7 @@ const AddMovieForm: React.FC<{onMovieAdded: () => void}> = ({onMovieAdded}) => {
             addToast('Movie added successfully!', 'success');
             resetForm();
             onMovieAdded();
+// FIX: Corrected invalid `catch` syntax from `catch (error) => {` to `catch (error) {`. This fixes this and several subsequent cascading errors.
         } catch (error) {
             const message = error instanceof Error ? error.message : 'An unknown error occurred.';
             console.error("Add movie failed:", message);
@@ -508,9 +531,18 @@ const AddMovieForm: React.FC<{onMovieAdded: () => void}> = ({onMovieAdded}) => {
                 <div>
                     <label className="block text-sm font-medium text-light-muted dark:text-muted mb-2">Download Links</label>
                     {links.map((link, index) => (
-                        <div key={index} className="flex items-center space-x-2 mb-2">
-                             <input type="text" placeholder="Label (e.g., 1080p)" value={link.label} onChange={(e) => handleLinkChange(index, 'label', e.target.value)} className="w-1/3 bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent" />
-                             <input type="url" placeholder="URL" value={link.url} onChange={(e) => handleLinkChange(index, 'url', e.target.value)} className="w-2/3 bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent" />
+                        <div 
+                            key={index} 
+                            className="flex items-center space-x-2 mb-2 p-1 rounded-md bg-light-primary dark:bg-primary"
+                            draggable
+                            onDragStart={() => (dragItem.current = index)}
+                            onDragEnter={() => (dragOverItem.current = index)}
+                            onDragEnd={handleDragSort}
+                            onDragOver={(e) => e.preventDefault()}
+                        >
+                             <span className="cursor-move p-1 text-light-muted dark:text-muted" title="Drag to reorder"><MenuIcon className="h-5 w-5"/></span>
+                             <input type="text" placeholder="Label (e.g., 1080p)" value={link.label} onChange={(e) => handleLinkChange(index, 'label', e.target.value)} className="w-1/3 bg-light-secondary dark:bg-secondary border border-light-border dark:border-gray-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent" />
+                             <input type="url" placeholder="URL" value={link.url} onChange={(e) => handleLinkChange(index, 'url', e.target.value)} className="w-2/3 bg-light-secondary dark:bg-secondary border border-light-border dark:border-gray-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent" />
                             <button type="button" onClick={() => handleRemoveLink(index)} className="p-2 text-red-500 hover:text-red-400"><TrashIcon className="h-5 w-5"/></button>
                         </div>
                     ))}

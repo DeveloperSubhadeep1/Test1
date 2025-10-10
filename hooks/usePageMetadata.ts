@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 
 interface Metadata {
@@ -43,16 +42,17 @@ export const usePageMetadata = (metadata: Metadata) => {
     setMetaTag('meta[property="og:title"]', metadata.title);
     setMetaTag('meta[property="og:description"]', metadata.description);
     setMetaTag('meta[property="og:url"]', canonicalUrl);
-    if(metadata.imageUrl) {
-        setMetaTag('meta[property="og:image"]', metadata.imageUrl);
-    }
 
     // Twitter Tags
     setMetaTag('meta[name="twitter:title"]', metadata.title);
     setMetaTag('meta[name="twitter:description"]', metadata.description);
-    if(metadata.imageUrl) {
-        setMetaTag('meta[name="twitter:image"]', metadata.imageUrl);
-    }
+
+    // Update image tags, falling back to the default image specified in index.html
+    const defaultImageUrl = `${cleanBaseUrl}og-default-image.png`;
+    const imageUrlToSet = metadata.imageUrl || defaultImageUrl;
+    
+    setMetaTag('meta[property="og:image"]', imageUrlToSet);
+    setMetaTag('meta[name="twitter:image"]', imageUrlToSet);
 
   }, [metadata]);
 };
