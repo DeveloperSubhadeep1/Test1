@@ -8,8 +8,7 @@ const SupportTicket = require('../models/SupportTicket');
 const Favorite = require('../models/Favorite');
 const Watchlist = require('../models/Watchlist');
 
-// --- Helper Middleware to get User ID ---
-// This makes sure user-specific requests have the necessary ID from the header.
+// --- Helper Middleware ---
 const getUserId = (req, res, next) => {
     const userId = req.headers['x-user-id'];
     if (!userId) {
@@ -18,6 +17,16 @@ const getUserId = (req, res, next) => {
     req.userId = userId;
     next();
 };
+
+const requireAdmin = (req, res, next) => {
+    // This middleware relies on getUserId running first to set req.userId
+    // The special admin user has a hardcoded ID. In a real app, this would be a role-based system.
+    if (req.userId !== 'admin_user') {
+        return res.status(403).json({ message: 'Forbidden: Admin access required.' });
+    }
+    next();
+};
+
 
 // --- Auth Routes ---
 router.post('/auth/login', async (req, res) => {
@@ -83,14 +92,39 @@ router.patch('/users/:id', getUserId, async (req, res) => {
     }
 });
 
+// --- User Management (Admin) ---
+router.get('/users', getUserId, requireAdmin, async (req, res) => {
+    try {
+        // Fetch all users, excluding the admin and passwords
+        const users = await User.find({ username: { $ne: 'admin' } }, '-password').lean();
+
+        // For each user, get their favorites and watchlist counts
+        const usersWithStats = await Promise.all(users.map(async (user) => {
+            const favoritesCount = await Favorite.countDocuments({ userId: user._id.toString() });
+            // FIX: Corrected a typo from `user._._id` to `user._id` which caused a server error.
+            const watchlistCount = await Watchlist.countDocuments({ userId: user._id.toString() });
+            return {
+                ...user,
+                favoritesCount,
+                watchlistCount,
+            };
+        }));
+        
+        res.json(usersWithStats);
+    } catch (error) {
+        console.error('Error fetching users for admin:', error);
+        res.status(500).json({ message: 'Server error fetching user data.' });
+    }
+});
+
 
 // --- Admin / Stored Content Routes ---
-router.get('/stored-movies', async (req, res) => res.json(await StoredMovie.find({})));
+router.get('/stored-movies', getUserId, requireAdmin, async (req, res) => res.json(await StoredMovie.find({})));
 router.get('/stored-movies/find', async (req, res) => {
     const { tmdbId, type } = req.query;
     res.json(await StoredMovie.findOne({ tmdb_id: tmdbId, type: type }));
 });
-router.post('/stored-movies', async (req, res) => {
+router.post('/stored-movies', getUserId, requireAdmin, async (req, res) => {
     try {
         const newMovie = new StoredMovie(req.body);
         await newMovie.save();
@@ -103,7 +137,7 @@ router.post('/stored-movies', async (req, res) => {
         res.status(500).json({ message: 'Failed to add movie.' });
     }
 });
-router.patch('/stored-movies/:id', async (req, res) => {
+router.patch('/stored-movies/:id', getUserId, requireAdmin, async (req, res) => {
     try {
         const { download_links } = req.body;
         const updatedMovie = await StoredMovie.findByIdAndUpdate(
@@ -119,7 +153,7 @@ router.patch('/stored-movies/:id', async (req, res) => {
         res.status(500).json({ message: 'Failed to update movie.' });
     }
 });
-router.delete('/stored-movies/:id', async (req, res) => {
+router.delete('/stored-movies/:id', getUserId, requireAdmin, async (req, res) => {
     await StoredMovie.findByIdAndDelete(req.params.id);
     res.status(204).send();
 });
@@ -130,25 +164,26 @@ router.patch('/stored-movies/:id/increment', async (req, res) => {
 
 
 // --- Support Tickets ---
-router.get('/support-tickets', async (req, res) => res.json(await SupportTicket.find({}).sort({ timestamp: -1 })));
+router.get('/support-tickets', getUserId, requireAdmin, async (req, res) => res.json(await SupportTicket.find({}).sort({ timestamp: -1 })));
 router.post('/support-tickets', async (req, res) => {
     const newTicket = new SupportTicket({ ...req.body, timestamp: new Date() });
     await newTicket.save();
     res.status(201).json(newTicket);
 });
-router.delete('/support-tickets/:id', async (req, res) => {
+router.delete('/support-tickets/:id', getUserId, requireAdmin, async (req, res) => {
     await SupportTicket.findByIdAndDelete(req.params.id);
     res.status(204).send();
 });
 
 
 // --- Metrics ---
-router.get('/metrics', async (req, res) => {
+router.get('/metrics', getUserId, requireAdmin, async (req, res) => {
     const movies = await StoredMovie.find({});
     const ticketsCount = await SupportTicket.countDocuments();
+    const usersCount = await User.countDocuments({ username: { $ne: 'admin' } });
     const totalLinks = movies.reduce((sum, movie) => sum + movie.download_links.length, 0);
     const totalDownloads = movies.reduce((sum, movie) => sum + movie.download_count, 0);
-    res.json({ totalLinks, totalDownloads, totalSupportTickets: ticketsCount });
+    res.json({ totalLinks, totalDownloads, totalSupportTickets: ticketsCount, totalUsers: usersCount });
 });
 
 

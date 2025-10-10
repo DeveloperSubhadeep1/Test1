@@ -70,6 +70,7 @@ export interface Metrics {
     totalLinks: number;
     totalDownloads: number;
     totalSupportTickets: number;
+    totalUsers: number;
 }
 
 export interface CastMember {
@@ -97,4 +98,10 @@ export interface UserProfile {
   _id: string;
   username: string;
   avatarId: string;
+  createdAt?: string;
+}
+
+export interface AdminUserView extends UserProfile {
+  favoritesCount: number;
+  watchlistCount: number;
 }

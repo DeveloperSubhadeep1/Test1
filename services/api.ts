@@ -16,6 +16,7 @@ import {
   WatchlistItem,
   ContentItem,
   DownloadLink,
+  AdminUserView,
 } from '../types';
 import { TMDB_API_KEY, TMDB_API_BASE_URL, DB_BASE_URL } from '../constants';
 
@@ -173,6 +174,7 @@ export const deleteSupportTicket = (id: string): Promise<void> => dbFetch(`/supp
 export const addSupportTicket = (ticketData: Omit<SupportTicket, '_id' | 'timestamp'>): Promise<SupportTicket> => dbFetch('/support-tickets', { method: 'POST', body: JSON.stringify(ticketData) });
 export const getMetrics = (): Promise<Metrics> => dbFetch('/metrics');
 export const incrementDownloadCount = (movieId: string): Promise<void> => dbFetch(`/stored-movies/${movieId}/increment`, { method: 'PATCH' });
+export const getUsers = (): Promise<AdminUserView[]> => dbFetch('/users');
 
 // --- User Lists (Favorites & Watchlist) ---
 export const getFavorites = (): Promise<FavoriteItem[]> => dbFetch('/favorites');
