@@ -16,9 +16,9 @@ const MovieCard: React.FC<MovieCardProps> = ({ item, type }) => {
 
   const title = 'title' in item ? item.title : item.name;
   const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
-  const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
+  const year = releaseDate ? new Date(releaseDate).getFullYear() : undefined;
   const rating = item.vote_average.toFixed(1);
-  const slug = generateSlug(title);
+  const slug = generateSlug(title, year);
   const linkTo = `/${type}/${slug}`;
   const onWl = isOnWatchlist(item.id);
 
@@ -65,7 +65,7 @@ const MovieCard: React.FC<MovieCardProps> = ({ item, type }) => {
           <div className="flex items-center text-gray-300 dark:text-muted text-sm mt-1 space-x-4">
             <div className="flex items-center">
               <CalendarIcon className="h-4 w-4 mr-1"/>
-              <span>{year}</span>
+              <span>{year || 'N/A'}</span>
             </div>
             <div className="flex items-center">
               <StarIcon className="h-4 w-4 mr-1 text-yellow-400"/>

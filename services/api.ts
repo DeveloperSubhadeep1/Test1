@@ -40,12 +40,50 @@ export const searchTMDB = async (query: string): Promise<{ results: (MovieSummar
 };
 
 export const findIdBySlug = async (type: ContentType, slug: string): Promise<number | null> => {
-    const query = slug.replace(/-/g, ' ');
-    const data = await tmdbFetch(`/search/${type}`, { query });
+    // Regex to find a 4-digit year at the end of the slug
+    const slugRegex = /^(.*)-(\d{4})$/;
+    const match = slug.match(slugRegex);
+
+    let query: string;
+    let year: string | undefined;
+
+    if (match && match[1] && match[2]) {
+        // We have a title and a year
+        query = match[1].replace(/-/g, ' ');
+        year = match[2];
+    } else {
+        // Fallback for old slugs or slugs without a year
+        query = slug.replace(/-/g, ' ');
+        year = undefined;
+    }
+
+    const searchParams: Record<string, string> = { query };
+    if (year) {
+        if (type === 'movie') {
+            searchParams.primary_release_year = year;
+        } else { // tv
+            searchParams.first_air_date_year = year;
+        }
+    }
+
+    const data = await tmdbFetch(`/search/${type}`, searchParams);
+    
     if (data.results && data.results.length > 0) {
-        // Assume the first result is the best match
+        // If we have a year, the first result with that year is likely the correct one.
+        // TMDB's search with year filter is quite effective.
+        // If no year, the first result is the best guess.
         return data.results[0].id;
     }
+    
+    // If search with year yielded no results, try searching without the year as a fallback
+    // This helps if the year in the slug is slightly off from TMDB's data
+    if (year) {
+        const fallbackData = await tmdbFetch(`/search/${type}`, { query });
+        if (fallbackData.results && fallbackData.results.length > 0) {
+            return fallbackData.results[0].id;
+        }
+    }
+
     return null;
 }
 

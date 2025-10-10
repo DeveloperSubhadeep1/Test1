@@ -181,7 +181,9 @@ const SearchBar: React.FC = () => {
                         const item = suggestions[activeIndex];
                         const type = 'title' in item ? 'movie' : 'tv';
                         const title = 'title' in item ? item.title : item.name;
-                        const slug = generateSlug(title);
+                        const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
+                        const year = releaseDate ? new Date(releaseDate).getFullYear() : undefined;
+                        const slug = generateSlug(title, year);
                         navigate(`/${type}/${slug}`);
                     } else {
                         navigate(`/search/${encodeURIComponent(query.trim())}`);
@@ -311,9 +313,9 @@ const SearchBar: React.FC = () => {
                         const type = 'title' in item ? 'movie' : 'tv';
                         const title = type === 'movie' ? (item as MovieSummary).title : (item as TVSummary).name;
                         const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
-                        const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
+                        const year = releaseDate ? new Date(releaseDate).getFullYear() : undefined;
                         const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : null;
-                        const slug = generateSlug(title);
+                        const slug = generateSlug(title, year);
 
                         return (
                             <li
@@ -338,7 +340,7 @@ const SearchBar: React.FC = () => {
                                     <div className="flex-grow min-w-0">
                                         <p className="text-light-text dark:text-white truncate font-semibold">{title}</p>
 
-                                        <p className="text-sm text-light-muted dark:text-muted">{year}</p>
+                                        <p className="text-sm text-light-muted dark:text-muted">{year || 'N/A'}</p>
                                     </div>
                                 </Link>
                             </li>

@@ -11,6 +11,10 @@ export const slugify = (text: string): string => {
     .replace(/-+$/, ''); // trim - from end of text
 };
 
-export const generateSlug = (title: string): string => {
-    return slugify(title);
+export const generateSlug = (title: string, year?: string | number): string => {
+    const slug = slugify(title);
+    if(year) {
+        return `${slug}-${year}`;
+    }
+    return slug;
 }
