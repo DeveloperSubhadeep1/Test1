@@ -8,6 +8,7 @@ import MovieCard from '../components/MovieCard';
 import Spinner from '../components/Spinner';
 import TelegramAd from '../components/TelegramAd';
 import { XIcon } from '../components/Icons';
+import MovieCardSkeleton from '../components/MovieCardSkeleton';
 
 const SortFilter: React.FC<{
   currentSort: string;
@@ -187,7 +188,11 @@ const HomePage: React.FC = () => {
         </div>
 
         {loading ? (
-            <Spinner />
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {Array.from({ length: 12 }).map((_, index) => (
+                    <MovieCardSkeleton key={index} />
+                ))}
+            </div>
         ) : content.length > 0 ? (
             <>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">

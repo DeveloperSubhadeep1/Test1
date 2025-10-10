@@ -5,7 +5,7 @@ import { MovieSummary, TVSummary } from '../types';
 import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import MovieCard from '../components/MovieCard';
-import Spinner from '../components/Spinner';
+import MovieCardSkeleton from '../components/MovieCardSkeleton';
 
 const SearchResultsPage: React.FC = () => {
   const { query } = useParams<{ query: string }>();
@@ -37,7 +37,16 @@ const SearchResultsPage: React.FC = () => {
   }, [query, addToast]);
 
   if (loading) {
-    return <Spinner />;
+    return (
+      <div>
+        <div className="h-9 w-2/3 max-w-lg bg-light-secondary dark:bg-secondary rounded-md animate-pulse mb-6"></div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          {Array.from({ length: 18 }).map((_, index) => (
+            <MovieCardSkeleton key={index} />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (

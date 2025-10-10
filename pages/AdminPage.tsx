@@ -206,7 +206,9 @@ const DashboardTab: React.FC = () => {
       totalSupportTickets: metricConfig.totalSupportTickets.color,
   };
 
-  const total = Object.values(metrics).reduce((sum, val) => sum + (val || 0), 0);
+  // FIX: Cast `val` to `Number` to resolve type errors. `Object.values(metrics)`
+  // returns `unknown[]`, so `val` must be explicitly converted to a number for the sum.
+  const total = Object.values(metrics).reduce((sum, val) => sum + (Number(val) || 0), 0);
   
   const legendItems = (Object.keys(metricConfig) as Array<keyof Metrics>).map(key => ({
       ...metricConfig[key],

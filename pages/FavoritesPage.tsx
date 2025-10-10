@@ -6,9 +6,10 @@ import MovieCard from '../components/MovieCard';
 import SortDropdown from '../components/SortDropdown';
 import { HeartIcon } from '../components/Icons';
 import { FavoriteItem } from '../types';
+import MovieCardSkeleton from '../components/MovieCardSkeleton';
 
 const FavoritesPage: React.FC = () => {
-  const { favorites } = useContext(FavoritesContext);
+  const { favorites, loading } = useContext(FavoritesContext);
   const [sortOption, setSortOption] = useState('dateAdded_desc');
   
   usePageMetadata({
@@ -43,6 +44,21 @@ const FavoritesPage: React.FC = () => {
     return sorted;
   }, [favorites, sortOption]);
 
+  if (loading) {
+    return (
+      <div>
+        <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6 gap-4">
+          <div className="h-9 w-64 bg-light-secondary dark:bg-secondary rounded-md animate-pulse"></div>
+          <div className="h-9 w-56 bg-light-secondary dark:bg-secondary rounded-md animate-pulse"></div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          {Array.from({ length: 12 }).map((_, index) => (
+            <MovieCardSkeleton key={index} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

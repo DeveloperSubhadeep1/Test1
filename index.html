@@ -7,6 +7,9 @@
     <title>CineStream | Discover & Download Movies and TV Shows</title>
     <meta name="description" content="Discover, stream, and download the latest movies and TV shows. Search our vast library, view details, get download links, and manage your favorites all in one place." />
 
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0D1117" />
+    
     <!-- SEO & Social Meta Tags -->
     <link rel="canonical" href="" />
     
@@ -65,6 +68,15 @@
               'light-text': '#1F2328',
               'light-border': '#D0D7DE',
             },
+            animation: {
+              'fade-in': 'fadeIn 0.3s ease-out',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              }
+            }
           },
         },
       }

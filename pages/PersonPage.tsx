@@ -5,9 +5,9 @@ import { PersonDetails, PersonCredit } from '../types';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
 import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
-import Spinner from '../components/Spinner';
 import MovieCard from '../components/MovieCard';
 import { UserIcon } from '../components/Icons';
+import MovieCardSkeleton from '../components/MovieCardSkeleton';
 
 const PersonPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -57,7 +57,36 @@ const PersonPage: React.FC = () => {
     fetchPersonData();
   }, [slug, addToast]);
 
-  if (loading) return <Spinner />;
+  if (loading) {
+    return (
+        <div className="space-y-12">
+            <section className="flex flex-col md:flex-row gap-8 animate-pulse">
+                <div className="md:w-1/4 flex-shrink-0">
+                    <div className="aspect-[2/3] bg-light-secondary dark:bg-secondary rounded-lg"></div>
+                </div>
+                <div className="md:w-3/4">
+                    <div className="h-10 bg-light-secondary dark:bg-secondary rounded w-1/2 mb-2"></div>
+                    <div className="h-5 bg-light-secondary dark:bg-secondary rounded w-1/4 mb-8"></div>
+                    <div className="h-6 bg-light-secondary dark:bg-secondary rounded w-1/4 mb-4"></div>
+                    <div className="space-y-2">
+                        <div className="h-4 bg-light-secondary dark:bg-secondary rounded"></div>
+                        <div className="h-4 bg-light-secondary dark:bg-secondary rounded"></div>
+                        <div className="h-4 bg-light-secondary dark:bg-secondary rounded w-5/6"></div>
+                    </div>
+                </div>
+            </section>
+            <section>
+                <div className="h-8 bg-light-secondary dark:bg-secondary rounded w-1/3 mb-4"></div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    {Array.from({ length: 6 }).map((_, index) => (
+                        <MovieCardSkeleton key={index} />
+                    ))}
+                </div>
+            </section>
+        </div>
+    );
+  }
+
   if (!person) return <p>Person not found.</p>;
 
   const profileUrl = person.profile_path

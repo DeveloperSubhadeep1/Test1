@@ -6,6 +6,7 @@ import { getWatchlist, addToWatchlist as apiAddToWatchlist, removeFromWatchlist 
 
 interface WatchlistContextType {
   watchlist: WatchlistItem[];
+  loading: boolean;
   addToWatchlist: (item: ContentItem) => void;
   removeFromWatchlist: (id: number) => void;
   isOnWatchlist: (id: number) => boolean;
@@ -13,6 +14,7 @@ interface WatchlistContextType {
 
 export const WatchlistContext = createContext<WatchlistContextType>({
   watchlist: [],
+  loading: true,
   addToWatchlist: () => {},
   removeFromWatchlist: () => {},
   isOnWatchlist: () => false,
@@ -25,20 +27,25 @@ interface WatchlistProviderProps {
 export const WatchlistProvider: React.FC<WatchlistProviderProps> = ({ children }) => {
   const { currentUser } = useContext(AuthContext);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
 
   useEffect(() => {
     const fetchWatchlist = async () => {
         if (currentUser) {
+            setLoading(true);
             try {
                 const userWatchlist = await getWatchlist();
                 setWatchlist(userWatchlist);
             } catch (error) {
                 console.error("Failed to fetch watchlist", error);
                 addToast("Could not load your watchlist.", 'error');
+            } finally {
+                setLoading(false);
             }
         } else {
             setWatchlist([]);
+            setLoading(false);
         }
     };
     fetchWatchlist();
@@ -84,7 +91,7 @@ export const WatchlistProvider: React.FC<WatchlistProviderProps> = ({ children }
   }, [watchlist]);
 
   return (
-    <WatchlistContext.Provider value={{ watchlist, addToWatchlist, removeFromWatchlist, isOnWatchlist }}>
+    <WatchlistContext.Provider value={{ watchlist, loading, addToWatchlist, removeFromWatchlist, isOnWatchlist }}>
       {children}
     </WatchlistContext.Provider>
   );

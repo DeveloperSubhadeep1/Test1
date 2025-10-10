@@ -6,6 +6,7 @@ import { getFavorites, addFavorite as apiAddFavorite, removeFavorite as apiRemov
 
 interface FavoritesContextType {
   favorites: FavoriteItem[];
+  loading: boolean;
   addFavorite: (item: ContentItem) => void;
   removeFavorite: (id: number) => void;
   isFavorite: (id: number) => boolean;
@@ -13,6 +14,7 @@ interface FavoritesContextType {
 
 export const FavoritesContext = createContext<FavoritesContextType>({
   favorites: [],
+  loading: true,
   addFavorite: () => {},
   removeFavorite: () => {},
   isFavorite: () => false,
@@ -25,20 +27,25 @@ interface FavoritesProviderProps {
 export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }) => {
   const { currentUser } = useContext(AuthContext);
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
 
   useEffect(() => {
     const fetchFavorites = async () => {
       if (currentUser) {
+        setLoading(true);
         try {
           const userFavorites = await getFavorites();
           setFavorites(userFavorites);
         } catch (error) {
           console.error("Failed to fetch favorites", error);
           addToast("Could not load your favorites.", 'error');
+        } finally {
+            setLoading(false);
         }
       } else {
         setFavorites([]);
+        setLoading(false);
       }
     };
     fetchFavorites();
@@ -84,7 +91,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
   }, [favorites]);
 
   return (
-    <FavoritesContext.Provider value={{ favorites, addFavorite, removeFavorite, isFavorite }}>
+    <FavoritesContext.Provider value={{ favorites, loading, addFavorite, removeFavorite, isFavorite }}>
       {children}
     </FavoritesContext.Provider>
   );
