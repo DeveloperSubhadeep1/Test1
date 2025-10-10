@@ -86,14 +86,26 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 </button>
               </>
             ) : (
-              <div className="hidden sm:flex items-center gap-2">
-                <Link to="/login" className="px-4 py-1.5 text-sm font-semibold rounded-full bg-light-secondary dark:bg-secondary hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                    Log In
+              <>
+                {/* Mobile: User icon linking to login */}
+                <Link
+                  to="/login"
+                  className="sm:hidden p-2 rounded-full text-light-muted dark:text-gray-400 hover:text-light-text dark:hover:text-white hover:bg-light-secondary dark:hover:bg-primary transition-colors"
+                  aria-label="Login or Sign up"
+                >
+                  <UserIcon className="h-5 w-5" />
                 </Link>
-                <Link to="/signup" className="px-4 py-1.5 text-sm font-semibold rounded-full bg-light-accent dark:bg-accent text-white hover:opacity-90 transition-opacity">
-                    Sign Up
-                </Link>
-              </div>
+          
+                {/* Desktop: Full Log In / Sign Up buttons */}
+                <div className="hidden sm:flex items-center gap-2">
+                  <Link to="/login" className="px-4 py-1.5 text-sm font-semibold rounded-full bg-light-secondary dark:bg-secondary hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                      Log In
+                  </Link>
+                  <Link to="/signup" className="px-4 py-1.5 text-sm font-semibold rounded-full bg-light-accent dark:bg-accent text-white hover:opacity-90 transition-opacity">
+                      Sign Up
+                  </Link>
+                </div>
+              </>
             )}
           </div>
         </div>
