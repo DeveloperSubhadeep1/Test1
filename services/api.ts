@@ -14,7 +14,8 @@ import {
   UserProfile,
   FavoriteItem,
   WatchlistItem,
-  ContentItem
+  ContentItem,
+  DownloadLink,
 } from '../types';
 import { TMDB_API_KEY, TMDB_API_BASE_URL, DB_BASE_URL } from '../constants';
 
@@ -164,6 +165,8 @@ export const getStoredMovie = async (tmdbId: number, type: ContentType): Promise
 };
 export const getStoredMovies = (): Promise<StoredMovie[]> => dbFetch('/stored-movies');
 export const addStoredMovie = (movie: Omit<StoredMovie, '_id'>): Promise<StoredMovie> => dbFetch('/stored-movies', { method: 'POST', body: JSON.stringify(movie) });
+export const updateStoredMovie = (id: string, movieData: { download_links: DownloadLink[] }): Promise<StoredMovie> => 
+    dbFetch(`/stored-movies/${id}`, { method: 'PATCH', body: JSON.stringify(movieData) });
 export const deleteStoredMovie = (id: string): Promise<void> => dbFetch(`/stored-movies/${id}`, { method: 'DELETE' });
 export const getSupportTickets = (): Promise<SupportTicket[]> => dbFetch('/support-tickets');
 export const deleteSupportTicket = (id: string): Promise<void> => dbFetch(`/support-tickets/${id}`, { method: 'DELETE' });

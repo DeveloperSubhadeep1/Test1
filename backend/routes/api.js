@@ -103,6 +103,22 @@ router.post('/stored-movies', async (req, res) => {
         res.status(500).json({ message: 'Failed to add movie.' });
     }
 });
+router.patch('/stored-movies/:id', async (req, res) => {
+    try {
+        const { download_links } = req.body;
+        const updatedMovie = await StoredMovie.findByIdAndUpdate(
+            req.params.id,
+            { download_links },
+            { new: true, runValidators: true }
+        );
+        if (!updatedMovie) {
+            return res.status(404).json({ message: 'Movie not found.' });
+        }
+        res.json(updatedMovie);
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to update movie.' });
+    }
+});
 router.delete('/stored-movies/:id', async (req, res) => {
     await StoredMovie.findByIdAndDelete(req.params.id);
     res.status(204).send();

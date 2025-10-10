@@ -1,14 +1,14 @@
 
 import React, { useState, useContext, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AuthContext } from '../context/AuthContext';
-import { getMetrics, getStoredMovies, addStoredMovie, deleteStoredMovie, searchTMDB, getSupportTickets, deleteSupportTicket } from '../services/api';
+import { getMetrics, getStoredMovies, addStoredMovie, deleteStoredMovie, searchTMDB, getSupportTickets, deleteSupportTicket, updateStoredMovie } from '../services/api';
 import { StoredMovie, MovieSummary, TVSummary, DownloadLink, Metrics, SupportTicket } from '../types';
 import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import Spinner from '../components/Spinner';
 import { useDebounce } from '../hooks/useDebounce';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
-import { TrashIcon, PlusCircleIcon, ArrowUpIcon, ArrowDownIcon, MenuIcon, UserCogIcon } from '../components/Icons';
+import { TrashIcon, PlusCircleIcon, ArrowUpIcon, ArrowDownIcon, MenuIcon, UserCogIcon, EditIcon, SaveIcon, XCircleIcon } from '../components/Icons';
 import ConfirmationModal from '../components/ConfirmationModal';
 
 const AdminPage: React.FC = () => {
@@ -190,15 +190,60 @@ const AdminDashboard: React.FC = () => {
 
             <SupportTicketsSection tickets={supportTickets} onDeleteRequest={(id) => handleDeleteRequest(id, 'ticket')} />
 
-            <StoredMoviesSection movies={storedMovies} onDeleteRequest={(id) => handleDeleteRequest(id, 'movie')} />
+            <StoredMoviesSection movies={storedMovies} onDeleteRequest={(id) => handleDeleteRequest(id, 'movie')} onSaveSuccess={refreshData} />
 
         </div>
     );
 };
 
-const StoredMoviesSection: React.FC<{ movies: StoredMovie[]; onDeleteRequest: (id: string) => void; }> = ({ movies, onDeleteRequest }) => {
+const StoredMoviesSection: React.FC<{ movies: StoredMovie[]; onDeleteRequest: (id: string) => void; onSaveSuccess: () => void; }> = ({ movies, onDeleteRequest, onSaveSuccess }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'title', direction: 'ascending' });
+    const [editingMovieId, setEditingMovieId] = useState<string | null>(null);
+    const [editableLinks, setEditableLinks] = useState<DownloadLink[]>([]);
+    const { addToast } = useToast();
+    
+    const dragItem = useRef<number | null>(null);
+    const dragOverItem = useRef<number | null>(null);
+
+    const handleEditClick = (movie: StoredMovie) => {
+        setEditingMovieId(movie._id);
+        setEditableLinks(JSON.parse(JSON.stringify(movie.download_links)));
+    };
+
+    const handleCancelEdit = () => {
+        setEditingMovieId(null);
+        setEditableLinks([]);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingMovieId) return;
+        try {
+            await updateStoredMovie(editingMovieId, { download_links: editableLinks.filter(l => l.label && l.url) });
+            addToast('Links updated successfully!', 'success');
+            onSaveSuccess();
+            handleCancelEdit();
+        } catch (error) {
+            addToast('Failed to update links.', 'error');
+        }
+    };
+    
+    const handleAddLink = () => setEditableLinks([...editableLinks, { label: '', url: '' }]);
+    const handleRemoveLink = (index: number) => setEditableLinks(editableLinks.filter((_, i) => i !== index));
+    const handleLinkChange = (index: number, field: keyof DownloadLink, value: string) => {
+        const newLinks = [...editableLinks];
+        newLinks[index][field] = value;
+        setEditableLinks(newLinks);
+    };
+    const handleDragSort = () => {
+        if (dragItem.current === null || dragOverItem.current === null || dragItem.current === dragOverItem.current) return;
+        const newLinks = [...editableLinks];
+        const draggedItemContent = newLinks.splice(dragItem.current, 1)[0];
+        newLinks.splice(dragOverItem.current, 0, draggedItemContent);
+        dragItem.current = null;
+        dragOverItem.current = null;
+        setEditableLinks(newLinks);
+    };
 
     const sortedMovies = useMemo(() => {
         let sortableItems = [...movies];
@@ -253,14 +298,57 @@ const StoredMoviesSection: React.FC<{ movies: StoredMovie[]; onDeleteRequest: (i
             <div className="space-y-4">
                 {paginatedMovies.length > 0 ? (
                     paginatedMovies.map(movie => (
-                        <div key={movie._id} className="bg-light-primary dark:bg-primary p-4 rounded-md flex justify-between items-center">
-                            <div>
-                                <p className="font-bold text-lg">{movie.title} <span className="text-xs uppercase bg-light-accent dark:bg-accent text-white dark:text-primary font-bold px-2 py-0.5 rounded-full ml-2">{movie.type}</span></p>
-                                <p className="text-sm text-light-muted dark:text-muted">{movie.download_links.length} link(s)</p>
-                            </div>
-                            <button onClick={() => onDeleteRequest(movie._id)} className="text-red-500 hover:text-red-400 p-2 rounded-full hover:bg-red-500/10">
-                                <TrashIcon className="h-5 w-5" />
-                            </button>
+                        <div key={movie._id} className="bg-light-primary dark:bg-primary p-4 rounded-md">
+                            {editingMovieId === movie._id ? (
+                                // EDITING VIEW
+                                <div className="space-y-3">
+                                    <p className="font-bold text-lg">{movie.title}</p>
+                                    {editableLinks.map((link, index) => (
+                                        <div 
+                                            key={index} 
+                                            className="flex items-center space-x-2 p-1 rounded-md bg-light-secondary dark:bg-secondary"
+                                            draggable
+                                            onDragStart={() => (dragItem.current = index)}
+                                            onDragEnter={() => (dragOverItem.current = index)}
+                                            onDragEnd={handleDragSort}
+                                            onDragOver={(e) => e.preventDefault()}
+                                        >
+                                            <span className="cursor-move p-1 text-light-muted dark:text-muted" title="Drag to reorder"><MenuIcon className="h-5 w-5"/></span>
+                                            <input type="text" placeholder="Label" value={link.label} onChange={(e) => handleLinkChange(index, 'label', e.target.value)} className="w-1/3 bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent" />
+                                            <input type="url" placeholder="URL" value={link.url} onChange={(e) => handleLinkChange(index, 'url', e.target.value)} className="w-2/3 bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent" />
+                                            <button type="button" onClick={() => handleRemoveLink(index)} className="p-2 text-red-500 hover:text-red-400"><TrashIcon className="h-5 w-5"/></button>
+                                        </div>
+                                    ))}
+                                    <button type="button" onClick={handleAddLink} className="flex items-center space-x-2 text-light-accent dark:text-accent hover:text-blue-400 text-sm">
+                                        <PlusCircleIcon className="h-5 w-5"/>
+                                        <span>Add Link</span>
+                                    </button>
+                                    <div className="flex justify-end items-center space-x-2 pt-2">
+                                        <button onClick={handleCancelEdit} className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-full bg-light-secondary dark:bg-secondary hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                                            <XCircleIcon className="h-5 w-5" /> Cancel
+                                        </button>
+                                        <button onClick={handleSaveEdit} className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-full bg-light-highlight dark:bg-highlight text-white hover:opacity-90 transition-opacity">
+                                            <SaveIcon className="h-5 w-5" /> Save
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                // NORMAL VIEW
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className="font-bold text-lg">{movie.title} <span className="text-xs uppercase bg-light-accent dark:bg-accent text-white dark:text-primary font-bold px-2 py-0.5 rounded-full ml-2">{movie.type}</span></p>
+                                        <p className="text-sm text-light-muted dark:text-muted">{movie.download_links.length} link(s)</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => handleEditClick(movie)} className="text-blue-500 hover:text-blue-400 p-2 rounded-full hover:bg-blue-500/10" title="Edit links">
+                                            <EditIcon className="h-5 w-5" />
+                                        </button>
+                                        <button onClick={() => onDeleteRequest(movie._id)} className="text-red-500 hover:text-red-400 p-2 rounded-full hover:bg-red-500/10" title="Delete entry">
+                                            <TrashIcon className="h-5 w-5" />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ))
                 ) : (
