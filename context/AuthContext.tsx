@@ -1,5 +1,7 @@
 
-import React, { createContext, useState, ReactNode } from 'react';
+import React, { createContext, useState, ReactNode, useEffect } from 'react';
+
+const AUTH_STORAGE_KEY = 'cineStreamAdminAuth';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -18,7 +20,25 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Initialize state from localStorage to persist login across sessions
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      const storedAuth = localStorage.getItem(AUTH_STORAGE_KEY);
+      return storedAuth ? JSON.parse(storedAuth) : false;
+    } catch {
+      // If parsing fails, default to logged out state
+      return false;
+    }
+  });
+
+  // Effect to update localStorage whenever the authentication state changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(isAuthenticated));
+    } catch (error) {
+      console.error("Failed to save auth state to localStorage", error);
+    }
+  }, [isAuthenticated]);
 
   // This is a mock login. In a real app, this would involve an API call.
   // Using simple hardcoded credentials for demonstration.

@@ -214,101 +214,133 @@ export const getAllGenres = async (): Promise<Genre[]> => {
     }
 };
 
-// --- Local Storage Database Service ---
+// --- Simulated Server-Side Database Service (for Admin Data) ---
 
-const STORED_MOVIES_KEY = 'cineStreamStoredMovies';
-const SUPPORT_TICKETS_KEY = 'cineStreamSupportTickets';
-const DOWNLOAD_COUNTS_KEY = 'cineStreamDownloadCounts';
+// #region INSTRUCTIONS FOR SETTING UP YOUR OWN BACKEND
+// IMPORTANT: To enable cross-device data syncing for the admin panel, you need a free JSONBin.io account.
+// This service will act as a simple cloud database.
+//
+// 1. Go to https://jsonbin.io/ and create a free account.
+//
+// 2. On your dashboard, find your "API Access Keys" section and copy your master API key.
+//    Paste it below to replace the placeholder 'YOUR_API_KEY_HERE'.
+//
+// 3. Go to the "Bins" section and create a new, private bin.
+//
+// 4. Paste the following JSON structure into your new bin and save it:
+//    {
+//      "storedMovies": [],
+//      "supportTickets": [],
+//      "downloadCounts": {}
+//    }
+//
+// 5. After saving, copy the Bin ID from the URL (it's the part after '.../b/').
+//    Paste it below to replace the placeholder 'YOUR_BIN_ID_HERE'.
+//
+// That's it! Your admin data will now be stored and synced in the cloud.
+// For a real production app, use a secure, managed database and a proper backend API.
+// #endregion
+const JSONBIN_API_KEY = 'YOUR_API_KEY_HERE';
+const JSONBIN_BIN_ID = 'YOUR_BIN_ID_HERE';
+const JSONBIN_BASE_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
 
-const getFromStorage = <T,>(key: string, defaultValue: T): T => {
-    try {
-        const item = localStorage.getItem(key);
-        return item ? JSON.parse(item) : defaultValue;
-    } catch (error) {
-        console.error(`Failed to parse ${key} from localStorage`, error);
-        return defaultValue;
+interface CineStreamDB {
+    storedMovies: StoredMovie[];
+    supportTickets: SupportTicket[];
+    downloadCounts: Record<string, number>;
+}
+
+// Fetches the entire database from JSONBin
+const getDb = async (): Promise<CineStreamDB> => {
+    if (JSONBIN_API_KEY === 'YOUR_API_KEY_HERE' || JSONBIN_BIN_ID === 'YOUR_BIN_ID_HERE') {
+        console.warn("JSONBin.io is not configured. Admin data will not be saved. See instructions in services/api.ts.");
+        // Return a default, empty DB structure to prevent the app from crashing.
+        return { storedMovies: [], supportTickets: [], downloadCounts: {} };
     }
+    const response = await fetch(`${JSONBIN_BASE_URL}/latest`, {
+        headers: { 'X-Master-Key': JSONBIN_API_KEY }
+    });
+    if (!response.ok) throw new Error('Failed to fetch from DB. Check your JSONBin credentials and Bin ID.');
+    const data = await response.json();
+    return data.record;
 };
 
-const saveToStorage = <T,>(key: string, value: T): void => {
-    try {
-        localStorage.setItem(key, JSON.stringify(value));
-    } catch (error) {
-        console.error(`Failed to save ${key} to localStorage`, error);
+// Updates the entire database on JSONBin
+const updateDb = async (db: CineStreamDB): Promise<void> => {
+    if (JSONBIN_API_KEY === 'YOUR_API_KEY_HERE' || JSONBIN_BIN_ID === 'YOUR_BIN_ID_HERE') {
+        return; // Do not attempt to save if not configured
     }
+    const response = await fetch(JSONBIN_BASE_URL, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Master-Key': JSONBIN_API_KEY,
+        },
+        body: JSON.stringify(db),
+    });
+    if (!response.ok) throw new Error('Failed to update DB.');
 };
-
 
 export const getStoredMovie = async (tmdbId: number, type: ContentType): Promise<StoredMovie | null> => {
-    const movies = getFromStorage<StoredMovie[]>(STORED_MOVIES_KEY, []);
-    const foundMovie = movies.find(movie => movie.tmdb_id === tmdbId && movie.type === type) || null;
-    return Promise.resolve(foundMovie);
+    const db = await getDb();
+    return db.storedMovies.find(movie => movie.tmdb_id === tmdbId && movie.type === type) || null;
 };
 
 export const getStoredMovies = async (): Promise<StoredMovie[]> => {
-    return Promise.resolve(getFromStorage<StoredMovie[]>(STORED_MOVIES_KEY, []));
+    const db = await getDb();
+    return db.storedMovies;
 };
 
 export const addStoredMovie = async (movie: Omit<StoredMovie, '_id'>): Promise<StoredMovie> => {
-    const movies = getFromStorage<StoredMovie[]>(STORED_MOVIES_KEY, []);
+    const db = await getDb();
     const newMovie: StoredMovie = {
         ...movie,
-        _id: `${Date.now()}-${Math.random()}`,
+        _id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     };
-    movies.push(newMovie);
-    saveToStorage(STORED_MOVIES_KEY, movies);
-    return Promise.resolve(newMovie);
+    db.storedMovies.push(newMovie);
+    await updateDb(db);
+    return newMovie;
 };
 
 export const deleteStoredMovie = async (id: string): Promise<void> => {
-    let movies = getFromStorage<StoredMovie[]>(STORED_MOVIES_KEY, []);
-    movies = movies.filter(movie => movie._id !== id);
-    saveToStorage(STORED_MOVIES_KEY, movies);
-    return Promise.resolve();
+    const db = await getDb();
+    db.storedMovies = db.storedMovies.filter(movie => movie._id !== id);
+    await updateDb(db);
 };
 
 export const getMetrics = async (): Promise<Metrics> => {
-    const movies = getFromStorage<StoredMovie[]>(STORED_MOVIES_KEY, []);
-    const tickets = getFromStorage<SupportTicket[]>(SUPPORT_TICKETS_KEY, []);
-    const counts = getFromStorage<Record<string, number>>(DOWNLOAD_COUNTS_KEY, {});
-
-    const totalLinks = movies.reduce((sum, movie) => sum + movie.download_links.length, 0);
-    const totalDownloads = Object.values(counts).reduce((sum, count) => sum + count, 0);
-    const totalSupportTickets = tickets.length;
-
-    return Promise.resolve({
-        totalLinks,
-        totalDownloads,
-        totalSupportTickets,
-    });
+    const db = await getDb();
+    const totalLinks = db.storedMovies.reduce((sum, movie) => sum + movie.download_links.length, 0);
+    const totalDownloads = Object.values(db.downloadCounts).reduce((sum, count) => sum + count, 0);
+    const totalSupportTickets = db.supportTickets.length;
+    return { totalLinks, totalDownloads, totalSupportTickets };
 };
 
 export const incrementDownloadCount = async (movieId: string): Promise<void> => {
-    const counts = getFromStorage<Record<string, number>>(DOWNLOAD_COUNTS_KEY, {});
-    counts[movieId] = (counts[movieId] || 0) + 1;
-    saveToStorage(DOWNLOAD_COUNTS_KEY, counts);
-    return Promise.resolve();
+    const db = await getDb();
+    db.downloadCounts[movieId] = (db.downloadCounts[movieId] || 0) + 1;
+    await updateDb(db);
 };
 
 export const addSupportTicket = async (ticketData: Omit<SupportTicket, '_id' | 'timestamp'>): Promise<SupportTicket> => {
-    const tickets = getFromStorage<SupportTicket[]>(SUPPORT_TICKETS_KEY, []);
+    const db = await getDb();
     const newTicket: SupportTicket = {
         ...ticketData,
-        _id: `${Date.now()}-${Math.random()}`,
+        _id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: new Date().toISOString(),
     };
-    tickets.push(newTicket);
-    saveToStorage(SUPPORT_TICKETS_KEY, tickets);
-    return Promise.resolve(newTicket);
+    db.supportTickets.push(newTicket);
+    await updateDb(db);
+    return newTicket;
 };
 
 export const getSupportTickets = async (): Promise<SupportTicket[]> => {
-    return Promise.resolve(getFromStorage<SupportTicket[]>(SUPPORT_TICKETS_KEY, []));
+    const db = await getDb();
+    return db.supportTickets;
 };
 
 export const deleteSupportTicket = async (id: string): Promise<void> => {
-    let tickets = getFromStorage<SupportTicket[]>(SUPPORT_TICKETS_KEY, []);
-    tickets = tickets.filter(ticket => ticket._id !== id);
-    saveToStorage(SUPPORT_TICKETS_KEY, tickets);
-    return Promise.resolve();
+    const db = await getDb();
+    db.supportTickets = db.supportTickets.filter(ticket => ticket._id !== id);
+    await updateDb(db);
 };
