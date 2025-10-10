@@ -23,7 +23,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // This is a mock login. In a real app, this would involve an API call.
   // Using simple hardcoded credentials for demonstration.
   const login = (user: string, pass:string): boolean => {
-    if (user === 'admin' && pass === 'password') {
+    if (user === 'devils2' && pass === 'devils2@777') {
       setIsAuthenticated(true);
       return true;
     }
