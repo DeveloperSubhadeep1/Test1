@@ -37,11 +37,16 @@ const otpStore = {};
 // DO NOT use your regular Gmail password here.
 // Store these credentials securely in your .env file on the server.
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true, // use SSL
     auth: {
         user: process.env.EMAIL_USER, // e.g., 'cinestream2006@gmail.com'
         pass: process.env.EMAIL_PASS, // The 16-character App Password from Google
     },
+    // Add timeouts to prevent the request from hanging indefinitely on auth failure
+    connectionTimeout: 10000, // 10 seconds
+    socketTimeout: 10000,     // 10 seconds
 });
 
 

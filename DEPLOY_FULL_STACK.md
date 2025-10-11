@@ -72,17 +72,35 @@ Now, let's get your server live.
     *   **Key:** `EMAIL_USER`
     *   **Value:** `cinestream2006@gmail.com`
     *   **Key:** `EMAIL_PASS`
-    *   **Value:** *Your 16-character Google App Password.* (See note below)
+    *   **Value:** *Your 16-character Google App Password.* (See instructions below)
 
-    > #### **IMPORTANT: How to Get a Google App Password**
-    > You cannot use your regular Gmail password. You must generate a special password for the application.
+    > ### **CRITICAL STEP: Configure Email Credentials (EMAIL_PASS)**
+    > The OTP signup system will **FAIL** if this is not configured correctly. You **cannot** use your regular Gmail password. You must generate a special 16-character **App Password**.
+    >
+    > **Troubleshooting Tip:** If the signup form shows a spinner and then an error like "Server error while sending OTP", it's almost certain your `EMAIL_PASS` is incorrect or there's a security block.
+    >
+    > **How to Generate Your App Password:**
     > 1.  Go to your Google Account settings: [myaccount.google.com](https://myaccount.google.com/).
-    > 2.  Go to the **Security** tab on the left.
-    > 3.  Under "How you sign in to Google," make sure **2-Step Verification** is turned **ON**. You cannot create an App Password without it.
-    > 4.  On the same Security page, click on **App passwords**. You may need to sign in again.
-    > 5.  Under "Select app," choose **"Mail"**. Under "Select device," choose **"Other (Custom name)"** and name it something like `CineStream Backend`.
-    > 6.  Click **"Generate"**. Google will give you a 16-character password in a yellow box.
-    > 7.  **Copy this password** (without spaces) and paste it as the value for the `EMAIL_PASS` environment variable in Render. This is the only time you'll see this password, so save it securely if needed.
+    > 2.  Click on the **"Security"** tab.
+    > 3.  **Enable 2-Step Verification:** Scroll to "How you sign in to Google" and ensure **2-Step Verification** is **ON**. This is mandatory for App Passwords.
+    > 4.  **Create the App Password:** On the same Security page, click on **"App passwords"**. You might need to sign in again.
+    >     *   For "Select app," choose **"Mail"**.
+    >     *   For "Select device," choose **"Other (Custom name)"**.
+    >     *   Enter a name like `CineStream Backend` and click **"GENERATE"**.
+    > 5.  **Copy the Password:** Google will display a 16-character password in a yellow box. It will look something like this:
+    >     `asdf tghd yyrr wqkl`
+    > 6.  **Paste into Render:** Copy this 16-character password and paste it into the `EMAIL_PASS` value field in Render. **IMPORTANT: Paste it WITHOUT any spaces.** The correct value would be:
+    >     `asdftghdyyrrwqkl`
+    >
+    > ### **New Troubleshooting Step: Check for Google Security Alerts**
+    >
+    > After your backend tries (and fails) to send an email for the first time, Google will likely block the sign-in attempt because it's from an unfamiliar location (the Render server). This is a security feature.
+    >
+    > 1.  **Check your Gmail inbox** for the account `cinestream2006@gmail.com`.
+    > 2.  Look for a **"Security alert"** or **"Sign-in attempt was blocked"** email from Google.
+    > 3.  Open the email and find the button that says **"Check activity"** or **"Yes, it was me"**. Click it.
+    > 4.  This tells Google to trust the Render server.
+    > 5.  Go back to your website and try the signup process again. The email should now send successfully.
 
 5.  **Deploy!**
     *   Click the **"Create Web Service"** button at the bottom.
