@@ -103,24 +103,26 @@ const TopContentBarChart: React.FC = () => {
         <div className="glass-panel p-6 rounded-lg h-full flex flex-col">
             <h3 className="font-bold text-lg text-white mb-4 flex-shrink-0">Top Content by Downloads</h3>
             {topMovies.length > 0 ? (
-                <div className="flex-grow grid grid-cols-6 gap-x-4">
-                    {topMovies.map((movie) => (
-                        <div key={movie._id} className="flex flex-col-reverse items-center group text-center">
-                            <p className="text-xs text-muted mt-2 truncate w-full flex-shrink-0" title={movie.title}>
-                                {movie.title}
-                            </p>
-                            <div className="relative w-full flex-grow" title={`${movie.title}: ${movie.download_count.toLocaleString()} downloads`}>
-                                <div
-                                    className="absolute bottom-0 left-0 right-0 bg-cyan rounded-t-md transition-all duration-1000 ease-out group-hover:bg-purple group-hover:shadow-[0_0_15px_theme(colors.purple)]"
-                                    style={{ height: chartReady ? `${(movie.download_count / maxDownloads) * 100}%` : '0%' }}
-                                >
-                                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-xs font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                                        {movie.download_count.toLocaleString()}
-                                    </span>
+                <div className="flex-grow overflow-x-auto -mx-6 px-6 pb-2">
+                    <div className="grid grid-cols-6 gap-x-4 min-w-[480px] h-full">
+                        {topMovies.map((movie) => (
+                            <div key={movie._id} className="flex flex-col-reverse items-center group text-center">
+                                <p className="text-xs text-muted mt-2 truncate w-full flex-shrink-0" title={movie.title}>
+                                    {movie.title}
+                                </p>
+                                <div className="relative w-full flex-grow" title={`${movie.title}: ${movie.download_count.toLocaleString()} downloads`}>
+                                    <div
+                                        className="absolute bottom-0 left-0 right-0 bg-cyan rounded-t-md transition-all duration-1000 ease-out group-hover:bg-purple group-hover:shadow-[0_0_15px_theme(colors.purple)]"
+                                        style={{ height: chartReady ? `${(movie.download_count / maxDownloads) * 100}%` : '0%' }}
+                                    >
+                                        <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-xs font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {movie.download_count.toLocaleString()}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             ) : (
                 <div className="flex-grow flex items-center justify-center text-muted">
@@ -591,8 +593,8 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
             {step === 1 ? (
               <div className="mt-4">
                 <div className="relative">
-                  <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search for a movie or TV show..." className={inputClass} />
-                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
+                  <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search for a movie or TV show..." className={`${inputClass} pl-10`} />
+                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
                 </div>
                 {loading && <Spinner />}
                 <ul className="mt-2 max-h-80 overflow-y-auto">
@@ -692,7 +694,7 @@ const MoviesTab: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
          <div className="relative w-full sm:max-w-xs">
           <input type="text" placeholder="Search by title..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`${inputClass} pl-10`} />
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><SearchIcon className="h-5 w-5 text-muted" /></div>
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"><SearchIcon className="h-5 w-5 text-muted" /></div>
         </div>
         <button
           onClick={() => setIsAddModalOpen(true)}
