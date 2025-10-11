@@ -113,6 +113,13 @@ router.post('/auth/send-otp', async (req, res) => {
 
     } catch (error) {
         console.error('Error sending OTP:', error);
+        // Provide more specific feedback for common SMTP issues.
+        if (error.code === 'EAUTH' || error.responseCode === 535) {
+            return res.status(500).json({ message: 'Email server authentication failed. Please check credentials in the backend environment.' });
+        }
+        if (error.code === 'ETIMEDOUT' || error.command === 'CONN') {
+            return res.status(500).json({ message: 'Connection to email server timed out. This may be due to a security block from your email provider. Please check the troubleshooting steps in the deployment guide.' });
+        }
         res.status(500).json({ message: 'Server error while sending OTP.' });
     }
 });

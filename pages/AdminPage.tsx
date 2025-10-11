@@ -154,7 +154,10 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
     // hover wouldn't work until after the animation finished.
     const arcData = useMemo(() => {
         const values = Object.values(metrics).map(v => v || 0);
-        const total = values.reduce((sum, val) => sum + val, 0);
+        // FIX: Operator '+' cannot be applied to types 'unknown' and 'unknown'.
+        // Cast value to number to perform addition. This also resolves errors
+        // on lines 160, 165 and 242 which depend on `total` and `arcData` being correctly typed as numbers.
+        const total = values.reduce((sum, val) => sum + (val as number), 0);
         const colorKeys = Object.keys(colors) as Array<keyof Metrics>;
         const finalArcData: ArcData[] = [];
         if (total > 0) {
@@ -186,7 +189,9 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
         canvas.style.height = `${canvasSize}px`;
         ctx.scale(devicePixelRatio, devicePixelRatio);
 
-        const total = Object.values(metrics).reduce((sum, val) => sum + (val || 0), 0);
+        // FIX: Operator '+' cannot be applied to types 'unknown' and 'unknown' (reported for line 189).
+        // Cast value to number to perform addition.
+        const total = Object.values(metrics).reduce((sum, val) => sum + ((val as number) || 0), 0);
 
         const centerX = canvasSize / 2;
         const centerY = canvasSize / 2;
