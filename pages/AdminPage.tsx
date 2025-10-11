@@ -31,9 +31,14 @@ import {
   PlusCircleIcon,
   XIcon,
   SearchIcon,
+  DownloadIcon,
+  MessageSquareIcon,
+  UsersIcon,
+  LinkIcon,
 } from '../components/Icons';
 import { useDebounce } from '../hooks/useDebounce';
 import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
+import { Avatar } from '../components/Avatars';
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Tab Button Component
@@ -43,13 +48,14 @@ const TabButton: React.FC<{ name: string; activeTab: string; setActiveTab: (name
   return (
     <button
       onClick={() => setActiveTab(name)}
-      className={`px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition-colors ${
+      className={`relative px-4 py-2 text-sm font-bold transition-all duration-300 ${
         isActive
-          ? 'border-light-accent dark:border-accent text-light-accent dark:text-accent'
-          : 'border-transparent text-light-muted dark:text-muted hover:border-gray-400 dark:hover:border-gray-500 hover:text-light-text dark:hover:text-white'
+          ? 'text-cyan'
+          : 'text-muted hover:text-cyan'
       }`}
     >
       {label}
+      {isActive && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan animate-glow" style={{'--glow-color': 'cyan'} as React.CSSProperties}></div>}
     </button>
   );
 };
@@ -57,6 +63,74 @@ const TabButton: React.FC<{ name: string; activeTab: string; setActiveTab: (name
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Dashboard Tab
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+const MetricCard: React.FC<{ icon: React.ReactNode; label: string; value: string; color: string; }> = ({ icon, label, value, color }) => (
+    <div className="glass-panel p-4 rounded-lg flex flex-col justify-between" style={{ borderLeft: `2px solid ${color}` }}>
+        <div>
+            <div className="flex justify-between items-center text-muted">
+                <span className="text-sm font-semibold">{label}</span>
+                <div style={{ color }}>{icon}</div>
+            </div>
+            <p className="text-4xl font-bold text-white mt-2">{value}</p>
+        </div>
+    </div>
+);
+
+const TopContentBarChart: React.FC = () => {
+    const [topMovies, setTopMovies] = useState<StoredMovie[]>([]);
+    const [chartReady, setChartReady] = useState(false);
+
+    useEffect(() => {
+        getStoredMovies()
+            .then(movies => {
+                const moviesWithDownloads = movies.filter(m => m.download_count > 0);
+                if (moviesWithDownloads.length > 0) {
+                    const sorted = [...moviesWithDownloads].sort((a,b) => b.download_count - a.download_count);
+                    setTopMovies(sorted.slice(0, 6));
+                } else {
+                    setTopMovies([]);
+                }
+                setTimeout(() => setChartReady(true), 100);
+            })
+            .catch(err => {
+                console.error("Failed to load top content for chart", err);
+                setTopMovies([]);
+            });
+    }, []);
+
+    const maxDownloads = topMovies.length > 0 ? topMovies[0].download_count : 1;
+
+    return (
+        <div className="glass-panel p-6 rounded-lg h-full flex flex-col">
+            <h3 className="font-bold text-lg text-white mb-4 flex-shrink-0">Top Content by Downloads</h3>
+            {topMovies.length > 0 ? (
+                <div className="flex-grow grid grid-cols-6 gap-x-4">
+                    {topMovies.map((movie) => (
+                        <div key={movie._id} className="flex flex-col-reverse items-center group text-center">
+                            <p className="text-xs text-muted mt-2 truncate w-full flex-shrink-0" title={movie.title}>
+                                {movie.title}
+                            </p>
+                            <div className="relative w-full flex-grow" title={`${movie.title}: ${movie.download_count.toLocaleString()} downloads`}>
+                                <div
+                                    className="absolute bottom-0 left-0 right-0 bg-cyan rounded-t-md transition-all duration-1000 ease-out group-hover:bg-purple group-hover:shadow-[0_0_15px_theme(colors.purple)]"
+                                    style={{ height: chartReady ? `${(movie.download_count / maxDownloads) * 100}%` : '0%' }}
+                                >
+                                    <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-xs font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {movie.download_count.toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="flex-grow flex items-center justify-center text-muted">
+                    No download data available.
+                </div>
+            )}
+        </div>
+    );
+};
+
 
 const CircularChart: React.FC<{ metrics: Metrics; colors: Record<keyof Metrics, string> }> = ({ metrics, colors }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -84,35 +158,28 @@ const CircularChart: React.FC<{ metrics: Metrics; colors: Record<keyof Metrics, 
         const radius = 90;
         const lineWidth = 30;
         
-        const textColor = theme === 'dark' ? '#E5E7EB' : '#1F2328';
-        const mutedTextColor = theme === 'dark' ? '#8B949E' : '#57606A';
+        const textColor = '#E5E7EB';
+        const mutedTextColor = '#8B949E';
+        const emptyColor = '#374151';
 
-        // Clear previous drawing before starting a new one
         ctx.clearRect(0, 0, canvasSize, canvasSize);
         
         if (total === 0) {
-            // Draw an empty state circle if there's no data
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-            ctx.strokeStyle = theme === 'dark' ? '#374151' : '#E5E7EB'; // Muted gray
+            ctx.strokeStyle = emptyColor;
             ctx.lineWidth = lineWidth;
             ctx.stroke();
-
-            // Draw center text for empty state
             ctx.fillStyle = textColor;
             ctx.textAlign = 'center';
-            ctx.font = 'bold 36px sans-serif';
-            ctx.fillText('0', centerX, centerY);
-            
-            ctx.fillStyle = mutedTextColor;
-            ctx.font = '14px sans-serif';
-            ctx.fillText('Total Records', centerX, centerY + 25);
-            return; // Exit after drawing empty state
+            ctx.font = 'bold 36px Rajdhani';
+            ctx.fillText('0', centerX, centerY + 10);
+            return;
         }
 
         let animationFrameId: number;
         let startTimestamp: number | null = null;
-        const duration = 1000; // 1 second animation
+        const duration = 1000;
 
         const animate = (timestamp: number) => {
             if (!startTimestamp) startTimestamp = timestamp;
@@ -121,14 +188,20 @@ const CircularChart: React.FC<{ metrics: Metrics; colors: Record<keyof Metrics, 
 
             ctx.clearRect(0, 0, canvasSize, canvasSize);
 
+            // Background arc
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = emptyColor;
+            ctx.lineWidth = lineWidth;
+            ctx.stroke();
+
             let currentAngle = -Math.PI / 2;
             const colorKeys = Object.keys(colors) as Array<keyof Metrics>;
 
             colorKeys.forEach(key => {
                 const value = metrics[key] || 0;
                 const sliceAngle = (value / total) * 2 * Math.PI;
-                
-                if (sliceAngle > 0) { // Only draw if there's a slice to draw
+                if (sliceAngle > 0) {
                     const endAngle = currentAngle + sliceAngle * progress;
                     ctx.beginPath();
                     ctx.arc(centerX, centerY, radius, currentAngle, endAngle);
@@ -136,35 +209,23 @@ const CircularChart: React.FC<{ metrics: Metrics; colors: Record<keyof Metrics, 
                     ctx.lineWidth = lineWidth;
                     ctx.stroke();
                 }
-                
                 currentAngle += sliceAngle;
             });
             
-            // Draw center text
             ctx.fillStyle = textColor;
             ctx.textAlign = 'center';
-            ctx.font = 'bold 36px sans-serif';
-            ctx.fillText(Math.round(total * progress).toLocaleString(), centerX, centerY);
-            
-            ctx.fillStyle = mutedTextColor;
-            ctx.font = '14px sans-serif';
-            ctx.fillText('Total Records', centerX, centerY + 25);
-
+            ctx.font = 'bold 42px Rajdhani';
+            ctx.fillText(Math.round(total * progress).toLocaleString(), centerX, centerY + 15);
 
             if (progress < 1) {
                 animationFrameId = requestAnimationFrame(animate);
             }
         };
-
         animationFrameId = requestAnimationFrame(animate);
-
-        return () => {
-            cancelAnimationFrame(animationFrameId);
-        };
-
+        return () => cancelAnimationFrame(animationFrameId);
     }, [metrics, colors, theme]);
 
-    return <canvas ref={canvasRef}></canvas>;
+    return <canvas ref={canvasRef} className="drop-shadow-[0_0_15px_rgba(8,217,214,0.4)]"></canvas>;
 };
 
 
@@ -174,27 +235,15 @@ const DashboardTab: React.FC = () => {
   const { addToast } = useToast();
 
   useEffect(() => {
-    const fetchMetrics = async () => {
-      try {
-        setLoading(true);
-        const data = await getMetrics();
-        setMetrics(data);
-      } catch (error) {
-        addToast('Failed to load site metrics.', 'error');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchMetrics();
+    getMetrics().then(setMetrics).catch(() => addToast('Failed to load site metrics.', 'error')).finally(() => setLoading(false));
   }, [addToast]);
   
-  const metricConfig = useMemo(() => ({
-      totalLinks: { label: 'Total Links', color: '#22c55e' },
-      totalDownloads: { label: 'Total Downloads', color: '#a855f7' },
-      totalUsers: { label: 'Total Users', color: '#9ca3af' },
-      totalSupportTickets: { label: 'Support Tickets', color: '#ef4444' },
-  }), []);
-
+  const metricConfig = {
+      totalLinks: { label: 'Total Links', color: '#08D9D6', icon: <LinkIcon className="h-5 w-5"/> },
+      totalDownloads: { label: 'Total Downloads', color: '#9A16DD', icon: <DownloadIcon className="h-5 w-5" /> },
+      totalUsers: { label: 'Total Users', color: '#8B949E', icon: <UsersIcon className="h-5 w-5" /> },
+      totalSupportTickets: { label: 'Support Tickets', color: '#FF2E63', icon: <MessageSquareIcon className="h-5 w-5" /> },
+  };
 
   if (loading) return <Spinner />;
   if (!metrics) return <p>Could not load metrics.</p>;
@@ -206,37 +255,31 @@ const DashboardTab: React.FC = () => {
       totalSupportTickets: metricConfig.totalSupportTickets.color,
   };
 
-  // FIX: Cast `val` to `Number` to resolve type errors. `Object.values(metrics)`
-  // returns `unknown[]`, so `val` must be explicitly converted to a number for the sum.
-  const total = Object.values(metrics).reduce((sum, val) => sum + (Number(val) || 0), 0);
-  
-  const legendItems = (Object.keys(metricConfig) as Array<keyof Metrics>).map(key => ({
-      ...metricConfig[key],
-      value: metrics[key] || 0,
-      percentage: total > 0 ? (((metrics[key] || 0) / total) * 100).toFixed(1) : '0.0'
-  }));
-
-
   return (
-     <div className="bg-light-secondary dark:bg-secondary p-6 rounded-lg shadow-lg text-center max-w-4xl mx-auto">
-        <h2 className="text-2xl font-bold text-light-text dark:text-white">System Overview</h2>
-        <p className="text-sm text-light-muted dark:text-muted mb-6">Live visualization of database records</p>
-        
-        <div className="flex justify-center my-4">
-             <CircularChart metrics={metrics} colors={chartColors} />
-        </div>
-        
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-6 mt-8 pt-6 border-t border-light-border dark:border-gray-700 text-left">
-            {legendItems.map(item => (
-                <div key={item.label}>
-                    <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></span>
-                        <span className="text-sm text-light-muted dark:text-muted">{item.label}</span>
+     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        {(Object.keys(metricConfig) as Array<keyof Metrics>).map(key => (
+            <MetricCard 
+                key={key}
+                label={metricConfig[key].label}
+                value={(metrics[key] || 0).toLocaleString()}
+                color={metricConfig[key].color}
+                icon={metricConfig[key].icon}
+            />
+        ))}
+        <div className="md:col-span-2 xl:col-span-2 glass-panel p-6 rounded-lg flex flex-col sm:flex-row items-center justify-center gap-6">
+            <CircularChart metrics={metrics} colors={chartColors} />
+            <div className="flex flex-col gap-4">
+                <h3 className="font-bold text-lg text-white text-center sm:text-left">Platform Overview</h3>
+                 {(Object.keys(chartColors) as Array<keyof Metrics>).map(key => (
+                    <div key={key} className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: chartColors[key] }}></div>
+                        <span className="text-sm text-gray-300">{metricConfig[key].label}</span>
                     </div>
-                    <p className="font-bold text-xl text-light-text dark:text-white mt-1">{item.value.toLocaleString()}</p>
-                    <p className="text-xs text-light-accent dark:text-accent font-semibold">{item.percentage}% of total</p>
-                </div>
-            ))}
+                ))}
+            </div>
+        </div>
+        <div className="md:col-span-2 xl:col-span-2">
+            <TopContentBarChart />
         </div>
      </div>
   );
@@ -251,45 +294,69 @@ const UsersTab: React.FC = () => {
   const { addToast } = useToast();
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setLoading(true);
-        const data = await getUsers();
-        setUsers(data);
-      } catch (error) {
-        addToast('Failed to load users.', 'error');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUsers();
+    getUsers().then(setUsers).catch(() => addToast('Failed to load users.', 'error')).finally(() => setLoading(false));
   }, [addToast]);
 
   if (loading) return <Spinner />;
 
   return (
-    <div className="bg-light-secondary dark:bg-secondary rounded-lg shadow overflow-x-auto">
-      <table className="w-full text-sm text-left">
-        <thead className="bg-light-primary dark:bg-primary text-xs uppercase text-light-muted dark:text-muted">
-          <tr>
-            <th scope="col" className="px-6 py-3">Username</th>
-            <th scope="col" className="px-6 py-3">Favorites</th>
-            <th scope="col" className="px-6 py-3">Watchlist</th>
-            <th scope="col" className="px-6 py-3">Joined</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map(user => (
-            <tr key={user._id} className="border-b border-light-border dark:border-gray-700 hover:bg-light-primary dark:hover:bg-primary">
-              <td className="px-6 py-4 font-medium text-light-text dark:text-white">{user.username}</td>
-              <td className="px-6 py-4">{user.favoritesCount}</td>
-              <td className="px-6 py-4">{user.watchlistCount}</td>
-              <td className="px-6 py-4">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</td>
+    <>
+      {/* Mobile Card View */}
+      <div className="space-y-4 md:hidden">
+        {users.map(user => (
+          <div key={user._id} className="glass-panel p-4 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Avatar avatarId={user.avatarId} className="h-10 w-10" />
+                <div>
+                  <p className="font-bold text-white">{user.username}</p>
+                  <p className="text-xs text-muted">
+                    Joined: {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-glass-border flex justify-around text-center text-sm">
+              <div>
+                <p className="text-muted">Favorites</p>
+                <p className="font-bold text-white">{user.favoritesCount}</p>
+              </div>
+              <div>
+                <p className="text-muted">Watchlist</p>
+                <p className="font-bold text-white">{user.watchlistCount}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block glass-panel rounded-lg shadow overflow-x-auto">
+        <table className="w-full text-sm text-left border-collapse">
+          <thead className="text-xs uppercase text-muted">
+            <tr>
+              <th scope="col" className="px-6 py-4 border-b border-glass-border">Username</th>
+              <th scope="col" className="px-6 py-4 border-b border-glass-border">Favorites</th>
+              <th scope="col" className="px-6 py-4 border-b border-glass-border">Watchlist</th>
+              <th scope="col" className="px-6 py-4 border-b border-glass-border">Joined</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody className="text-gray-300">
+            {users.map(user => (
+              <tr key={user._id} className="border-b border-glass-border hover:bg-cyan/10 transition-colors">
+                <td className="px-6 py-4 font-medium text-white flex items-center gap-3">
+                  <Avatar avatarId={user.avatarId} className="h-8 w-8" />
+                  {user.username}
+                </td>
+                <td className="px-6 py-4">{user.favoritesCount}</td>
+                <td className="px-6 py-4">{user.watchlistCount}</td>
+                <td className="px-6 py-4">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 };
 
@@ -337,22 +404,22 @@ const SupportTicketsTab: React.FC = () => {
       <div className="space-y-4">
         {tickets.length > 0 ? (
           tickets.map(ticket => (
-            <div key={ticket._id} className="bg-light-secondary dark:bg-secondary p-4 rounded-lg shadow">
+            <div key={ticket._id} className="glass-panel p-4 rounded-lg shadow-lg border-l-2 border-danger">
               <div className="flex justify-between items-start">
                 <div>
-                  <h4 className="font-bold">{ticket.subject}</h4>
-                  {ticket.contentTitle && <p className="text-sm text-light-muted dark:text-muted">Content: {ticket.contentTitle}</p>}
-                  <p className="text-xs text-light-muted dark:text-muted mt-1">{new Date(ticket.timestamp).toLocaleString()}</p>
+                  <h4 className="font-bold text-white">{ticket.subject}</h4>
+                  {ticket.contentTitle && <p className="text-sm text-muted">Content: {ticket.contentTitle}</p>}
+                  <p className="text-xs text-muted mt-1">{new Date(ticket.timestamp).toLocaleString()}</p>
                 </div>
-                <button onClick={() => setTicketToDelete(ticket)} className="p-2 text-light-muted dark:text-muted hover:text-red-500" title="Delete Ticket">
+                <button onClick={() => setTicketToDelete(ticket)} className="p-2 text-muted hover:text-danger transition-colors" title="Delete Ticket">
                   <TrashIcon className="h-5 w-5" />
                 </button>
               </div>
-              <p className="mt-2 text-sm whitespace-pre-wrap">{ticket.message}</p>
+              <p className="mt-2 text-sm whitespace-pre-wrap text-gray-300">{ticket.message}</p>
             </div>
           ))
         ) : (
-          <p className="text-center text-light-muted dark:text-muted">No support tickets.</p>
+          <p className="text-center text-muted">No support tickets.</p>
         )}
       </div>
       <ConfirmationModal
@@ -369,8 +436,8 @@ const SupportTicketsTab: React.FC = () => {
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Movies Tab and Modals
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+const inputClass = "w-full bg-primary border border-glass-border rounded-md p-2 text-white placeholder-muted focus:outline-none focus:ring-2 focus:ring-cyan transition-all";
 
-// Edit Modal
 interface MovieEditModalProps {
   movie: StoredMovie;
   onClose: () => void;
@@ -411,30 +478,30 @@ const MovieEditModal: React.FC<MovieEditModalProps> = ({ movie, onClose, onSave 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-light-secondary dark:bg-secondary rounded-lg shadow-xl w-full max-w-2xl" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+      <div className="glass-panel rounded-lg shadow-xl w-full max-w-2xl border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
         <form onSubmit={handleSubmit}>
           <div className="p-6">
-            <h3 className="text-lg font-bold">Edit Links for: {movie.title}</h3>
+            <h3 className="text-lg font-bold text-white">Edit Links for: <span className="text-cyan">{movie.title}</span></h3>
             <div className="space-y-4 mt-4 max-h-96 overflow-y-auto pr-2">
               {links.map((link, index) => (
                 <div key={index} className="flex gap-2 items-center">
-                  <input type="text" placeholder="Label (e.g., 1080p)" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className="w-1/3 bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded p-2" />
-                  <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className="w-2/3 bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded p-2" />
-                  <button type="button" onClick={() => removeLink(index)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-full">
+                  <input type="text" placeholder="Label (e.g., 1080p)" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className={`${inputClass} w-1/3`} />
+                  <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className={`${inputClass} w-2/3`} />
+                  <button type="button" onClick={() => removeLink(index)} className="p-2 text-danger hover:bg-danger/10 rounded-full transition-colors">
                     <XIcon className="h-5 w-5" />
                   </button>
                 </div>
               ))}
             </div>
-            <button type="button" onClick={addLink} className="mt-4 flex items-center gap-2 text-sm text-light-accent dark:text-accent font-semibold">
+            <button type="button" onClick={addLink} className="mt-4 flex items-center gap-2 text-sm text-cyan font-semibold hover:brightness-125 transition-all">
               <PlusCircleIcon className="h-5 w-5" />
               Add another link
             </button>
           </div>
-          <div className="bg-light-primary dark:bg-primary px-6 py-4 flex justify-end gap-2 rounded-b-lg">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded bg-gray-500 text-white">Cancel</button>
-            <button type="submit" disabled={loading} className="px-4 py-2 rounded bg-light-accent dark:bg-accent text-white disabled:bg-gray-400">
+          <div className="bg-primary/50 px-6 py-4 flex justify-end gap-2 rounded-b-lg">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Cancel</button>
+            <button type="submit" disabled={loading} className="px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:bg-muted disabled:text-gray-800 disabled:cursor-not-allowed">
               {loading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
@@ -444,7 +511,6 @@ const MovieEditModal: React.FC<MovieEditModalProps> = ({ movie, onClose, onSave 
   );
 };
 
-// Add Modal
 interface MovieAddModalProps {
   onClose: () => void;
   onSave: () => void;
@@ -514,28 +580,28 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-light-secondary dark:bg-secondary rounded-lg shadow-xl w-full max-w-2xl" onClick={e => e.stopPropagation()}>
+     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+      <div className="glass-panel rounded-lg shadow-xl w-full max-w-2xl border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
         <form onSubmit={handleSubmit}>
           <div className="p-6">
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold">{step === 1 ? 'Step 1: Find Content' : `Step 2: Add links for ${selectedItem && ('title' in selectedItem ? selectedItem.title : selectedItem.name)}`}</h3>
-              <button type="button" onClick={onClose}><XIcon className="h-5 w-5" /></button>
+              <h3 className="text-lg font-bold text-white">{step === 1 ? 'Step 1: Find Content' : `Step 2: Add links for ${selectedItem && ('title' in selectedItem ? selectedItem.title : selectedItem.name)}`}</h3>
+              <button type="button" onClick={onClose} className="text-muted hover:text-white"><XIcon className="h-5 w-5" /></button>
             </div>
             {step === 1 ? (
               <div className="mt-4">
                 <div className="relative">
-                  <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search for a movie or TV show..." className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded p-2 pl-10" />
-                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-light-muted dark:text-muted" />
+                  <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search for a movie or TV show..." className={inputClass} />
+                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
                 </div>
                 {loading && <Spinner />}
                 <ul className="mt-2 max-h-80 overflow-y-auto">
                   {searchResults.map(item => (
-                    <li key={item.id} onClick={() => handleSelect(item)} className="p-2 flex gap-4 items-center hover:bg-light-primary dark:hover:bg-primary rounded cursor-pointer">
-                      <img src={item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : ''} alt="" className="w-10 h-14 object-cover rounded bg-light-primary dark:bg-primary" />
+                    <li key={item.id} onClick={() => handleSelect(item)} className="p-2 flex gap-4 items-center hover:bg-cyan/10 rounded cursor-pointer transition-colors">
+                      <img src={item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : ''} alt="" className="w-10 h-14 object-cover rounded bg-primary" />
                       <div>
-                        <p>{'title' in item ? item.title : item.name}</p>
-                        <p className="text-sm text-light-muted dark:text-muted">{new Date('release_date' in item ? item.release_date : item.first_air_date).getFullYear() || 'N/A'}</p>
+                        <p className="text-white">{'title' in item ? item.title : item.name}</p>
+                        <p className="text-sm text-muted">{new Date('release_date' in item ? item.release_date : item.first_air_date).getFullYear() || 'N/A'}</p>
                       </div>
                     </li>
                   ))}
@@ -543,29 +609,29 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
               </div>
             ) : (
               <div className="mt-4">
-                <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                 <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                   {links.map((link, index) => (
                     <div key={index} className="flex gap-2 items-center">
-                      <input type="text" placeholder="Label (e.g., 1080p)" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className="w-1/3 bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded p-2" />
-                      <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className="w-2/3 bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded p-2" />
-                      <button type="button" onClick={() => removeLink(index)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-full">
+                      <input type="text" placeholder="Label (e.g., 1080p)" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className={`${inputClass} w-1/3`} />
+                      <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className={`${inputClass} w-2/3`} />
+                      <button type="button" onClick={() => removeLink(index)} className="p-2 text-danger hover:bg-danger/10 rounded-full transition-colors">
                         <XIcon className="h-5 w-5" />
                       </button>
                     </div>
                   ))}
                 </div>
-                <button type="button" onClick={addLink} className="mt-4 flex items-center gap-2 text-sm text-light-accent dark:text-accent font-semibold">
+                <button type="button" onClick={addLink} className="mt-4 flex items-center gap-2 text-sm text-cyan font-semibold hover:brightness-125 transition-all">
                   <PlusCircleIcon className="h-5 w-5" />
                   Add another link
                 </button>
               </div>
             )}
           </div>
-          <div className="bg-light-primary dark:bg-primary px-6 py-4 flex justify-end gap-2 rounded-b-lg">
-            {step === 2 && <button type="button" onClick={() => setStep(1)} className="px-4 py-2 rounded bg-gray-500 text-white">Back to Search</button>}
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded bg-gray-500 text-white">Cancel</button>
+          <div className="bg-primary/50 px-6 py-4 flex justify-end gap-2 rounded-b-lg">
+            {step === 2 && <button type="button" onClick={() => setStep(1)} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Back</button>}
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Cancel</button>
             {step === 2 && (
-              <button type="submit" disabled={loading} className="px-4 py-2 rounded bg-light-accent dark:bg-accent text-white disabled:bg-gray-400">
+              <button type="submit" disabled={loading} className="px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:bg-muted disabled:text-gray-800 disabled:cursor-not-allowed">
                 {loading ? 'Saving...' : 'Save Content'}
               </button>
             )}
@@ -603,12 +669,8 @@ const MoviesTab: React.FC = () => {
   }, [fetchMovies]);
 
   const filteredMovies = useMemo(() => {
-    if (!searchQuery) {
-      return movies;
-    }
-    return movies.filter(movie =>
-      movie.title.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    if (!searchQuery) return movies;
+    return movies.filter(movie => movie.title.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [movies, searchQuery]);
 
   const handleDelete = async () => {
@@ -628,66 +690,89 @@ const MoviesTab: React.FC = () => {
   return (
     <>
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
-        <div className="relative w-full sm:max-w-xs">
-          <input
-            type="text"
-            placeholder="Search by title..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent"
-          />
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <SearchIcon className="h-5 w-5 text-light-muted dark:text-muted" />
-          </div>
+         <div className="relative w-full sm:max-w-xs">
+          <input type="text" placeholder="Search by title..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`${inputClass} pl-10`} />
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><SearchIcon className="h-5 w-5 text-muted" /></div>
         </div>
-
         <button
           onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-2 bg-light-accent dark:bg-accent text-white font-bold py-2 px-4 rounded-md hover:opacity-90 transition-opacity w-full sm:w-auto flex-shrink-0"
+          className="flex items-center justify-center gap-2 bg-cyan text-primary font-bold py-2 px-4 rounded-md hover:brightness-125 transition-all w-full sm:w-auto flex-shrink-0"
         >
           <PlusCircleIcon className="h-5 w-5" />
           <span>Add New Links</span>
         </button>
       </div>
 
-      <div className="bg-light-secondary dark:bg-secondary rounded-lg shadow overflow-x-auto">
-        <table className="w-full text-sm text-left">
-          <thead className="bg-light-primary dark:bg-primary text-xs uppercase text-light-muted dark:text-muted">
+      {/* Mobile Card View */}
+      <div className="space-y-4 md:hidden">
+        {filteredMovies.map(movie => (
+          <div key={movie._id} className="glass-panel p-4 rounded-lg">
+            <div>
+              <p className="font-bold text-white truncate">{movie.title}</p>
+              <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full mt-1 inline-block ${movie.type === 'movie' ? 'bg-purple/20 text-purple' : 'bg-cyan/20 text-cyan'}`}>
+                {movie.type}
+              </span>
+            </div>
+            <div className="mt-4 pt-4 border-t border-glass-border flex justify-between items-center text-sm">
+              <div className="flex gap-6">
+                  <div>
+                    <p className="text-muted text-xs">Links</p>
+                    <p className="font-bold text-white">{movie.download_links.length}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted text-xs">Downloads</p>
+                    <p className="font-bold text-white">{movie.download_count}</p>
+                  </div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setMovieToEdit(movie)} className="p-2 text-muted hover:text-cyan transition-colors" title="Edit Links">
+                  <EditIcon className="h-5 w-5" />
+                </button>
+                <button onClick={() => setMovieToDelete(movie)} className="p-2 text-muted hover:text-danger transition-colors" title="Delete">
+                  <TrashIcon className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {/* Desktop Table View */}
+      <div className="hidden md:block glass-panel rounded-lg shadow overflow-x-auto">
+        <table className="w-full text-sm text-left border-collapse">
+          <thead className="text-xs uppercase text-muted">
             <tr>
-              <th scope="col" className="px-6 py-3">Title</th>
-              <th scope="col" className="px-6 py-3">Type</th>
-              <th scope="col" className="px-6 py-3">Links</th>
-              <th scope="col" className="px-6 py-3">Downloads</th>
-              <th scope="col" className="px-6 py-3">Actions</th>
+              <th scope="col" className="px-6 py-4 border-b border-glass-border">Title</th>
+              <th scope="col" className="px-6 py-4 border-b border-glass-border">Type</th>
+              <th scope="col" className="px-6 py-4 border-b border-glass-border">Links</th>
+              <th scope="col" className="px-6 py-4 border-b border-glass-border">Downloads</th>
+              <th scope="col" className="px-6 py-4 border-b border-glass-border">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="text-gray-300">
             {filteredMovies.map(movie => (
-              <tr key={movie._id} className="border-b border-light-border dark:border-gray-700 hover:bg-light-primary dark:hover:bg-primary">
-                <td className="px-6 py-4 font-medium text-light-text dark:text-white">{movie.title}</td>
+              <tr key={movie._id} className="border-b border-glass-border hover:bg-cyan/10 transition-colors">
+                <td className="px-6 py-4 font-medium text-white">{movie.title}</td>
                 <td className="px-6 py-4 uppercase">{movie.type}</td>
                 <td className="px-6 py-4">{movie.download_links.length}</td>
                 <td className="px-6 py-4">{movie.download_count}</td>
                 <td className="px-6 py-4 flex gap-2">
-                  <button onClick={() => setMovieToEdit(movie)} className="p-2 text-light-muted dark:text-muted hover:text-light-accent dark:hover:text-accent" title="Edit Links">
+                  <button onClick={() => setMovieToEdit(movie)} className="p-2 text-muted hover:text-cyan transition-colors" title="Edit Links">
                     <EditIcon className="h-5 w-5" />
                   </button>
-                  <button onClick={() => setMovieToDelete(movie)} className="p-2 text-light-muted dark:text-muted hover:text-red-500" title="Delete">
+                  <button onClick={() => setMovieToDelete(movie)} className="p-2 text-muted hover:text-danger transition-colors" title="Delete">
                     <TrashIcon className="h-5 w-5" />
                   </button>
                 </td>
               </tr>
             ))}
-             {filteredMovies.length === 0 && !loading && (
-              <tr>
-                <td colSpan={5} className="text-center py-10 text-light-muted dark:text-muted">
-                  No content found matching your search.
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>
+
+      {(filteredMovies.length === 0 && !loading) && (
+        <p className="text-center py-10 text-muted">No content found matching your search.</p>
+      )}
 
       {isAddModalOpen && <MovieAddModal onClose={() => setIsAddModalOpen(false)} onSave={fetchMovies} />}
       {movieToEdit && <MovieEditModal movie={movieToEdit} onClose={() => setMovieToEdit(null)} onSave={fetchMovies} />}
@@ -716,43 +801,40 @@ const AdminPage: React.FC = () => {
   });
 
   if (!isAuthenticated) {
-    return <p className="text-center py-20 text-xl">Please log in to view the admin dashboard.</p>;
+    return <p className="text-center py-20 text-xl text-white">Please log in to view the admin dashboard.</p>;
   }
 
   if (!isAdmin) {
     return (
       <div className="text-center py-20">
-        <h1 className="text-4xl font-bold">Access Denied</h1>
-        <p className="mt-4 text-light-muted dark:text-muted">You do not have permission to view this page.</p>
+        <h1 className="text-4xl font-bold text-danger">Access Denied</h1>
+        <p className="mt-4 text-muted">You do not have permission to view this page.</p>
       </div>
     );
   }
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'dashboard':
-        return <DashboardTab />;
-      case 'movies':
-        return <MoviesTab />;
-      case 'users':
-        return <UsersTab />;
-      case 'tickets':
-        return <SupportTicketsTab />;
-      default:
-        return null;
+      case 'dashboard': return <DashboardTab />;
+      case 'movies': return <MoviesTab />;
+      case 'users': return <UsersTab />;
+      case 'tickets': return <SupportTicketsTab />;
+      default: return null;
     }
   };
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold border-l-4 border-light-accent dark:border-accent pl-4">Admin Dashboard</h1>
-      <div className="flex border-b border-light-border dark:border-gray-700">
-        <TabButton name="dashboard" activeTab={activeTab} setActiveTab={setActiveTab} label="Dashboard" />
-        <TabButton name="movies" activeTab={activeTab} setActiveTab={setActiveTab} label="Content Links" />
-        <TabButton name="users" activeTab={activeTab} setActiveTab={setActiveTab} label="Users" />
-        <TabButton name="tickets" activeTab={activeTab} setActiveTab={setActiveTab} label="Support Tickets" />
+      <h1 className="text-4xl font-bold text-white uppercase tracking-wider">Admin Dashboard</h1>
+      <div className="glass-panel rounded-lg">
+        <div className="flex border-b border-glass-border overflow-x-auto">
+          <TabButton name="dashboard" activeTab={activeTab} setActiveTab={setActiveTab} label="Dashboard" />
+          <TabButton name="movies" activeTab={activeTab} setActiveTab={setActiveTab} label="Content Links" />
+          <TabButton name="users" activeTab={activeTab} setActiveTab={setActiveTab} label="Users" />
+          <TabButton name="tickets" activeTab={activeTab} setActiveTab={setActiveTab} label="Support Tickets" />
+        </div>
       </div>
-      <div>{renderTabContent()}</div>
+      <div key={activeTab} className="animate-fade-in">{renderTabContent()}</div>
     </div>
   );
 };

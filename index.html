@@ -36,6 +36,11 @@
       // TODO: Replace with your Google Analytics ID
       gtag('config', 'G-XXXXXXXXXX');
     </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -51,6 +56,9 @@
             },
           },
           extend: {
+            fontFamily: {
+                sans: ['Rajdhani', 'sans-serif'],
+            },
             colors: {
               // Dark Theme
               'primary': '#0D1117',
@@ -58,6 +66,13 @@
               'accent': '#58A6FF',
               'highlight': '#238636',
               'muted': '#8B949E',
+
+              // Neon & Glass
+              'cyan': '#08D9D6',
+              'purple': '#9A16DD',
+              'danger': '#FF2E63',
+              'glass-dark': 'rgba(12, 12, 20, 0.5)',
+              'glass-border': 'rgba(255, 255, 255, 0.1)',
               
               // Light Theme
               'light-primary': '#FFFFFF',
@@ -69,12 +84,22 @@
               'light-border': '#D0D7DE',
             },
             animation: {
-              'fade-in': 'fadeIn 0.3s ease-out',
+              'fade-in': 'fadeIn 0.5s ease-out forwards',
+              'glow': 'glow 2s ease-in-out infinite alternate',
+              'bar-in': 'barIn 0.8s ease-out forwards',
             },
             keyframes: {
               fadeIn: {
-                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                '0%': { opacity: '0', transform: 'translateY(20px)' },
                 '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              glow: {
+                'from': { 'box-shadow': '0 0 5px currentColor, 0 0 10px currentColor' },
+                'to': { 'box-shadow': '0 0 20px currentColor, 0 0 30px currentColor' },
+              },
+              barIn: {
+                '0%': { width: '0%', opacity: '0' },
+                '100%': { opacity: '1' },
               }
             }
           },
@@ -91,6 +116,25 @@
       * {
         -ms-overflow-style: none;  /* IE and Edge */
         scrollbar-width: none;  /* Firefox */
+      }
+      body.dark {
+        background-color: #050508;
+        background-image: radial-gradient(ellipse at top, rgba(154, 22, 221, 0.2) 0%, transparent 50%), 
+                          radial-gradient(ellipse at bottom, rgba(8, 217, 214, 0.2) 0%, transparent 50%);
+        background-size: 100% 100%;
+        background-repeat: no-repeat;
+        animation: aurora 20s ease-in-out infinite alternate;
+      }
+      @keyframes aurora {
+        from { background-position: 0% 0%; }
+        to { background-position: 0% 100%; }
+      }
+      /* Custom class for glass panels */
+      .glass-panel {
+        background-color: rgba(22, 27, 34, 0.5);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
       }
     </style>
   <script type="importmap">
