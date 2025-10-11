@@ -1,4 +1,4 @@
-
+import { Blob } from "@google/genai";
 
 export interface MovieSummary {
   id: number;
@@ -99,7 +99,8 @@ export interface UserProfile {
   _id: string;
   username: string;
   email?: string;
-  avatarId: string;
+  avatar: string; // Default avatar ID from DB
+  customAvatar?: string | null; // Custom avatar from localStorage
   createdAt?: string;
 }
 

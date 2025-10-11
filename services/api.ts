@@ -160,7 +160,11 @@ export const apiSendOtp = (username: string, email: string, pass: string): Promi
 export const apiSignup = (username: string, otp: string): Promise<UserProfile> => 
     dbFetch('/auth/signup', { method: 'POST', body: JSON.stringify({ username, otp }) });
 
-export const apiUpdateProfile = (userId: string, profileData: Partial<UserProfile>): Promise<UserProfile> => dbFetch(`/users/${userId}`, { method: 'PATCH', body: JSON.stringify(profileData) });
+export const apiSendResetOtp = (email: string): Promise<{ message: string }> => 
+    dbFetch('/auth/send-reset-otp', { method: 'POST', body: JSON.stringify({ email }) });
+
+export const apiResetPassword = (email: string, otp: string, newPassword: string): Promise<{ message: string }> => 
+    dbFetch('/auth/reset-password', { method: 'POST', body: JSON.stringify({ email, otp, newPassword }) });
 
 // --- Admin ---
 export const getStoredMovie = async (tmdbId: number, type: ContentType): Promise<StoredMovie | null> => {

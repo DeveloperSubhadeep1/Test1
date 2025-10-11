@@ -1,9 +1,10 @@
 import React, { createContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { UserProfile } from '../types';
 import { useToast } from '../hooks/useToast';
-import { apiLogin, apiSendOtp, apiSignup, apiUpdateProfile } from '../services/api';
+import { apiLogin, apiSendOtp, apiSignup } from '../services/api';
 
 const SESSION_STORAGE_KEY = 'cineStreamSession';
+const CUSTOM_AVATAR_KEY_PREFIX = 'cineStreamCustomAvatar_';
 
 interface AuthContextType {
   currentUser: UserProfile | null;
@@ -13,7 +14,7 @@ interface AuthContextType {
   sendOtp: (user: string, email: string, pass: string) => Promise<{ success: boolean; message: string }>;
   verifyAndSignup: (user: string, otp: string, pass: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
-  updateProfile: (newProfileData: Omit<UserProfile, 'username' | '_id' | 'email'>) => Promise<void>;
+  saveCustomAvatar: (avatarData: string | null) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -24,7 +25,7 @@ export const AuthContext = createContext<AuthContextType>({
   sendOtp: async () => ({ success: false, message: 'OTP function not ready.' }),
   verifyAndSignup: async () => ({ success: false, message: 'Signup function not ready.' }),
   logout: () => {},
-  updateProfile: async () => {},
+  saveCustomAvatar: async () => {},
 });
 
 interface AuthProviderProps {
@@ -37,9 +38,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     try {
-      const sessionUser = sessionStorage.getItem(SESSION_STORAGE_KEY);
-      if (sessionUser) {
-        setCurrentUser(JSON.parse(sessionUser));
+      const sessionUserJson = sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (sessionUserJson) {
+        const sessionUser: UserProfile = JSON.parse(sessionUserJson);
+        const customAvatar = localStorage.getItem(`${CUSTOM_AVATAR_KEY_PREFIX}${sessionUser._id}`);
+        sessionUser.customAvatar = customAvatar;
+        setCurrentUser(sessionUser);
       }
     } catch (error) {
       console.error('Failed to load user session', error);
@@ -50,8 +54,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = useCallback(async (username: string, pass: string): Promise<boolean> => {
     try {
       const userProfile = await apiLogin(username, pass);
+      const customAvatar = localStorage.getItem(`${CUSTOM_AVATAR_KEY_PREFIX}${userProfile._id}`);
+      userProfile.customAvatar = customAvatar;
+      
       setCurrentUser(userProfile);
       sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(userProfile));
+      
       addToast(`Welcome back, ${username}!`, 'success');
       return true;
     } catch (error) {
@@ -104,23 +112,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     addToast("You've been logged out.", 'info');
   }, [addToast]);
   
-  const updateProfile = useCallback(async (newProfileData: Omit<UserProfile, 'username' | '_id' | 'email'>) => {
-    if (!currentUser) return;
+  const saveCustomAvatar = useCallback(async (avatarData: string | null) => {
+    if (!currentUser) {
+      addToast('You must be logged in to update your profile.', 'error');
+      return;
+    }
+    
     try {
-        const updatedProfile = await apiUpdateProfile(currentUser._id, newProfileData);
-        setCurrentUser(updatedProfile);
-        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updatedProfile));
-        addToast('Profile updated!', 'success');
+      const key = `${CUSTOM_AVATAR_KEY_PREFIX}${currentUser._id}`;
+      if (avatarData) {
+        localStorage.setItem(key, avatarData);
+      } else {
+        localStorage.removeItem(key);
+      }
+      
+      setCurrentUser(prevUser => {
+        if (!prevUser) return null;
+        const updatedUser = { ...prevUser, customAvatar: avatarData };
+        // Also update session storage so it persists on refresh
+        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updatedUser));
+        return updatedUser;
+      });
+      
+      addToast('Avatar updated successfully!', 'success');
     } catch (e) {
-        addToast('Failed to save profile.', 'error');
+      console.error('Failed to save avatar to local storage:', e);
+      addToast('Failed to save avatar. Your browser storage might be full.', 'error');
     }
   }, [currentUser, addToast]);
+
 
   const isAuthenticated = !!currentUser;
   const isAdmin = currentUser?.username === 'admin';
 
   return (
-    <AuthContext.Provider value={{ currentUser, isAuthenticated, isAdmin, login, sendOtp, verifyAndSignup, logout, updateProfile }}>
+    <AuthContext.Provider value={{ currentUser, isAuthenticated, isAdmin, login, sendOtp, verifyAndSignup, logout, saveCustomAvatar }}>
       {children}
     </AuthContext.Provider>
   );

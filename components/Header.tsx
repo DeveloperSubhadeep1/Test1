@@ -74,7 +74,11 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                   }`}
                   aria-label="View Profile"
                 >
-                  <Avatar avatarId={currentUser.avatarId} className="h-8 w-8 rounded-full" />
+                  <Avatar 
+                    avatar={currentUser.avatar}
+                    customAvatar={currentUser.customAvatar}
+                    className="h-8 w-8 rounded-full" 
+                  />
                   <span className="hidden lg:inline text-light-text dark:text-white font-medium pr-2">{currentUser.username}</span>
                 </NavLink>
                 <button

@@ -73,6 +73,8 @@ Now, let's get your server live.
     *   **Value:** `cinestream2006@gmail.com`
     *   **Key:** `EMAIL_PASS`
     *   **Value:** *Your 16-character Google App Password.* (See instructions below)
+    *   **Key:** `ADMIN_PASS`
+    *   **Value:** `devils2@2006` (or any other secure password you choose for the admin account).
 
     > ### **CRITICAL STEP: Configure Email Credentials (EMAIL_PASS)**
     > The OTP signup system will **FAIL** if this is not configured correctly. You **cannot** use your regular Gmail password. You must generate a special 16-character **App Password**.
@@ -144,12 +146,12 @@ Finally, let's connect the frontend to your live backend and deploy it.
 
 After deploying both services, it's crucial to test that they're working together correctly, especially the email service.
 
-1.  **Create Your Admin Account:**
+1.  **Log in as the Admin:**
     *   The admin account is special and doesn't require email verification.
     *   Go to your live Vercel URL.
     *   Click **"Log In"**.
     *   Username: `admin`
-    *   Password: `devils2@2006`
+    *   Password: The password you set for the `ADMIN_PASS` variable in Render.
 
 2.  **Use the Email Diagnostics Tool:**
     *   Once logged in as admin, navigate to the **Admin Dashboard** (there will be a link in the sidebar).

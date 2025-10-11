@@ -10,8 +10,13 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust the first hop from the proxy (e.g., Render's load balancer)
+// This is crucial for rate limiting to work correctly with req.ip
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(cors());
+// Use default JSON body limit as large avatar payloads are no longer sent to the server.
 app.use(express.json());
 
 // Database Connection

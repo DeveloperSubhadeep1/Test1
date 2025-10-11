@@ -12,7 +12,7 @@ const LoginPage: React.FC = () => {
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from?.pathname || "/";
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/";
 
   usePageMetadata({
     title: 'Login',
@@ -72,6 +72,11 @@ const LoginPage: React.FC = () => {
                   <EyeIcon className="h-5 w-5" />
                 )}
               </button>
+            </div>
+             <div className="text-right mt-2">
+                <Link to="/forgot-password" className="text-sm font-semibold text-light-accent dark:text-accent hover:underline">
+                    Forgot Password?
+                </Link>
             </div>
           </div>
           <button

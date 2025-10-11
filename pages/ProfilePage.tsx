@@ -1,13 +1,18 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect, useRef } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { usePageMetadata } from '../hooks/usePageMetadata';
-import { Avatar, AVATAR_OPTIONS } from '../components/Avatars';
+import { Avatar } from '../components/Avatars';
+import { useToast } from '../hooks/useToast';
+import { EditIcon, XCircleIcon } from '../components/Icons';
+
+const MAX_AVATAR_SIZE_KB = 100;
 
 const ProfilePage: React.FC = () => {
-  const { currentUser, updateProfile } = useContext(AuthContext);
-  const [username, setUsername] = useState('');
-  const [selectedAvatar, setSelectedAvatar] = useState('avatar1');
+  const { currentUser, saveCustomAvatar } = useContext(AuthContext);
+  const { addToast } = useToast();
+  const [newAvatarPreview, setNewAvatarPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   usePageMetadata({
     title: 'Your Profile',
@@ -16,28 +21,89 @@ const ProfilePage: React.FC = () => {
   });
 
   useEffect(() => {
-    if (currentUser) {
-      setUsername(currentUser.username);
-      setSelectedAvatar(currentUser.avatarId);
-    }
+    // Reset avatar preview if the current user changes (e.g., on logout/login)
+    setNewAvatarPreview(null);
   }, [currentUser]);
   
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentUser || selectedAvatar === currentUser.avatarId) {
-      return; // No changes to save
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      addToast('Invalid file type. Please select a JPG, PNG, or WEBP image.', 'error');
+      return;
     }
 
+    if (file.size > MAX_AVATAR_SIZE_KB * 1024) {
+      addToast(`File is too large. Please select an image smaller than ${MAX_AVATAR_SIZE_KB}KB.`, 'error');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setNewAvatarPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAvatarPreview) return;
+
     setLoading(true);
-    await updateProfile({ avatarId: selectedAvatar });
+    await saveCustomAvatar(newAvatarPreview);
+    setNewAvatarPreview(null); // Clear the preview after saving
     setLoading(false);
   };
+
+  const handleReset = async () => {
+    setLoading(true);
+    await saveCustomAvatar(null);
+    setNewAvatarPreview(null);
+    setLoading(false);
+  }
+
+  const triggerFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  if (!currentUser) {
+    return null; // Or a loading state
+  }
+
+  const hasCustomAvatar = !!(newAvatarPreview || currentUser.customAvatar);
 
   return (
     <div className="max-w-2xl mx-auto">
       <h1 className="text-3xl font-bold mb-6 border-l-4 border-light-accent dark:border-accent pl-4">Your Profile</h1>
       <div className="bg-light-secondary dark:bg-secondary p-8 rounded-lg shadow-lg">
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative group">
+              <Avatar 
+                avatar={currentUser.avatar}
+                customAvatar={newAvatarPreview || currentUser.customAvatar}
+                className="h-32 w-32 rounded-full" 
+              />
+              <button
+                type="button"
+                onClick={triggerFileSelect}
+                className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                aria-label="Change avatar"
+              >
+                <EditIcon className="h-8 w-8 text-white" />
+              </button>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg, image/png, image/webp"
+              onChange={handleFileChange}
+              className="hidden"
+              aria-hidden="true"
+            />
+             <p className="text-xs text-light-muted dark:text-muted">Click image to change. Max {MAX_AVATAR_SIZE_KB}KB.</p>
+          </div>
           <div>
             <label htmlFor="username" className="block text-sm font-medium text-light-muted dark:text-muted mb-2">
               Username
@@ -45,38 +111,28 @@ const ProfilePage: React.FC = () => {
             <input
               id="username"
               type="text"
-              value={username}
+              value={currentUser.username || ''}
               className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent"
-              disabled // Username changes are complex and not supported in this setup for simplicity.
+              disabled
             />
              <p className="text-xs text-light-muted dark:text-muted mt-1">Username cannot be changed.</p>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-light-muted dark:text-muted mb-2">
-              Choose Your Avatar
-            </label>
-            <div className="flex flex-wrap gap-4">
-              {AVATAR_OPTIONS.map((avatarId) => (
-                <button
-                  type="button"
-                  key={avatarId}
-                  onClick={() => setSelectedAvatar(avatarId)}
-                  className={`rounded-full p-1 transition-all duration-200 ${
-                    selectedAvatar === avatarId ? 'ring-2 ring-light-accent dark:ring-accent' : 'ring-2 ring-transparent hover:ring-light-muted dark:hover:ring-muted'
-                  }`}
-                  aria-label={`Select avatar ${avatarId}`}
-                  disabled={loading}
+          <div className="pt-4 flex flex-col sm:flex-row gap-3">
+             {hasCustomAvatar && (
+                 <button
+                    type="button"
+                    onClick={handleReset}
+                    className="w-full flex items-center justify-center gap-2 bg-light-muted/50 dark:bg-muted/50 text-white font-bold py-3 px-4 rounded-md hover:bg-light-muted/70 dark:hover:bg-muted/70 transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
+                    disabled={loading}
                 >
-                  <Avatar avatarId={avatarId} className="h-16 w-16" />
+                    <XCircleIcon className="h-5 w-5" />
+                    Reset to Default
                 </button>
-              ))}
-            </div>
-          </div>
-          <div className="pt-4">
+             )}
             <button
               type="submit"
-              className="w-full bg-light-accent dark:bg-accent text-white font-bold py-3 px-4 rounded-md hover:bg-blue-500 transition-colors disabled:bg-gray-500"
-              disabled={loading || (currentUser && selectedAvatar === currentUser.avatarId)}
+              className="w-full bg-light-accent dark:bg-accent text-white font-bold py-3 px-4 rounded-md hover:bg-blue-500 transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
+              disabled={loading || !newAvatarPreview}
             >
               {loading ? 'Saving...' : 'Save Profile'}
             </button>

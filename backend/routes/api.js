@@ -28,8 +28,59 @@ const requireAdmin = (req, res, next) => {
     next();
 };
 
+// --- Rate Limiting (In-memory) ---
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const MAX_REQUESTS_PER_WINDOW = 5;
+const rateLimitStore = {}; // { ip: [timestamp1, timestamp2, ...] }
+
+const rateLimiter = (req, res, next) => {
+    const ip = req.ip; // Relies on `app.set('trust proxy', 1)` in server.js
+    const now = Date.now();
+    const windowStart = now - RATE_LIMIT_WINDOW_MS;
+
+    // Get recent requests for this IP, filtering out old ones
+    const userRequests = (rateLimitStore[ip] || []).filter(ts => ts > windowStart);
+
+    if (userRequests.length >= MAX_REQUESTS_PER_WINDOW) {
+        return res.status(429).json({ message: 'Too many requests. Please try again later.' });
+    }
+
+    // Add the current request timestamp and proceed
+    rateLimitStore[ip] = [...userRequests, now];
+    next();
+};
+
+// Periodically clean up the rate limit store to prevent memory leaks
+setInterval(() => {
+    const now = Date.now();
+    const windowStart = now - RATE_LIMIT_WINDOW_MS;
+    for (const ip in rateLimitStore) {
+        const recentRequests = rateLimitStore[ip].filter(ts => ts > windowStart);
+        if (recentRequests.length > 0) {
+            rateLimitStore[ip] = recentRequests;
+        } else {
+            delete rateLimitStore[ip];
+        }
+    }
+}, 30 * 60 * 1000); // Clean up every 30 minutes
+
+
 // --- OTP Store (In-memory, clears on server restart) ---
+// Structure: { key: { otp, expiry, type, ...data } }
+// e.g., 'testuser': { otp: '123', expiry: ..., type: 'signup', email: '...', password: '...' }
+// e.g., 'test@test.com': { otp: '456', expiry: ..., type: 'reset' }
 const otpStore = {};
+const OTP_EXPIRY_DURATION = 60 * 60 * 1000; // 1 Hour
+
+// Periodically clean up expired OTPs to prevent memory leaks
+setInterval(() => {
+    const now = Date.now();
+    for (const key in otpStore) {
+        if (otpStore[key].expiry < now) {
+            delete otpStore[key];
+        }
+    }
+}, 10 * 60 * 1000); // Clean up every 10 minutes
 
 // --- Nodemailer Setup ---
 // IMPORTANT: For this to work with Gmail, you MUST enable 2-Factor Authentication
@@ -55,8 +106,8 @@ router.post('/auth/login', async (req, res) => {
     try {
         const { username, password } = req.body;
         // Special admin case
-        if (username === 'admin' && password === 'devils2@2006') {
-            return res.json({ _id: 'admin_user', username: 'admin', avatarId: 'avatar4' });
+        if (username === 'admin' && password === (process.env.ADMIN_PASS || 'devils2@2006')) {
+            return res.json({ _id: 'admin_user', username: 'admin', avatar: 'avatar4' });
         }
 
         const user = await User.findOne({ username });
@@ -76,8 +127,8 @@ router.post('/auth/login', async (req, res) => {
     }
 });
 
-// Step 1 of Signup - Send OTP
-router.post('/auth/send-otp', async (req, res) => {
+// Step 1 of Signup - Send OTP (Rate Limited)
+router.post('/auth/send-otp', rateLimiter, async (req, res) => {
     try {
         const { username, email, password } = req.body;
 
@@ -91,9 +142,9 @@ router.post('/auth/send-otp', async (req, res) => {
         }
 
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        const expiry = Date.now() + 10 * 60 * 1000; // 10 minutes
+        const expiry = Date.now() + OTP_EXPIRY_DURATION;
 
-        otpStore[username] = { otp, email, password, expiry };
+        otpStore[username] = { otp, email, password, expiry, type: 'signup' };
         
         await transporter.sendMail({
             from: `"CineStream" <${process.env.EMAIL_USER}>`,
@@ -104,7 +155,7 @@ router.post('/auth/send-otp', async (req, res) => {
                     <h2 style="color: #0D1117;">Welcome to CineStream!</h2>
                     <p>Your verification code is:</p>
                     <p style="font-size: 24px; font-weight: bold; letter-spacing: 5px; background: #f0f0f0; padding: 10px 20px; border-radius: 5px; display: inline-block;">${otp}</p>
-                    <p>This code will expire in 10 minutes.</p>
+                    <p>This code will expire in 1 hour.</p>
                 </div>
             `,
         });
@@ -124,7 +175,7 @@ router.post('/auth/signup', async (req, res) => {
         const { username, otp } = req.body;
         const storedData = otpStore[username];
 
-        if (!storedData) {
+        if (!storedData || storedData.type !== 'signup') {
             return res.status(400).json({ message: 'Invalid request. Please start the signup process again.' });
         }
         
@@ -140,7 +191,7 @@ router.post('/auth/signup', async (req, res) => {
         const { email, password } = storedData;
         
         // In a real app, hash the password: const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = new User({ username, email, password /*: hashedPassword*/, avatarId: 'avatar1' });
+        const newUser = new User({ username, email, password /*: hashedPassword*/, avatar: 'avatar1' });
         await newUser.save();
         
         delete otpStore[username];
@@ -153,6 +204,92 @@ router.post('/auth/signup', async (req, res) => {
         }
         console.error('Error during signup:', error);
         res.status(500).json({ message: 'Server error during signup.' });
+    }
+});
+
+// Step 1 of Password Reset - Send Reset OTP (Rate Limited)
+router.post('/auth/send-reset-otp', rateLimiter, async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ message: 'Email address is required.' });
+        }
+
+        const user = await User.findOne({ email });
+        // To prevent user enumeration, always send a generic success message.
+        if (user) {
+            const otp = Math.floor(100000 + Math.random() * 900000).toString();
+            const expiry = Date.now() + OTP_EXPIRY_DURATION;
+            
+            otpStore[email] = { otp, expiry, type: 'reset' };
+
+            await transporter.sendMail({
+                from: `"CineStream" <${process.env.EMAIL_USER}>`,
+                to: email,
+                subject: 'Your CineStream Password Reset Code',
+                html: `
+                    <div style="font-family: sans-serif; text-align: center; padding: 20px; color: #333;">
+                        <h2 style="color: #0D1117;">Password Reset Request</h2>
+                        <p>Your password reset code is:</p>
+                        <p style="font-size: 24px; font-weight: bold; letter-spacing: 5px; background: #f0f0f0; padding: 10px 20px; border-radius: 5px; display: inline-block;">${otp}</p>
+                        <p>This code will expire in 1 hour.</p>
+                        <p>If you did not request a password reset, you can safely ignore this email.</p>
+                    </div>
+                `,
+            });
+        }
+        
+        res.status(200).json({ message: 'If an account with this email exists, a password reset code has been sent.' });
+
+    } catch (error) {
+        console.error('Error sending password reset OTP:', error);
+        res.status(500).json({ message: 'Server error while sending password reset code.' });
+    }
+});
+
+// Step 2 of Password Reset - Verify OTP and update password
+router.post('/auth/reset-password', async (req, res) => {
+    try {
+        const { email, otp, newPassword } = req.body;
+        
+        if (!email || !otp || !newPassword) {
+            return res.status(400).json({ message: 'Email, OTP, and new password are required.' });
+        }
+        if (newPassword.length < 6) {
+            return res.status(400).json({ message: 'Password must be at least 6 characters.' });
+        }
+
+        const storedData = otpStore[email];
+
+        if (!storedData || storedData.type !== 'reset') {
+            return res.status(400).json({ message: 'Invalid request or no active password reset for this email.' });
+        }
+
+        if (Date.now() > storedData.expiry) {
+            delete otpStore[email];
+            return res.status(400).json({ message: 'OTP has expired. Please request a new one.' });
+        }
+
+        if (otp !== storedData.otp) {
+            return res.status(400).json({ message: 'Invalid OTP.' });
+        }
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        // In a real app, hash this password
+        user.password = newPassword;
+        await user.save();
+        
+        delete otpStore[email];
+
+        res.status(200).json({ message: 'Password has been reset successfully. Please log in.' });
+
+    } catch (error) {
+        console.error('Error resetting password:', error);
+        res.status(500).json({ message: 'Server error during password reset.' });
     }
 });
 
@@ -190,25 +327,6 @@ router.post('/admin/test-email', getUserId, requireAdmin, async (req, res) => {
         }
 
         res.status(500).json({ success: false, message: errorMessage });
-    }
-});
-
-
-// --- User Routes ---
-router.patch('/users/:id', getUserId, async (req, res) => {
-    // Ensure a user can only update their own profile
-    if (req.params.id !== req.userId) {
-        return res.status(403).json({ message: 'Forbidden: You can only update your own profile.' });
-    }
-    try {
-        const updatedUser = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        if (!updatedUser) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-        const { password, ...userProfile } = updatedUser.toObject();
-        res.json(userProfile);
-    } catch (error) {
-        res.status(500).json({ message: 'Error updating user profile.' });
     }
 });
 

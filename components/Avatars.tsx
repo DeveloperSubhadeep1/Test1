@@ -1,6 +1,6 @@
 import React from 'react';
 
-// A few simple, stylish SVG avatars
+// A few simple, stylish SVG avatars for defaults
 const avatarSvgs: { [key: string]: React.ReactNode } = {
   avatar1: (
     <svg viewBox="0 0 36 36" fill="none" role="img" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
@@ -48,17 +48,31 @@ const avatarSvgs: { [key: string]: React.ReactNode } = {
   ),
 };
 
-export const AVATAR_OPTIONS = Object.keys(avatarSvgs);
-
 interface AvatarProps {
-  avatarId: string;
+  avatar: string; // The default avatar ID
+  customAvatar?: string | null; // The custom avatar from local storage
   className?: string;
 }
 
-export const Avatar: React.FC<AvatarProps> = ({ avatarId, className = 'h-8 w-8' }) => {
+export const Avatar: React.FC<AvatarProps> = ({ avatar, customAvatar, className = 'h-8 w-8' }) => {
+  const isCustomImage = customAvatar && customAvatar.startsWith('data:image/');
+  
+  if (isCustomImage) {
+    return (
+      <img
+        src={customAvatar}
+        alt="User avatar"
+        className={`${className} object-cover bg-light-secondary dark:bg-secondary`}
+      />
+    );
+  }
+
+  // Fallback to SVG avatars
+  const svgAvatar = avatarSvgs[avatar] || avatarSvgs['avatar1'];
+
   return (
     <div className={className}>
-      {avatarSvgs[avatarId] || avatarSvgs['avatar1']}
+      {svgAvatar}
     </div>
   );
 };
