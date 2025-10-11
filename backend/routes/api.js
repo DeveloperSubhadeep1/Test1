@@ -179,8 +179,16 @@ router.post('/admin/test-email', getUserId, requireAdmin, async (req, res) => {
 
     } catch (error) {
         console.error('Email diagnostic test failed:', error);
-        // Provide a detailed error message for easier debugging
-        const errorMessage = `Failed to send test email. Error: ${error.message}. Code: ${error.code || 'N/A'}. Command: ${error.command || 'N/A'}.`;
+        
+        let errorMessage = `Failed to send test email. Error: ${error.message}. Code: ${error.code || 'N/A'}. Command: ${error.command || 'N/A'}.`;
+        
+        // Add specific troubleshooting advice for common errors
+        if (error.code === 'ETIMEDOUT') {
+            errorMessage += `\n\nTROUBLESHOOTING:\nThis is a connection timeout error. It usually means the server couldn't reach Google's mail server. Please check the following:\n1.  **Google Security Alert:** Check the inbox of your EMAIL_USER (${process.env.EMAIL_USER}) for a "Security alert" email from Google. You may need to approve the sign-in attempt from the new server location (Render).\n2.  **Firewall:** Ensure your hosting provider (Render) allows outbound connections on port 465. (This is usually not an issue).\n3.  **Wait and Retry:** Sometimes, this is a temporary network issue. Please wait a minute and try again.`;
+        } else if (error.code === 'EAUTH' || (error.responseCode === 535)) {
+             errorMessage += `\n\nTROUBLESHOOTING:\nThis is an authentication error. Please check your email credentials:\n1.  **Correct App Password:** Make sure your EMAIL_PASS is the 16-character "App Password" generated from your Google Account, NOT your regular Gmail password.\n2.  **No Spaces:** Ensure the App Password was copied without any spaces.\n3.  **2-Step Verification:** "App Passwords" can only be used if 2-Step Verification is enabled on your Google Account.`;
+        }
+
         res.status(500).json({ success: false, message: errorMessage });
     }
 });

@@ -890,6 +890,34 @@ const MoviesTab: React.FC = () => {
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Diagnostics Tab
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+const FormattedErrorMessage: React.FC<{ message: string }> = ({ message }) => {
+    const parts = message.split('\n\nTROUBLESHOOTING:\n');
+    const rawError = parts[0];
+    const troubleshootingText = parts.length > 1 ? parts[1] : null;
+
+    const formatLine = (line: string) => {
+        // Bolds text wrapped in ** and makes it cyan
+        const boldedLine = line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-cyan">$1</strong>');
+        return <span dangerouslySetInnerHTML={{ __html: boldedLine }} />;
+    };
+
+    return (
+        <div>
+            <p className="font-mono bg-primary p-3 rounded-md text-gray-400 text-xs mb-4 whitespace-pre-wrap break-words">{rawError}</p>
+            {troubleshootingText && (
+                <div>
+                    <h5 className="font-bold text-white mb-2 uppercase tracking-wider">Troubleshooting</h5>
+                    <ol className="space-y-3 text-sm text-gray-300 list-decimal list-outside ml-5">
+                        {troubleshootingText.split(/\n(?=\d\.)/).map((step, index) => (
+                            <li key={index} className="pl-2">{formatLine(step.replace(/^\d\.\s*/, ''))}</li>
+                        ))}
+                    </ol>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const DiagnosticsTab: React.FC = () => {
     const [isTesting, setIsTesting] = useState(false);
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -943,12 +971,16 @@ const DiagnosticsTab: React.FC = () => {
 
                 {testResult && (
                     <div className="mt-4 p-4 rounded-md bg-primary/50 border border-glass-border animate-fade-in">
-                        <h4 className={`font-bold ${testResult.success ? 'text-highlight' : 'text-danger'}`}>
+                        <h4 className={`font-bold mb-3 ${testResult.success ? 'text-highlight' : 'text-danger'}`}>
                             Test Result: {testResult.success ? 'Success' : 'Failure'}
                         </h4>
-                        <pre className="mt-2 text-xs text-gray-300 whitespace-pre-wrap break-words">
-                            <code>{testResult.message}</code>
-                        </pre>
+                        {testResult.success ? (
+                            <pre className="mt-2 text-xs text-gray-300 whitespace-pre-wrap break-words">
+                                <code>{testResult.message}</code>
+                            </pre>
+                        ) : (
+                           <FormattedErrorMessage message={testResult.message} />
+                        )}
                     </div>
                 )}
             </div>
