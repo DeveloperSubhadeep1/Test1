@@ -65,12 +65,17 @@ setInterval(() => {
 }, 30 * 60 * 1000); // Clean up every 30 minutes
 
 
-// --- OTP Store (In-memory, clears on server restart) ---
+// --- OTP Generation and Storage ---
 // Structure: { key: { otp, expiry, type, ...data } }
 // e.g., 'testuser': { otp: '123', expiry: ..., type: 'signup', email: '...', password: '...' }
 // e.g., 'test@test.com': { otp: '456', expiry: ..., type: 'reset' }
 const otpStore = {};
-const OTP_EXPIRY_DURATION = 60 * 60 * 1000; // 1 Hour
+const OTP_EXPIRY_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Generate a 6-digit OTP
+function generateOTP() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
 // Periodically clean up expired OTPs to prevent memory leaks
 setInterval(() => {
@@ -157,7 +162,7 @@ router.post('/auth/send-otp', rateLimiter, async (req, res) => {
             return res.status(409).json({ message: 'Username or email already exists.' });
         }
 
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otp = generateOTP();
         const expiry = Date.now() + OTP_EXPIRY_DURATION;
 
         otpStore[username] = { otp, email, password, expiry, type: 'signup' };
@@ -168,10 +173,10 @@ router.post('/auth/send-otp', rateLimiter, async (req, res) => {
             subject: 'Your CineStream Verification Code',
             html: `
                 <div style="font-family: sans-serif; text-align: center; padding: 20px; color: #333;">
-                    <h2 style="color: #0D1117;">Welcome to CineStream!</h2>
+                    <h2 style="color: #0D1117;">🔐 Welcome to CineStream!</h2>
                     <p>Your verification code is:</p>
-                    <p style="font-size: 24px; font-weight: bold; letter-spacing: 5px; background: #f0f0f0; padding: 10px 20px; border-radius: 5px; display: inline-block;">${otp}</p>
-                    <p>This code will expire in 1 hour.</p>
+                    <p style="font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #58A6FF; background: #f0f0f0; padding: 10px 20px; border-radius: 5px; display: inline-block;">${otp}</p>
+                    <p>⚠️ This code will expire in 5 minutes.</p>
                 </div>
             `,
         });
@@ -234,7 +239,7 @@ router.post('/auth/send-reset-otp', rateLimiter, async (req, res) => {
         const user = await User.findOne({ email });
         // To prevent user enumeration, always send a generic success message.
         if (user) {
-            const otp = Math.floor(100000 + Math.random() * 900000).toString();
+            const otp = generateOTP();
             const expiry = Date.now() + OTP_EXPIRY_DURATION;
             
             otpStore[email] = { otp, expiry, type: 'reset' };
@@ -245,10 +250,10 @@ router.post('/auth/send-reset-otp', rateLimiter, async (req, res) => {
                 subject: 'Your CineStream Password Reset Code',
                 html: `
                     <div style="font-family: sans-serif; text-align: center; padding: 20px; color: #333;">
-                        <h2 style="color: #0D1117;">Password Reset Request</h2>
+                        <h2 style="color: #0D1117;">🔐 Password Reset Request</h2>
                         <p>Your password reset code is:</p>
-                        <p style="font-size: 24px; font-weight: bold; letter-spacing: 5px; background: #f0f0f0; padding: 10px 20px; border-radius: 5px; display: inline-block;">${otp}</p>
-                        <p>This code will expire in 1 hour.</p>
+                        <p style="font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #58A6FF; background: #f0f0f0; padding: 10px 20px; border-radius: 5px; display: inline-block;">${otp}</p>
+                        <p>⚠️ This code will expire in 5 minutes.</p>
                         <p>If you did not request a password reset, you can safely ignore this email.</p>
                     </div>
                 `,
