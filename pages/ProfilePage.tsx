@@ -5,7 +5,8 @@ import { Avatar } from '../components/Avatars';
 import { useToast } from '../hooks/useToast';
 import { EditIcon, XCircleIcon } from '../components/Icons';
 
-const MAX_AVATAR_SIZE_KB = 100;
+const MAX_AVATAR_SIZE_MB = 10;
+const MAX_AVATAR_SIZE_BYTES = MAX_AVATAR_SIZE_MB * 1024 * 1024;
 
 const ProfilePage: React.FC = () => {
   const { currentUser, saveCustomAvatar } = useContext(AuthContext);
@@ -29,13 +30,13 @@ const ProfilePage: React.FC = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      addToast('Invalid file type. Please select a JPG, PNG, or WEBP image.', 'error');
+    if (!file.type.startsWith('image/')) {
+      addToast('Invalid file type. Please select an image file.', 'error');
       return;
     }
 
-    if (file.size > MAX_AVATAR_SIZE_KB * 1024) {
-      addToast(`File is too large. Please select an image smaller than ${MAX_AVATAR_SIZE_KB}KB.`, 'error');
+    if (file.size > MAX_AVATAR_SIZE_BYTES) {
+      addToast(`File is too large. Please select an image smaller than ${MAX_AVATAR_SIZE_MB}MB.`, 'error');
       return;
     }
 
@@ -97,12 +98,12 @@ const ProfilePage: React.FC = () => {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg, image/png, image/webp"
+              accept="image/*"
               onChange={handleFileChange}
               className="hidden"
               aria-hidden="true"
             />
-             <p className="text-xs text-light-muted dark:text-muted">Click image to change. Max {MAX_AVATAR_SIZE_KB}KB.</p>
+             <p className="text-xs text-light-muted dark:text-muted">Click image to change. Max {MAX_AVATAR_SIZE_MB}MB.</p>
           </div>
           <div>
             <label htmlFor="username" className="block text-sm font-medium text-light-muted dark:text-muted mb-2">
