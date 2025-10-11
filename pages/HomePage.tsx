@@ -188,14 +188,14 @@ const HomePage: React.FC = () => {
         </div>
 
         {loading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-5">
                 {Array.from({ length: 12 }).map((_, index) => (
                     <MovieCardSkeleton key={index} />
                 ))}
             </div>
         ) : content.length > 0 ? (
             <>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-5">
                 {content.map(item => (
                     <MovieCard key={`${item.type}-${item.id}`} item={item} type={item.type} />
                 ))}

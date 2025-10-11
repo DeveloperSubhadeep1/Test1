@@ -3,7 +3,7 @@
 This guide provides step-by-step instructions to deploy both your Node.js backend and your React frontend to live, publicly accessible URLs. We will use free-tier services that are perfect for projects like this.
 
 **Architecture Overview:**
-1.  **Backend (Node.js/Express):** This will be deployed as a "Web Service" on a platform called **Render**. It will connect to your MongoDB database.
+1.  **Backend (Node.js/Express):** This will be deployed as a "Web Service" on a platform called **Render**. It will connect to your MongoDB database and send emails for user verification.
 2.  **Frontend (React):** This is a static site that will be deployed to **Vercel**. It will be configured to send API requests to your live backend on Render.
 
 ---
@@ -66,9 +66,23 @@ Now, let's get your server live.
     *   **Instance Type:** Select the **Free** tier.
 
 4.  **Add Environment Variables:**
-    *   Scroll down to the "Advanced" section and click **"Add Environment Variable"**. This is how you securely provide your MongoDB connection string.
+    *   Scroll down to the "Advanced" section and click **"Add Environment Variable"**. This is how you securely provide your database and email credentials.
     *   **Key:** `MONGODB_URI`
     *   **Value:** `mongodb+srv://hellking2:hellking2@cluster0.u3ibvlt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`
+    *   **Key:** `EMAIL_USER`
+    *   **Value:** `cinestream2006@gmail.com`
+    *   **Key:** `EMAIL_PASS`
+    *   **Value:** *Your 16-character Google App Password.* (See note below)
+
+    > #### **IMPORTANT: How to Get a Google App Password**
+    > You cannot use your regular Gmail password. You must generate a special password for the application.
+    > 1.  Go to your Google Account settings: [myaccount.google.com](https://myaccount.google.com/).
+    > 2.  Go to the **Security** tab on the left.
+    > 3.  Under "How you sign in to Google," make sure **2-Step Verification** is turned **ON**. You cannot create an App Password without it.
+    > 4.  On the same Security page, click on **App passwords**. You may need to sign in again.
+    > 5.  Under "Select app," choose **"Mail"**. Under "Select device," choose **"Other (Custom name)"** and name it something like `CineStream Backend`.
+    > 6.  Click **"Generate"**. Google will give you a 16-character password in a yellow box.
+    > 7.  **Copy this password** (without spaces) and paste it as the value for the `EMAIL_PASS` environment variable in Render. This is the only time you'll see this password, so save it securely if needed.
 
 5.  **Deploy!**
     *   Click the **"Create Web Service"** button at the bottom.

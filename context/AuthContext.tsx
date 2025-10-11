@@ -1,7 +1,7 @@
 import React, { createContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { UserProfile } from '../types';
 import { useToast } from '../hooks/useToast';
-import { apiLogin, apiSignup, apiUpdateProfile } from '../services/api';
+import { apiLogin, apiSendOtp, apiSignup, apiUpdateProfile } from '../services/api';
 
 const SESSION_STORAGE_KEY = 'cineStreamSession';
 
@@ -10,9 +10,10 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   login: (user: string, pass: string) => Promise<boolean>;
-  signup: (user: string, pass: string) => Promise<{ success: boolean; message: string }>;
+  sendOtp: (user: string, email: string, pass: string) => Promise<{ success: boolean; message: string }>;
+  verifyAndSignup: (user: string, otp: string, pass: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
-  updateProfile: (newProfileData: Omit<UserProfile, 'username' | '_id'>) => Promise<void>;
+  updateProfile: (newProfileData: Omit<UserProfile, 'username' | '_id' | 'email'>) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -20,7 +21,8 @@ export const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   isAdmin: false,
   login: async () => false,
-  signup: async () => ({ success: false, message: 'Signup function not ready.' }),
+  sendOtp: async () => ({ success: false, message: 'OTP function not ready.' }),
+  verifyAndSignup: async () => ({ success: false, message: 'Signup function not ready.' }),
   logout: () => {},
   updateProfile: async () => {},
 });
@@ -58,7 +60,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [addToast]);
 
-  const signup = useCallback(async (username: string, pass: string): Promise<{ success: boolean; message: string }> => {
+  const sendOtp = useCallback(async (username: string, email: string, pass: string): Promise<{ success: boolean; message: string }> => {
     if (!username || username.trim().length < 3) {
       return { success: false, message: 'Username must be at least 3 characters.' };
     }
@@ -71,16 +73,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     try {
-       const newUserProfile = await apiSignup(trimmedUsername, pass);
-       setCurrentUser(newUserProfile);
-       sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(newUserProfile));
-       addToast('Account created successfully! You are now logged in.', 'success');
-       return { success: true, message: 'Signup successful!' };
+       const result = await apiSendOtp(trimmedUsername, email, pass);
+       return { success: true, message: result.message };
     } catch (error) {
        const message = error instanceof Error ? error.message : 'An unknown error occurred.';
        return { success: false, message };
     }
-  }, [addToast]);
+  }, []);
+
+  const verifyAndSignup = useCallback(async (username: string, otp: string, pass: string): Promise<{ success: boolean; message: string }> => {
+    try {
+        await apiSignup(username, otp);
+        addToast('Account created successfully! Logging you in...', 'success');
+        const loginSuccess = await login(username, pass);
+        if (loginSuccess) {
+            return { success: true, message: 'Signup and login successful!' };
+        } else {
+            return { success: false, message: 'Account created, but auto-login failed. Please log in manually.' };
+        }
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+        return { success: false, message };
+    }
+  }, [addToast, login]);
+
 
   const logout = useCallback(() => {
     setCurrentUser(null);
@@ -88,7 +104,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     addToast("You've been logged out.", 'info');
   }, [addToast]);
   
-  const updateProfile = useCallback(async (newProfileData: Omit<UserProfile, 'username' | '_id'>) => {
+  const updateProfile = useCallback(async (newProfileData: Omit<UserProfile, 'username' | '_id' | 'email'>) => {
     if (!currentUser) return;
     try {
         const updatedProfile = await apiUpdateProfile(currentUser._id, newProfileData);
@@ -104,7 +120,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const isAdmin = currentUser?.username === 'admin';
 
   return (
-    <AuthContext.Provider value={{ currentUser, isAuthenticated, isAdmin, login, signup, logout, updateProfile }}>
+    <AuthContext.Provider value={{ currentUser, isAuthenticated, isAdmin, login, sendOtp, verifyAndSignup, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

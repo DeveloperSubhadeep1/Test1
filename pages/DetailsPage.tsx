@@ -1,16 +1,17 @@
 import React, { useEffect, useState, useContext } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { getDetails, getStoredMovie, incrementDownloadCount, getCredits, findIdBySlug } from '../services/api';
 import { ContentType, MovieDetail, StoredMovie, TVDetail, CastMember, ContentItem } from '../types';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
 import { FavoritesContext } from '../context/FavoritesContext';
 import { WatchlistContext } from '../context/WatchlistContext';
+import { AuthContext } from '../context/AuthContext';
 import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import Spinner from '../components/Spinner';
 import TelegramAd from '../components/TelegramAd';
 import CastCard from '../components/CastCard';
-import { StarIcon, CalendarIcon, ClockIcon, DownloadIcon, HeartIcon, BookmarkIcon, ShareIcon } from '../components/Icons';
+import { StarIcon, CalendarIcon, ClockIcon, DownloadIcon, HeartIcon, BookmarkIcon, ShareIcon, SpinnerIcon } from '../components/Icons';
 import ExpandableText from '../components/ExpandableText';
 
 interface DetailsPageProps {
@@ -25,7 +26,14 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   const [loading, setLoading] = useState(true);
   const { addFavorite, removeFavorite, isFavorite } = useContext(FavoritesContext);
   const { addToWatchlist, removeFromWatchlist, isOnWatchlist } = useContext(WatchlistContext);
+  const { isAuthenticated } = useContext(AuthContext);
   const { addToast } = useToast();
+  const location = useLocation();
+  
+  // States for download countdown
+  const [isPreparing, setIsPreparing] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [showLinks, setShowLinks] = useState(false);
   
   const title = details ? ('title' in details ? details.title : details.name) : '';
   const posterPath = details?.poster_path ? `${TMDB_IMAGE_BASE_URL}${details.poster_path}` : undefined;
@@ -110,6 +118,27 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
       }
     }
   }, [details, type]);
+  
+  // Effect for countdown timer
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    if (isPreparing && countdown !== null && countdown > 0) {
+      timer = setTimeout(() => {
+        setCountdown(countdown - 1);
+      }, 1000);
+    } else if (countdown === 0) {
+      setIsPreparing(false);
+      setShowLinks(true);
+      setCountdown(null);
+    }
+    return () => clearTimeout(timer);
+  }, [isPreparing, countdown]);
+
+  const handlePrepareDownloads = () => {
+    if (isPreparing) return;
+    setIsPreparing(true);
+    setCountdown(10);
+  };
 
   const handleDownloadClick = async (url: string) => {
     if (storedMovie) {
@@ -272,18 +301,59 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
         <div className="mt-8 bg-light-secondary dark:bg-secondary p-6 rounded-lg">
           <h2 className="text-2xl font-bold mb-4">Download Links</h2>
           {storedMovie && storedMovie.download_links.length > 0 ? (
-            <div className="space-y-3">
-              {storedMovie.download_links.map((link, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleDownloadClick(link.url)}
-                  className="w-full flex items-center justify-between bg-light-highlight dark:bg-highlight text-white font-bold py-3 px-4 rounded-lg hover:bg-green-600 transition-colors duration-300"
-                >
-                  <span>{link.label}</span>
-                  <DownloadIcon className="h-6 w-6" />
-                </button>
-              ))}
-            </div>
+            <>
+              {isAuthenticated ? (
+                <>
+                  {!showLinks ? (
+                    <button
+                      onClick={handlePrepareDownloads}
+                      disabled={isPreparing}
+                      className="w-full flex items-center justify-center gap-2 bg-light-highlight dark:bg-highlight text-white font-bold py-3 px-4 rounded-lg hover:bg-green-600 transition-colors duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed"
+                    >
+                      {isPreparing ? (
+                        <>
+                          <SpinnerIcon className="animate-spin h-6 w-6" />
+                          <span>Generating links in {countdown}s...</span>
+                        </>
+                      ) : (
+                        <>
+                          <DownloadIcon className="h-6 w-6" />
+                          <span>Prepare Download Links</span>
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="space-y-3 animate-fade-in">
+                      {storedMovie.download_links.map((link, index) => (
+                        <button
+                          key={index}
+                          onClick={() => handleDownloadClick(link.url)}
+                          className="w-full flex items-center justify-between bg-light-accent dark:bg-accent text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-opacity"
+                        >
+                          <span>{link.label}</span>
+                          <DownloadIcon className="h-6 w-6" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center p-4 bg-light-primary dark:bg-primary/40 rounded-md border border-light-border dark:border-glass-border">
+                    <h3 className="font-bold text-lg text-light-text dark:text-white mb-2">Login to Download</h3>
+                    <p className="text-light-muted dark:text-muted mb-4">
+                        Please log in or create a free account to prepare and view the download links for this content.
+                    </p>
+                    <Link
+                        to="/login"
+                        state={{ from: location }}
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-light-accent dark:bg-accent text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-opacity"
+                    >
+                        <DownloadIcon className="h-6 w-6" />
+                        <span>Log In or Sign Up to Download</span>
+                    </Link>
+                </div>
+              )}
+            </>
           ) : (
             <p className="text-light-muted dark:text-muted">No download links available yet. Please check back later.</p>
           )}

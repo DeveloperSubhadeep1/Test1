@@ -129,9 +129,6 @@ const dbFetch = async (endpoint: string, options: RequestInit = {}) => {
     const sessionUser = sessionStorage.getItem('cineStreamSession');
     const user = sessionUser ? JSON.parse(sessionUser) : null;
 
-    // FIX: The spread syntax for `options.headers` is not type-safe because HeadersInit
-    // can be a Headers object or a string[][], which don't spread correctly into a plain object.
-    // This is corrected by normalizing `options.headers` into a plain object before spreading.
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         ...(options.headers ? Object.fromEntries(new Headers(options.headers)) : {}),
@@ -156,7 +153,13 @@ const dbFetch = async (endpoint: string, options: RequestInit = {}) => {
 
 // --- Auth ---
 export const apiLogin = (username: string, pass: string): Promise<UserProfile> => dbFetch('/auth/login', { method: 'POST', body: JSON.stringify({ username, password: pass }) });
-export const apiSignup = (username: string, pass: string): Promise<UserProfile> => dbFetch('/auth/signup', { method: 'POST', body: JSON.stringify({ username, password: pass }) });
+
+export const apiSendOtp = (username: string, email: string, pass: string): Promise<{ message: string }> => 
+    dbFetch('/auth/send-otp', { method: 'POST', body: JSON.stringify({ username, email, password: pass }) });
+
+export const apiSignup = (username: string, otp: string): Promise<UserProfile> => 
+    dbFetch('/auth/signup', { method: 'POST', body: JSON.stringify({ username, otp }) });
+
 export const apiUpdateProfile = (userId: string, profileData: Partial<UserProfile>): Promise<UserProfile> => dbFetch(`/users/${userId}`, { method: 'PATCH', body: JSON.stringify(profileData) });
 
 // --- Admin ---

@@ -133,10 +133,44 @@ const TopContentBarChart: React.FC = () => {
     );
 };
 
+interface ArcData {
+  key: keyof Metrics;
+  startAngle: number;
+  endAngle: number;
+}
+interface CircularChartProps {
+  metrics: Metrics;
+  colors: Record<keyof Metrics, string>;
+  metricConfig: Record<keyof Metrics, { label: string; color: string; icon: React.ReactNode }>;
+  onHover: (tooltipData: TooltipData) => void;
+}
 
-const CircularChart: React.FC<{ metrics: Metrics; colors: Record<keyof Metrics, string> }> = ({ metrics, colors }) => {
+const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricConfig, onHover }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+
+    // Use useMemo to calculate arc data immediately. This ensures the data for hit
+    // detection is available on the first render, fixing the race condition where
+    // hover wouldn't work until after the animation finished.
+    const arcData = useMemo(() => {
+        const values = Object.values(metrics).map(v => v || 0);
+        const total = values.reduce((sum, val) => sum + val, 0);
+        const colorKeys = Object.keys(colors) as Array<keyof Metrics>;
+        const finalArcData: ArcData[] = [];
+        if (total > 0) {
+            let currentAngle = -Math.PI / 2; // Start at 12 o'clock
+            colorKeys.forEach(key => {
+                const value = metrics[key] || 0;
+                if (value > 0) {
+                    const sliceAngle = (value / total) * 2 * Math.PI;
+                    const endAngle = currentAngle + sliceAngle;
+                    finalArcData.push({ key, startAngle: currentAngle, endAngle });
+                    currentAngle = endAngle;
+                }
+            });
+        }
+        return finalArcData;
+    }, [metrics, colors]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -152,25 +186,22 @@ const CircularChart: React.FC<{ metrics: Metrics; colors: Record<keyof Metrics, 
         canvas.style.height = `${canvasSize}px`;
         ctx.scale(devicePixelRatio, devicePixelRatio);
 
-        const values = [metrics.totalLinks, metrics.totalDownloads, metrics.totalUsers, metrics.totalSupportTickets];
-        const total = values.reduce((sum, val) => sum + (val || 0), 0);
+        const total = Object.values(metrics).reduce((sum, val) => sum + (val || 0), 0);
 
         const centerX = canvasSize / 2;
         const centerY = canvasSize / 2;
         const radius = 90;
-        const lineWidth = 30;
+        const defaultLineWidth = 30;
         
         const textColor = '#E5E7EB';
-        const mutedTextColor = '#8B949E';
         const emptyColor = '#374151';
-
-        ctx.clearRect(0, 0, canvasSize, canvasSize);
         
         if (total === 0) {
+            ctx.clearRect(0, 0, canvasSize, canvasSize);
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
             ctx.strokeStyle = emptyColor;
-            ctx.lineWidth = lineWidth;
+            ctx.lineWidth = defaultLineWidth;
             ctx.stroke();
             ctx.fillStyle = textColor;
             ctx.textAlign = 'center';
@@ -190,28 +221,19 @@ const CircularChart: React.FC<{ metrics: Metrics; colors: Record<keyof Metrics, 
 
             ctx.clearRect(0, 0, canvasSize, canvasSize);
 
-            // Background arc
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
             ctx.strokeStyle = emptyColor;
-            ctx.lineWidth = lineWidth;
+            ctx.lineWidth = defaultLineWidth;
             ctx.stroke();
 
-            let currentAngle = -Math.PI / 2;
-            const colorKeys = Object.keys(colors) as Array<keyof Metrics>;
-
-            colorKeys.forEach(key => {
-                const value = metrics[key] || 0;
-                const sliceAngle = (value / total) * 2 * Math.PI;
-                if (sliceAngle > 0) {
-                    const endAngle = currentAngle + sliceAngle * progress;
-                    ctx.beginPath();
-                    ctx.arc(centerX, centerY, radius, currentAngle, endAngle);
-                    ctx.strokeStyle = colors[key];
-                    ctx.lineWidth = lineWidth;
-                    ctx.stroke();
-                }
-                currentAngle += sliceAngle;
+            arcData.forEach(arc => {
+                const animatedEndAngle = arc.startAngle + (arc.endAngle - arc.startAngle) * progress;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, arc.startAngle, animatedEndAngle);
+                ctx.strokeStyle = colors[arc.key];
+                ctx.lineWidth = arc.key === hoveredKey ? defaultLineWidth + 4 : defaultLineWidth;
+                ctx.stroke();
             });
             
             ctx.fillStyle = textColor;
@@ -225,16 +247,77 @@ const CircularChart: React.FC<{ metrics: Metrics; colors: Record<keyof Metrics, 
         };
         animationFrameId = requestAnimationFrame(animate);
         return () => cancelAnimationFrame(animationFrameId);
-    }, [metrics, colors, theme]);
+    }, [metrics, colors, hoveredKey, arcData]);
+    
+    const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        const canvasSize = 250;
+        const centerX = canvasSize / 2;
+        const centerY = canvasSize / 2;
+        const radius = 90;
+        const halfLineWidth = 15;
+        
+        const dx = x - centerX;
+        const dy = y - centerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        let angle = Math.atan2(dy, dx);
+        if (angle < -Math.PI / 2) {
+            angle += 2 * Math.PI;
+        }
 
-    return <canvas ref={canvasRef} className="drop-shadow-[0_0_15px_rgba(8,217,214,0.4)]"></canvas>;
+        let foundSegment: ArcData | null = null;
+        if (distance > radius - halfLineWidth && distance < radius + halfLineWidth) {
+            for (const arc of arcData) {
+                if (angle >= arc.startAngle && angle < arc.endAngle) {
+                    foundSegment = arc;
+                    break;
+                }
+            }
+        }
+        
+        if (foundSegment) {
+            setHoveredKey(foundSegment.key);
+            const value = metrics[foundSegment.key] || 0;
+            const label = metricConfig[foundSegment.key].label;
+            onHover({
+                visible: true,
+                content: `${label}: ${value.toLocaleString()}`,
+                x: e.clientX,
+                y: e.clientY
+            });
+        } else {
+            setHoveredKey(null);
+            onHover({ visible: false, content: '', x: 0, y: 0 });
+        }
+    };
+
+    const handleMouseLeave = () => {
+        setHoveredKey(null);
+        onHover({ visible: false, content: '', x: 0, y: 0 });
+    };
+
+    return <canvas ref={canvasRef} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} className="drop-shadow-[0_0_15px_rgba(8,217,214,0.4)]"></canvas>;
 };
 
 
+interface TooltipData {
+  visible: boolean;
+  content: string;
+  x: number;
+  y: number;
+}
 const DashboardTab: React.FC = () => {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
+  const [tooltip, setTooltip] = useState<TooltipData>({ visible: false, content: '', x: 0, y: 0 });
 
   useEffect(() => {
     getMetrics().then(setMetrics).catch(() => addToast('Failed to load site metrics.', 'error')).finally(() => setLoading(false));
@@ -258,32 +341,44 @@ const DashboardTab: React.FC = () => {
   };
 
   return (
-     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        {(Object.keys(metricConfig) as Array<keyof Metrics>).map(key => (
-            <MetricCard 
-                key={key}
-                label={metricConfig[key].label}
-                value={(metrics[key] || 0).toLocaleString()}
-                color={metricConfig[key].color}
-                icon={metricConfig[key].icon}
-            />
-        ))}
-        <div className="md:col-span-2 xl:col-span-2 glass-panel p-6 rounded-lg flex flex-col sm:flex-row items-center justify-center gap-6">
-            <CircularChart metrics={metrics} colors={chartColors} />
-            <div className="flex flex-col gap-4">
-                <h3 className="font-bold text-lg text-white text-center sm:text-left">Platform Overview</h3>
-                 {(Object.keys(chartColors) as Array<keyof Metrics>).map(key => (
-                    <div key={key} className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: chartColors[key] }}></div>
-                        <span className="text-sm text-gray-300">{metricConfig[key].label}</span>
-                    </div>
-                ))}
-            </div>
-        </div>
-        <div className="md:col-span-2 xl:col-span-2">
-            <TopContentBarChart />
-        </div>
-     </div>
+    <>
+      {tooltip.visible && (
+          <div 
+              className="fixed z-50 p-2 text-xs font-bold text-white bg-black/70 rounded-md shadow-lg pointer-events-none"
+              style={{
+                  transform: `translate(${tooltip.x + 15}px, ${tooltip.y + 15}px)`
+              }}
+          >
+              {tooltip.content}
+          </div>
+      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          {(Object.keys(metricConfig) as Array<keyof Metrics>).map(key => (
+              <MetricCard 
+                  key={key}
+                  label={metricConfig[key].label}
+                  value={(metrics[key] || 0).toLocaleString()}
+                  color={metricConfig[key].color}
+                  icon={metricConfig[key].icon}
+              />
+          ))}
+          <div className="md:col-span-2 xl:col-span-2 glass-panel p-6 rounded-lg flex flex-col sm:flex-row items-center justify-center gap-6">
+              <CircularChart metrics={metrics} colors={chartColors} onHover={setTooltip} metricConfig={metricConfig} />
+              <div className="flex flex-col gap-4">
+                  <h3 className="font-bold text-lg text-white text-center sm:text-left">Platform Overview</h3>
+                  {(Object.keys(chartColors) as Array<keyof Metrics>).map(key => (
+                      <div key={key} className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: chartColors[key] }}></div>
+                          <span className="text-sm text-gray-300">{metricConfig[key].label}</span>
+                      </div>
+                  ))}
+              </div>
+          </div>
+          <div className="md:col-span-2 xl:col-span-2">
+              <TopContentBarChart />
+          </div>
+      </div>
+    </>
   );
 };
 

@@ -1,4 +1,5 @@
 
+
 export interface MovieSummary {
   id: number;
   title: string;
@@ -97,6 +98,7 @@ export type PersonCredit = (MovieSummary | TVSummary) & { media_type: 'movie' | 
 export interface UserProfile {
   _id: string;
   username: string;
+  email?: string;
   avatarId: string;
   createdAt?: string;
 }

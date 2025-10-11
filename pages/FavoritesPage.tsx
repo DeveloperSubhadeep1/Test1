@@ -51,7 +51,7 @@ const FavoritesPage: React.FC = () => {
           <div className="h-9 w-64 bg-light-secondary dark:bg-secondary rounded-md animate-pulse"></div>
           <div className="h-9 w-56 bg-light-secondary dark:bg-secondary rounded-md animate-pulse"></div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-5">
           {Array.from({ length: 12 }).map((_, index) => (
             <MovieCardSkeleton key={index} />
           ))}
@@ -70,7 +70,7 @@ const FavoritesPage: React.FC = () => {
       </div>
 
       {favorites.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-5">
           {sortedFavorites.map(item => (
             <MovieCard key={`${item.type}-${item.id}`} item={item} type={item.type} />
           ))}

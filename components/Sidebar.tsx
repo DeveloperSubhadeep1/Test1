@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { NavLink, Link } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
 import { FilmIcon, HomeIcon, HeartIcon, BookmarkIcon, UserCogIcon, GridIcon, XIcon } from './Icons';
 
 interface SidebarProps {
@@ -8,6 +9,7 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ onLinkClick, onClose }) => {
+  const { isAdmin } = useContext(AuthContext);
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-4 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
@@ -49,10 +51,12 @@ const Sidebar: React.FC<SidebarProps> = ({ onLinkClick, onClose }) => {
             <BookmarkIcon className="h-5 w-5" />
             <span>Watchlist</span>
         </NavLink>
-        <NavLink to="/admin" className={navLinkClass} onClick={onLinkClick}>
-            <UserCogIcon className="h-5 w-5" />
-            <span>Admin</span>
-        </NavLink>
+        {isAdmin && (
+          <NavLink to="/admin" className={navLinkClass} onClick={onLinkClick}>
+              <UserCogIcon className="h-5 w-5" />
+              <span>Admin</span>
+          </NavLink>
+        )}
       </nav>
     </aside>
   );

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const nodemailer = require('nodemailer');
 
 // Import Mongoose Models
 const User = require('../models/User');
@@ -26,6 +27,22 @@ const requireAdmin = (req, res, next) => {
     }
     next();
 };
+
+// --- OTP Store (In-memory, clears on server restart) ---
+const otpStore = {};
+
+// --- Nodemailer Setup ---
+// IMPORTANT: For this to work with Gmail, you MUST enable 2-Factor Authentication
+// on your Google account and then generate an "App Password".
+// DO NOT use your regular Gmail password here.
+// Store these credentials securely in your .env file on the server.
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER, // e.g., 'cinestream2006@gmail.com'
+        pass: process.env.EMAIL_PASS, // The 16-character App Password from Google
+    },
+});
 
 
 // --- Auth Routes ---
@@ -54,21 +71,82 @@ router.post('/auth/login', async (req, res) => {
     }
 });
 
+// Step 1 of Signup - Send OTP
+router.post('/auth/send-otp', async (req, res) => {
+    try {
+        const { username, email, password } = req.body;
+
+        if (!username || !email || !password) {
+            return res.status(400).json({ message: 'All fields are required.' });
+        }
+
+        const existingUser = await User.findOne({ $or: [{ username }, { email }] });
+        if (existingUser) {
+            return res.status(409).json({ message: 'Username or email already exists.' });
+        }
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiry = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+        otpStore[username] = { otp, email, password, expiry };
+        
+        await transporter.sendMail({
+            from: `"CineStream" <${process.env.EMAIL_USER}>`,
+            to: email,
+            subject: 'Your CineStream Verification Code',
+            html: `
+                <div style="font-family: sans-serif; text-align: center; padding: 20px; color: #333;">
+                    <h2 style="color: #0D1117;">Welcome to CineStream!</h2>
+                    <p>Your verification code is:</p>
+                    <p style="font-size: 24px; font-weight: bold; letter-spacing: 5px; background: #f0f0f0; padding: 10px 20px; border-radius: 5px; display: inline-block;">${otp}</p>
+                    <p>This code will expire in 10 minutes.</p>
+                </div>
+            `,
+        });
+
+        res.status(200).json({ message: 'OTP sent successfully. Please check your email.' });
+
+    } catch (error) {
+        console.error('Error sending OTP:', error);
+        res.status(500).json({ message: 'Server error while sending OTP.' });
+    }
+});
+
+
+// Step 2 of Signup - Verify OTP and Create User
 router.post('/auth/signup', async (req, res) => {
     try {
-        const { username, password } = req.body;
-        const existingUser = await User.findOne({ username });
-        if (existingUser) {
-            return res.status(400).json({ message: 'Username already exists.' });
+        const { username, otp } = req.body;
+        const storedData = otpStore[username];
+
+        if (!storedData) {
+            return res.status(400).json({ message: 'Invalid request. Please start the signup process again.' });
         }
         
+        if (Date.now() > storedData.expiry) {
+            delete otpStore[username];
+            return res.status(400).json({ message: 'OTP has expired. Please try again.' });
+        }
+
+        if (otp !== storedData.otp) {
+            return res.status(400).json({ message: 'Invalid OTP.' });
+        }
+        
+        const { email, password } = storedData;
+        
         // In a real app, hash the password: const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = new User({ username, password /*: hashedPassword*/, avatarId: 'avatar1' });
+        const newUser = new User({ username, email, password /*: hashedPassword*/, avatarId: 'avatar1' });
         await newUser.save();
+        
+        delete otpStore[username];
 
         const { password: _, ...userProfile } = newUser.toObject();
         res.status(201).json(userProfile);
     } catch (error) {
+        if (error.code === 11000) {
+             return res.status(409).json({ message: 'Username or email already exists.' });
+        }
+        console.error('Error during signup:', error);
         res.status(500).json({ message: 'Server error during signup.' });
     }
 });
@@ -101,7 +179,6 @@ router.get('/users', getUserId, requireAdmin, async (req, res) => {
         // For each user, get their favorites and watchlist counts
         const usersWithStats = await Promise.all(users.map(async (user) => {
             const favoritesCount = await Favorite.countDocuments({ userId: user._id.toString() });
-            // FIX: Corrected a typo from `user._._id` to `user._id` which caused a server error.
             const watchlistCount = await Watchlist.countDocuments({ userId: user._id.toString() });
             return {
                 ...user,

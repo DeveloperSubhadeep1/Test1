@@ -77,7 +77,7 @@ const PersonPage: React.FC = () => {
             </section>
             <section>
                 <div className="h-8 bg-light-secondary dark:bg-secondary rounded w-1/3 mb-4"></div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-5">
                     {Array.from({ length: 6 }).map((_, index) => (
                         <MovieCardSkeleton key={index} />
                     ))}
@@ -124,7 +124,7 @@ const PersonPage: React.FC = () => {
       <section>
         <h2 className="text-2xl font-bold mb-4 border-l-4 border-light-accent dark:border-accent pl-4">Known For</h2>
         {credits.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-5">
             {credits.map(item => (
               <MovieCard key={`${item.media_type}-${item.id}`} item={item} type={item.media_type} />
             ))}
