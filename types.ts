@@ -108,3 +108,10 @@ export interface AdminUserView extends UserProfile {
   favoritesCount: number;
   watchlistCount: number;
 }
+
+export interface Notification {
+  _id: string;
+  title: string;
+  type: ContentType;
+  tmdb_id: number;
+}

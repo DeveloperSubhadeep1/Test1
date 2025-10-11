@@ -54,7 +54,7 @@ const MovieCard: React.FC<MovieCardProps> = ({ item, type }) => {
         </div>
         <button
           onClick={handleWatchlistToggle}
-          className="absolute top-2 right-2 z-10 p-1.5 bg-black/60 backdrop-blur-sm rounded-full text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all duration-300 hover:bg-light-accent/80 dark:hover:bg-accent/80"
+          className="absolute top-2 right-2 z-10 p-1.5 bg-black/60 backdrop-blur-sm rounded-full text-white transition-all duration-300 hover:bg-light-accent/80 dark:hover:bg-accent/80"
           title={onWl ? 'Remove from watchlist' : 'Add to watchlist'}
           aria-label="Toggle Watchlist"
         >

@@ -17,6 +17,7 @@ import {
   ContentItem,
   DownloadLink,
   AdminUserView,
+  Notification,
 } from '../types';
 import { TMDB_API_KEY, TMDB_API_BASE_URL, DB_BASE_URL } from '../constants';
 
@@ -150,6 +151,9 @@ const dbFetch = async (endpoint: string, options: RequestInit = {}) => {
     }
     return response.json();
 };
+
+// --- Notifications ---
+export const getNotifications = (): Promise<Notification[]> => dbFetch('/notifications');
 
 // --- Auth ---
 export const apiLogin = (username: string, pass: string): Promise<UserProfile> => dbFetch('/auth/login', { method: 'POST', body: JSON.stringify({ username, password: pass }) });

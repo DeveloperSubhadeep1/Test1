@@ -101,6 +101,22 @@ const transporter = nodemailer.createTransport({
 });
 
 
+// --- Notifications ---
+router.get('/notifications', async (req, res) => {
+    try {
+        const recentMovies = await StoredMovie.find({})
+            .sort({ _id: -1 }) // Sort by ObjectId descending (approximates creation time)
+            .limit(10)
+            .select('_id title type tmdb_id') // Select only necessary fields
+            .lean(); // Use lean for performance
+        res.json(recentMovies);
+    } catch (error) {
+        console.error('Error fetching notifications:', error);
+        res.status(500).json({ message: 'Server error fetching notifications.' });
+    }
+});
+
+
 // --- Auth Routes ---
 router.post('/auth/login', async (req, res) => {
     try {

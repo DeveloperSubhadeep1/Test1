@@ -1,11 +1,11 @@
 import React, { useContext } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import SearchBar from './SearchBar';
-// FIX: Removed LogOutIcon from this import as it's defined below.
 import { FilmIcon, MenuIcon, SunIcon, MoonIcon, UserIcon } from './Icons';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { Avatar } from './Avatars';
+import Notifications from './Notifications';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -65,6 +65,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               )}
             </button>
             
+            <Notifications />
+
             {currentUser ? (
               <>
                 <NavLink

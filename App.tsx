@@ -5,6 +5,7 @@ import { FavoritesProvider } from './context/FavoritesContext';
 import { WatchlistProvider } from './context/WatchlistContext';
 import { ToastProvider } from './context/ToastContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { NotificationsProvider } from './context/NotificationsContext';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -90,9 +91,11 @@ const App: React.FC = () => {
         <AuthProvider>
           <FavoritesProvider>
             <WatchlistProvider>
-              <HashRouter>
-                <AppLayout />
-              </HashRouter>
+              <NotificationsProvider>
+                <HashRouter>
+                  <AppLayout />
+                </HashRouter>
+              </NotificationsProvider>
             </WatchlistProvider>
           </FavoritesProvider>
         </AuthProvider>
