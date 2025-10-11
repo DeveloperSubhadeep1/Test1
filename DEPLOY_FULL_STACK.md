@@ -77,8 +77,6 @@ Now, let's get your server live.
     > ### **CRITICAL STEP: Configure Email Credentials (EMAIL_PASS)**
     > The OTP signup system will **FAIL** if this is not configured correctly. You **cannot** use your regular Gmail password. You must generate a special 16-character **App Password**.
     >
-    > **Troubleshooting Tip:** If the signup form shows a spinner and then an error like "Server error while sending OTP", it's almost certain your `EMAIL_PASS` is incorrect or there's a security block.
-    >
     > **How to Generate Your App Password:**
     > 1.  Go to your Google Account settings: [myaccount.google.com](https://myaccount.google.com/).
     > 2.  Click on the **"Security"** tab.
@@ -91,16 +89,6 @@ Now, let's get your server live.
     >     `asdf tghd yyrr wqkl`
     > 6.  **Paste into Render:** Copy this 16-character password and paste it into the `EMAIL_PASS` value field in Render. **IMPORTANT: Paste it WITHOUT any spaces.** The correct value would be:
     >     `asdftghdyyrrwqkl`
-    >
-    > ### **New Troubleshooting Step: Check for Google Security Alerts**
-    >
-    > After your backend tries (and fails) to send an email for the first time, Google will likely block the sign-in attempt because it's from an unfamiliar location (the Render server). This is a security feature.
-    >
-    > 1.  **Check your Gmail inbox** for the account `cinestream2006@gmail.com`.
-    > 2.  Look for a **"Security alert"** or **"Sign-in attempt was blocked"** email from Google.
-    > 3.  Open the email and find the button that says **"Check activity"** or **"Yes, it was me"**. Click it.
-    > 4.  This tells Google to trust the Render server.
-    > 5.  Go back to your website and try the signup process again. The email should now send successfully.
 
 5.  **Deploy!**
     *   Click the **"Create Web Service"** button at the bottom.
@@ -149,6 +137,35 @@ Finally, let's connect the frontend to your live backend and deploy it.
 6.  **Your Site is Live!**
     *   Vercel will deploy your frontend in under a minute.
     *   Once complete, it will give you a public URL (e.g., `https://cinestream-fullstack.vercel.app`). Click it to see your live application.
+
+---
+
+## Part 4: Verify and Troubleshoot Your Deployment
+
+After deploying both services, it's crucial to test that they're working together correctly, especially the email service.
+
+1.  **Create Your Admin Account:**
+    *   The admin account is special and doesn't require email verification.
+    *   Go to your live Vercel URL.
+    *   Click **"Log In"**.
+    *   Username: `admin`
+    *   Password: `devils2@2006`
+
+2.  **Use the Email Diagnostics Tool:**
+    *   Once logged in as admin, navigate to the **Admin Dashboard** (there will be a link in the sidebar).
+    *   Click on the **"Diagnostics"** tab.
+    *   Click the **"Send Test Email"** button.
+
+3.  **Analyze the Result:**
+    *   **If you see a `Success` message:** Your email is configured perfectly! The OTP signup process for new users will work.
+    *   **If you see a `Failure` message:** The detailed error message will tell you exactly what's wrong. Here's how to fix common errors:
+        *   **Error containing `Invalid login` or `Authentication failed`:** Your `EMAIL_PASS` App Password in Render is incorrect. Double-check that you copied the 16 characters exactly and **without any spaces**.
+        *   **Error containing `Connection timeout` or `ETIMEDOUT`:** This is a network or security issue. It means Render's server couldn't reach Google.
+            *   **Go check your `cinestream2006@gmail.com` inbox for a "Security Alert" email from Google.** You MUST approve this sign-in attempt. This is the most common cause of this error.
+            *   Wait a few minutes and try the test again.
+        *   **Other errors:** The error message should give you a clue. If you're stuck, use the message to search for a solution online.
+
+Once the diagnostics tool reports success, your application is fully functional. You can log out and try the regular signup process to confirm.
 
 ---
 

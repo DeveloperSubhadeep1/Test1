@@ -113,13 +113,6 @@ router.post('/auth/send-otp', async (req, res) => {
 
     } catch (error) {
         console.error('Error sending OTP:', error);
-        // Provide more specific feedback for common SMTP issues.
-        if (error.code === 'EAUTH' || error.responseCode === 535) {
-            return res.status(500).json({ message: 'Email server authentication failed. Please check credentials in the backend environment.' });
-        }
-        if (error.code === 'ETIMEDOUT' || error.command === 'CONN') {
-            return res.status(500).json({ message: 'Connection to email server timed out. This may be due to a security block from your email provider. Please check the troubleshooting steps in the deployment guide.' });
-        }
         res.status(500).json({ message: 'Server error while sending OTP.' });
     }
 });
@@ -160,6 +153,35 @@ router.post('/auth/signup', async (req, res) => {
         }
         console.error('Error during signup:', error);
         res.status(500).json({ message: 'Server error during signup.' });
+    }
+});
+
+// --- Admin Diagnostics ---
+router.post('/admin/test-email', getUserId, requireAdmin, async (req, res) => {
+    try {
+        await transporter.verify(); // First, verify connection config
+        const info = await transporter.sendMail({
+            from: `"CineStream Diagnostics" <${process.env.EMAIL_USER}>`,
+            to: process.env.EMAIL_USER,
+            subject: 'CineStream Email Test Successful ✔',
+            html: `
+                <div style="font-family: sans-serif; padding: 20px;">
+                    <h2>Email Configuration Test</h2>
+                    <p>This is an automated test email from your CineStream application.</p>
+                    <p>If you received this, your email service is configured correctly!</p>
+                    <p style="color: #888;">Timestamp: ${new Date().toISOString()}</p>
+                </div>
+            `,
+        });
+
+        console.log('Test email sent: %s', info.messageId);
+        res.status(200).json({ success: true, message: `Successfully sent test email to ${process.env.EMAIL_USER}. Message ID: ${info.messageId}` });
+
+    } catch (error) {
+        console.error('Email diagnostic test failed:', error);
+        // Provide a detailed error message for easier debugging
+        const errorMessage = `Failed to send test email. Error: ${error.message}. Code: ${error.code || 'N/A'}. Command: ${error.command || 'N/A'}.`;
+        res.status(500).json({ success: false, message: errorMessage });
     }
 });
 

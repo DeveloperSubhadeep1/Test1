@@ -11,6 +11,7 @@ import {
   updateStoredMovie,
   addStoredMovie,
   searchTMDB,
+  apiTestEmail,
 } from '../services/api';
 import {
   Metrics,
@@ -35,6 +36,8 @@ import {
   MessageSquareIcon,
   UsersIcon,
   LinkIcon,
+  SettingsIcon,
+  SpinnerIcon,
 } from '../components/Icons';
 import { useDebounce } from '../hooks/useDebounce';
 import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
@@ -154,10 +157,7 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
     // hover wouldn't work until after the animation finished.
     const arcData = useMemo(() => {
         const values = Object.values(metrics).map(v => v || 0);
-        // FIX: Operator '+' cannot be applied to types 'unknown' and 'unknown'.
-        // Cast value to number to perform addition. This also resolves errors
-        // on lines 160, 165 and 242 which depend on `total` and `arcData` being correctly typed as numbers.
-        const total = values.reduce((sum, val) => sum + (val as number), 0);
+        const total = values.reduce((sum, val) => sum + val, 0);
         const colorKeys = Object.keys(colors) as Array<keyof Metrics>;
         const finalArcData: ArcData[] = [];
         if (total > 0) {
@@ -189,9 +189,7 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
         canvas.style.height = `${canvasSize}px`;
         ctx.scale(devicePixelRatio, devicePixelRatio);
 
-        // FIX: Operator '+' cannot be applied to types 'unknown' and 'unknown' (reported for line 189).
-        // Cast value to number to perform addition.
-        const total = Object.values(metrics).reduce((sum, val) => sum + ((val as number) || 0), 0);
+        const total = Object.values(metrics).reduce((sum, val) => sum + (val || 0), 0);
 
         const centerX = canvasSize / 2;
         const centerY = canvasSize / 2;
@@ -890,6 +888,76 @@ const MoviesTab: React.FC = () => {
 };
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Diagnostics Tab
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+const DiagnosticsTab: React.FC = () => {
+    const [isTesting, setIsTesting] = useState(false);
+    const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+    const { addToast } = useToast();
+
+    const handleTestEmail = async () => {
+        setIsTesting(true);
+        setTestResult(null);
+        try {
+            const result = await apiTestEmail();
+            setTestResult(result);
+            if (result.success) {
+                addToast('Test email sent successfully!', 'success');
+            } else {
+                addToast('Test email failed. See details below.', 'error');
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "An unknown error occurred.";
+            setTestResult({ success: false, message });
+            addToast('An error occurred while running the test.', 'error');
+        } finally {
+            setIsTesting(false);
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-white">System Diagnostics</h2>
+            <div className="glass-panel p-6 rounded-lg">
+                <h3 className="font-bold text-lg text-white mb-2">Email Service Test</h3>
+                <p className="text-sm text-muted mb-4">
+                    Click the button below to send a test email to the address configured in your backend environment variables (`EMAIL_USER`). This will verify your SMTP credentials and connection.
+                </p>
+                <button
+                    onClick={handleTestEmail}
+                    disabled={isTesting}
+                    className="flex items-center justify-center gap-2 bg-cyan text-primary font-bold py-2 px-4 rounded-md hover:brightness-125 transition-all disabled:bg-muted disabled:cursor-not-allowed"
+                >
+                    {isTesting ? (
+                        <>
+                            <SpinnerIcon className="animate-spin h-5 w-5" />
+                            <span>Testing...</span>
+                        </>
+                    ) : (
+                        <>
+                            <SettingsIcon className="h-5 w-5" />
+                            <span>Send Test Email</span>
+                        </>
+                    )}
+                </button>
+
+                {testResult && (
+                    <div className="mt-4 p-4 rounded-md bg-primary/50 border border-glass-border animate-fade-in">
+                        <h4 className={`font-bold ${testResult.success ? 'text-highlight' : 'text-danger'}`}>
+                            Test Result: {testResult.success ? 'Success' : 'Failure'}
+                        </h4>
+                        <pre className="mt-2 text-xs text-gray-300 whitespace-pre-wrap break-words">
+                            <code>{testResult.message}</code>
+                        </pre>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Main AdminPage Component
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 const AdminPage: React.FC = () => {
@@ -921,6 +989,7 @@ const AdminPage: React.FC = () => {
       case 'movies': return <MoviesTab />;
       case 'users': return <UsersTab />;
       case 'tickets': return <SupportTicketsTab />;
+      case 'diagnostics': return <DiagnosticsTab />;
       default: return null;
     }
   };
@@ -934,6 +1003,7 @@ const AdminPage: React.FC = () => {
           <TabButton name="movies" activeTab={activeTab} setActiveTab={setActiveTab} label="Content Links" />
           <TabButton name="users" activeTab={activeTab} setActiveTab={setActiveTab} label="Users" />
           <TabButton name="tickets" activeTab={activeTab} setActiveTab={setActiveTab} label="Support Tickets" />
+          <TabButton name="diagnostics" activeTab={activeTab} setActiveTab={setActiveTab} label="Diagnostics" />
         </div>
       </div>
       <div key={activeTab} className="animate-fade-in">{renderTabContent()}</div>

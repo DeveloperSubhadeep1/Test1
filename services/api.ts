@@ -178,6 +178,7 @@ export const addSupportTicket = (ticketData: Omit<SupportTicket, '_id' | 'timest
 export const getMetrics = (): Promise<Metrics> => dbFetch('/metrics');
 export const incrementDownloadCount = (movieId: string): Promise<void> => dbFetch(`/stored-movies/${movieId}/increment`, { method: 'PATCH' });
 export const getUsers = (): Promise<AdminUserView[]> => dbFetch('/users');
+export const apiTestEmail = (): Promise<{ success: boolean; message: string }> => dbFetch('/admin/test-email', { method: 'POST' });
 
 // --- User Lists (Favorites & Watchlist) ---
 export const getFavorites = (): Promise<FavoriteItem[]> => dbFetch('/favorites');
