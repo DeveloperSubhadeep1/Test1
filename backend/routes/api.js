@@ -90,6 +90,45 @@ setInterval(() => {
     }
 }, 30 * 60 * 1000); // Clean up every 30 minutes
 
+// --- Cloudflare Turnstile CAPTCHA Verification Middleware ---
+const verifyTurnstile = async (req, res, next) => {
+    const token = req.body.turnstileToken;
+    const ip = req.ip;
+
+    // Special case for post-OTP login, where captcha is not needed.
+    if (token === 'verified_by_otp') {
+        delete req.body.turnstileToken;
+        return next();
+    }
+
+    if (!token) {
+        return res.status(400).json({ message: 'CAPTCHA token is missing. Please complete the check.' });
+    }
+    
+    // Use the test secret key for development, or a real key from environment variables in production.
+    const secretKey = process.env.TURNSTILE_SECRET_KEY || '1x0000000000000000000000000000000AA';
+    
+    try {
+        const response = await fetch('https://challenges.cloudflare.com/api/v0/siteverify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `secret=${encodeURIComponent(secretKey)}&response=${encodeURIComponent(token)}&remoteip=${encodeURIComponent(ip)}`,
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            delete req.body.turnstileToken;
+            next();
+        } else {
+            console.warn('Turnstile verification failed:', data['error-codes']);
+            res.status(401).json({ message: 'CAPTCHA verification failed. Please try again.' });
+        }
+    } catch (error) {
+        console.error('Error verifying Turnstile token:', error);
+        res.status(500).json({ message: 'Server error while verifying CAPTCHA.' });
+    }
+};
 
 // --- OTP Generation and Storage ---
 // Structure: { key: { otp, expiry, type, ...data } }
@@ -149,7 +188,7 @@ router.get('/notifications', async (req, res) => {
 
 
 // --- Auth Routes ---
-router.post('/auth/login', async (req, res) => {
+router.post('/auth/login', verifyTurnstile, async (req, res) => {
     try {
         const { username, password } = req.body;
         // Special admin case
@@ -175,7 +214,7 @@ router.post('/auth/login', async (req, res) => {
 });
 
 // Step 1 of Signup - Send OTP (Rate Limited)
-router.post('/auth/send-otp', rateLimiter, async (req, res) => {
+router.post('/auth/send-otp', rateLimiter, verifyTurnstile, async (req, res) => {
     try {
         const { username, email, password } = req.body;
 
@@ -272,7 +311,7 @@ router.post('/auth/signup', async (req, res) => {
 });
 
 // Step 1 of Password Reset - Send Reset OTP (Rate Limited)
-router.post('/auth/send-reset-otp', rateLimiter, async (req, res) => {
+router.post('/auth/send-reset-otp', rateLimiter, verifyTurnstile, async (req, res) => {
     try {
         const { email } = req.body;
         if (!email) {
@@ -567,7 +606,7 @@ router.patch('/stored-movies/:id/increment', async (req, res) => {
 
 // --- Support Tickets ---
 router.get('/support-tickets', getUserId, requireAdmin, async (req, res) => res.json(await SupportTicket.find({}).sort({ timestamp: -1 })));
-router.post('/support-tickets', async (req, res) => {
+router.post('/support-tickets', verifyTurnstile, async (req, res) => {
     const newTicket = new SupportTicket({ ...req.body, timestamp: new Date() });
     await newTicket.save();
     res.status(201).json(newTicket);

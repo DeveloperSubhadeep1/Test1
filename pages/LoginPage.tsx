@@ -3,12 +3,14 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import { FilmIcon, EyeIcon, EyeOffIcon } from '../components/Icons';
+import Turnstile from '../components/Turnstile';
 
 const LoginPage: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
   const location = useLocation();
@@ -23,10 +25,15 @@ const LoginPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const success = await login(username, password);
+    const success = await login(username, password, turnstileToken);
     setLoading(false);
     if (success) {
       navigate(from, { replace: true });
+    } else {
+        if (window.turnstile) {
+            window.turnstile.reset();
+        }
+        setTurnstileToken('');
     }
   };
 
@@ -79,10 +86,13 @@ const LoginPage: React.FC = () => {
                 </Link>
             </div>
           </div>
+          <div className="flex justify-center pt-2">
+              <Turnstile onSuccess={setTurnstileToken} />
+          </div>
           <button
             type="submit"
-            className="w-full bg-light-accent dark:bg-accent text-white font-bold py-2 px-4 rounded-md hover:bg-blue-500 transition-colors disabled:bg-gray-500"
-            disabled={loading}
+            className="w-full bg-light-accent dark:bg-accent text-white font-bold py-2 px-4 rounded-md hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={loading || !turnstileToken}
           >
             {loading ? 'Logging in...' : 'Log In'}
           </button>

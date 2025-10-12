@@ -16,8 +16,8 @@ interface AuthContextType {
   currentUser: UserProfile | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  login: (user: string, pass: string) => Promise<boolean>;
-  sendOtp: (user: string, email: string, pass: string) => Promise<{ success: boolean; message: string }>;
+  login: (user: string, pass: string, turnstileToken: string) => Promise<boolean>;
+  sendOtp: (user: string, email: string, pass: string, turnstileToken: string) => Promise<{ success: boolean; message: string }>;
   verifyAndSignup: (user: string, otp: string, pass: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
   updateProfileDetails: (details: UpdateDetailsPayload) => Promise<boolean>;
@@ -55,9 +55,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  const login = useCallback(async (username: string, pass: string): Promise<boolean> => {
+  const login = useCallback(async (username: string, pass: string, turnstileToken: string): Promise<boolean> => {
     try {
-      const userProfile = await apiLogin(username, pass);
+      const userProfile = await apiLogin(username, pass, turnstileToken);
       setCurrentUser(userProfile);
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userProfile));
       
@@ -69,7 +69,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [addToast]);
 
-  const sendOtp = useCallback(async (username: string, email: string, pass: string): Promise<{ success: boolean; message: string }> => {
+  const sendOtp = useCallback(async (username: string, email: string, pass: string, turnstileToken: string): Promise<{ success: boolean; message: string }> => {
     if (!username || username.trim().length < 3) {
       return { success: false, message: 'Username must be at least 3 characters.' };
     }
@@ -82,7 +82,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     try {
-       const result = await apiSendOtp(trimmedUsername, email, pass);
+       const result = await apiSendOtp(trimmedUsername, email, pass, turnstileToken);
        return { success: true, message: result.message };
     } catch (error) {
        const message = error instanceof Error ? error.message : 'An unknown error occurred.';
@@ -94,7 +94,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
         await apiSignup(username, otp);
         addToast('Account created successfully! Logging you in...', 'success');
-        const loginSuccess = await login(username, pass);
+        // We don't need captcha for the auto-login step as the user has already been verified via OTP.
+        const loginSuccess = await login(username, pass, 'verified_by_otp');
         if (loginSuccess) {
             return { success: true, message: 'Signup and login successful!' };
         } else {

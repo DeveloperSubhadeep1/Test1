@@ -170,16 +170,16 @@ export const getNotifications = async (): Promise<Notification[]> => {
 };
 
 // --- Auth & User Profile ---
-export const apiLogin = (username: string, pass: string): Promise<UserProfile> => dbFetch('/auth/login', { method: 'POST', body: JSON.stringify({ username, password: pass }) });
+export const apiLogin = (username: string, pass: string, turnstileToken: string): Promise<UserProfile> => dbFetch('/auth/login', { method: 'POST', body: JSON.stringify({ username, password: pass, turnstileToken }) });
 
-export const apiSendOtp = (username: string, email: string, pass: string): Promise<{ message: string }> => 
-    dbFetch('/auth/send-otp', { method: 'POST', body: JSON.stringify({ username, email, password: pass }) });
+export const apiSendOtp = (username: string, email: string, pass: string, turnstileToken: string): Promise<{ message: string }> => 
+    dbFetch('/auth/send-otp', { method: 'POST', body: JSON.stringify({ username, email, password: pass, turnstileToken }) });
 
 export const apiSignup = (username: string, otp: string): Promise<UserProfile> => 
     dbFetch('/auth/signup', { method: 'POST', body: JSON.stringify({ username, otp }) });
 
-export const apiSendResetOtp = (email: string): Promise<{ message: string }> => 
-    dbFetch('/auth/send-reset-otp', { method: 'POST', body: JSON.stringify({ email }) });
+export const apiSendResetOtp = (email: string, turnstileToken: string): Promise<{ message: string }> => 
+    dbFetch('/auth/send-reset-otp', { method: 'POST', body: JSON.stringify({ email, turnstileToken }) });
 
 export const apiResetPassword = (email: string, otp: string, newPassword: string): Promise<{ message: string }> => 
     dbFetch('/auth/reset-password', { method: 'POST', body: JSON.stringify({ email, otp, newPassword }) });
@@ -205,7 +205,7 @@ export const getSupportTickets = async (): Promise<SupportTicket[]> => {
     return data || [];
 };
 export const deleteSupportTicket = (id: string): Promise<void> => dbFetch(`/support-tickets/${id}`, { method: 'DELETE' });
-export const addSupportTicket = (ticketData: Omit<SupportTicket, '_id' | 'timestamp'>): Promise<SupportTicket> => dbFetch('/support-tickets', { method: 'POST', body: JSON.stringify(ticketData) });
+export const addSupportTicket = (ticketData: Omit<SupportTicket, '_id' | 'timestamp'>, turnstileToken: string): Promise<SupportTicket> => dbFetch('/support-tickets', { method: 'POST', body: JSON.stringify({ ...ticketData, turnstileToken }) });
 export const getMetrics = (): Promise<Metrics> => dbFetch('/metrics');
 export const getDbStats = (): Promise<DbStats> => dbFetch('/db-stats');
 export const incrementDownloadCount = (movieId: string): Promise<void> => dbFetch(`/stored-movies/${movieId}/increment`, { method: 'PATCH' });

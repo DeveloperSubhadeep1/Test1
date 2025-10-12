@@ -4,10 +4,12 @@ import { apiSendResetOtp } from '../services/api';
 import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import { FilmIcon, SpinnerIcon } from '../components/Icons';
+import Turnstile from '../components/Turnstile';
 
 const ForgotPasswordPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
   const { addToast } = useToast();
   const navigate = useNavigate();
 
@@ -21,11 +23,15 @@ const ForgotPasswordPage: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const result = await apiSendResetOtp(email);
+      const result = await apiSendResetOtp(email, turnstileToken);
       addToast(result.message, 'success');
       navigate('/reset-password', { state: { email } });
     } catch (error) {
       addToast(error instanceof Error ? error.message : 'An unexpected error occurred.', 'error');
+      if (window.turnstile) {
+        window.turnstile.reset();
+      }
+      setTurnstileToken('');
     } finally {
       setLoading(false);
     }
@@ -54,10 +60,13 @@ const ForgotPasswordPage: React.FC = () => {
               placeholder="you@example.com"
             />
           </div>
+          <div className="flex justify-center pt-2">
+            <Turnstile onSuccess={setTurnstileToken} />
+          </div>
           <button
             type="submit"
-            className="w-full bg-light-accent dark:bg-accent text-white font-bold py-2 px-4 rounded-md hover:bg-blue-500 transition-colors disabled:bg-gray-500"
-            disabled={loading}
+            className="w-full bg-light-accent dark:bg-accent text-white font-bold py-2 px-4 rounded-md hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={loading || !turnstileToken}
           >
             {loading ? <SpinnerIcon className="animate-spin h-5 w-5 mx-auto" /> : 'Send Reset Code'}
           </button>

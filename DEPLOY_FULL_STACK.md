@@ -44,6 +44,26 @@ Both Koyeb and Vercel deploy directly from a GitHub repository.
 
 ---
 
+## Part 1.5: Configure Cloudflare Turnstile (CAPTCHA)
+
+Your app is now protected by Cloudflare Turnstile. For the live deployment, you must replace the development test keys with your own free keys from Cloudflare.
+
+1.  **Sign Up for Cloudflare:**
+    *   Create a free account at [dash.cloudflare.com](https://dash.cloudflare.com).
+
+2.  **Get Turnstile Keys:**
+    *   In the Cloudflare dashboard, go to **Turnstile** from the left sidebar.
+    *   Click **"Add site"**.
+    *   **Site name:** `CineStream Frontend`
+    *   **Domain:** Enter your Vercel domain *after* you deploy it (you can come back and edit this). For now, you can enter `localhost`.
+    *   **Widget Mode:** Select `Managed`.
+    *   Click **"Create"**.
+
+3.  **Copy Your Keys:**
+    *   Cloudflare will provide you with a **Site Key** and a **Secret Key**. Keep this page open.
+
+---
+
 ## Part 2: Deploy the Backend to Koyeb
 
 Now, let's get your server live. We recommend the UI-based method for simplicity.
@@ -80,6 +100,8 @@ Now, let's get your server live. We recommend the UI-based method for simplicity
         *   **Value:** *Your 16-character Google App Password.* (See instructions below)
     *   **Name:** `ADMIN_PASS`
         *   **Value:** `devils2@2006` (or any other secure password you choose for the admin account).
+    *   **Name:** `TURNSTILE_SECRET_KEY`
+        *   **Value:** Paste the **Secret Key** you copied from Cloudflare here.
 
     > ### **CRITICAL STEP: Configure Email Credentials (EMAIL_PASS)**
     > The OTP signup system will **FAIL** if this is not configured correctly. You **cannot** use your regular Gmail password. You must generate a special 16-character **App Password**.
@@ -118,7 +140,7 @@ This project includes a `koyeb.yaml` file for automated deployments.
 2.  **Create Secrets in Koyeb:**
     *   Go to your Koyeb control panel.
     *   Navigate to your App's settings, then to the "Secrets" tab.
-    *   Create the same secrets as listed in Step 4 of the UI method (`MONGODB_URI`, `EMAIL_USER`, `EMAIL_PASS`, `ADMIN_PASS`).
+    *   Create the same secrets as listed in Step 4 of the UI method (`MONGODB_URI`, `EMAIL_USER`, `EMAIL_PASS`, `ADMIN_PASS`, `TURNSTILE_SECRET_KEY`).
 
 3.  **Deploy:**
     *   Create a new App in Koyeb and select your GitHub repository.
@@ -138,12 +160,22 @@ Finally, let's connect the frontend to your live backend and deploy it.
         // file: constants.ts
         export const DB_BASE_URL = 'https://cinestream-backend-your-org.koyeb.app/api'; // <-- PASTE YOUR URL HERE
         ```
+    *   Open `components/Turnstile.tsx`.
+    *   Find the line `siteKey = '1x00000000000000000000AA'`.
+    *   **Replace the test key with your actual Site Key** from Cloudflare.
+        ```typescript
+        // file: components/Turnstile.tsx
+        const Turnstile: React.FC<TurnstileProps> = ({ 
+            // ...
+            siteKey = 'YOUR_REAL_SITE_KEY_HERE', // <-- PASTE YOUR SITE KEY HERE
+        }) => { //... }
+        ```
 
 2.  **Commit and Push the Change:**
-    *   Save the `constants.ts` file. In your terminal, run:
+    *   Save the changed files. In your terminal, run:
         ```bash
-        git add constants.ts
-        git commit -m "feat: configure frontend for live backend API"
+        git add constants.ts components/Turnstile.tsx
+        git commit -m "feat: configure frontend for live deployment"
         git push
         ```
 
@@ -163,6 +195,10 @@ Finally, let's connect the frontend to your live backend and deploy it.
 6.  **Your Site is Live!**
     *   Vercel will deploy your frontend in under a minute.
     *   Once complete, it will give you a public URL (e.g., `https://cinestream-fullstack.vercel.app`). Click it to see your live application.
+
+7.  **Update Cloudflare Domain:**
+    *   Go back to your Turnstile settings in Cloudflare.
+    *   Edit your site and add your new Vercel domain to the list of domains. This ensures the widget will work on your live site.
 
 ---
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import { useToast } from '../hooks/useToast';
 import { addSupportTicket } from '../services/api';
+import Turnstile from '../components/Turnstile';
 
 const SupportPage: React.FC = () => {
   usePageMetadata({
@@ -15,6 +16,7 @@ const SupportPage: React.FC = () => {
   const [contentTitle, setContentTitle] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,16 +32,24 @@ const SupportPage: React.FC = () => {
         subject,
         contentTitle: subject === 'Missing Download Link' ? contentTitle : '',
         message,
-      });
+      }, turnstileToken);
       addToast('Thank you for your feedback! We have received your message.', 'success');
       
       // Reset form fields
       setSubject('Missing Download Link');
       setContentTitle('');
       setMessage('');
+      if (window.turnstile) {
+        window.turnstile.reset();
+      }
+      setTurnstileToken('');
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
         addToast(`Failed to submit feedback: ${errorMessage}`, 'error');
+        if (window.turnstile) {
+            window.turnstile.reset();
+        }
+        setTurnstileToken('');
     } finally {
       setIsSubmitting(false);
     }
@@ -103,12 +113,16 @@ const SupportPage: React.FC = () => {
               aria-required="true"
             />
           </div>
+          
+          <div className="flex justify-center pt-2">
+            <Turnstile onSuccess={setTurnstileToken} />
+          </div>
 
           <div className="pt-2">
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="w-full bg-light-accent dark:bg-accent text-white font-bold py-3 px-4 rounded-md hover:bg-blue-500 transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed"
+              disabled={isSubmitting || !turnstileToken}
+              className="w-full bg-light-accent dark:bg-accent text-white font-bold py-3 px-4 rounded-md hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
             </button>

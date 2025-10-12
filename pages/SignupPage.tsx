@@ -4,6 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import { useToast } from '../hooks/useToast';
 import { FilmIcon, EyeIcon, EyeOffIcon, SpinnerIcon } from '../components/Icons';
+import Turnstile from '../components/Turnstile';
 
 const SignupPage: React.FC = () => {
   const [step, setStep] = useState<'details' | 'otp'>('details');
@@ -13,6 +14,7 @@ const SignupPage: React.FC = () => {
   const [otp, setOtp] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
   const { sendOtp, verifyAndSignup } = useContext(AuthContext);
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -26,7 +28,7 @@ const SignupPage: React.FC = () => {
   const handleDetailsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const result = await sendOtp(username, email, password);
+    const result = await sendOtp(username, email, password, turnstileToken);
     setLoading(false);
 
     if (result.success) {
@@ -34,6 +36,10 @@ const SignupPage: React.FC = () => {
       setStep('otp');
     } else {
       addToast(result.message, 'error');
+      if (window.turnstile) {
+          window.turnstile.reset();
+      }
+      setTurnstileToken('');
     }
   };
   
@@ -105,10 +111,13 @@ const SignupPage: React.FC = () => {
             </div>
             <p className="text-xs text-light-muted dark:text-muted mt-1">Must be at least 6 characters long.</p>
         </div>
+        <div className="flex justify-center pt-2">
+            <Turnstile onSuccess={setTurnstileToken} />
+        </div>
         <button
             type="submit"
-            className="w-full bg-light-accent dark:bg-accent text-white font-bold py-2 px-4 rounded-md hover:bg-blue-500 transition-colors disabled:bg-gray-500"
-            disabled={loading}
+            className="w-full bg-light-accent dark:bg-accent text-white font-bold py-2 px-4 rounded-md hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={loading || !turnstileToken}
         >
             {loading ? <SpinnerIcon className="animate-spin h-5 w-5 mx-auto" /> : 'Continue'}
         </button>
