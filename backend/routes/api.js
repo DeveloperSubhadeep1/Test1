@@ -172,11 +172,22 @@ router.post('/auth/send-otp', rateLimiter, async (req, res) => {
             to: email,
             subject: 'Your CineStream Verification Code',
             html: `
-                <div style="font-family: sans-serif; text-align: center; padding: 20px; color: #333;">
-                    <h2 style="color: #0D1117;">🔐 Welcome to CineStream!</h2>
-                    <p>Your verification code is:</p>
-                    <p style="font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #58A6FF; background: #f0f0f0; padding: 10px 20px; border-radius: 5px; display: inline-block;">${otp}</p>
-                    <p>⚠️ This code will expire in 1 hour.</p>
+                <div style="font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 12px; overflow: hidden;">
+                    <div style="background-color: #0D1117; color: #ffffff; padding: 24px; text-align: center;">
+                        <h1 style="margin: 0; font-size: 28px; font-weight: bold;">Welcome to CineStream!</h1>
+                        <p style="margin: 8px 0 0; font-size: 16px;">Your adventure into movies & TV starts now.</p>
+                    </div>
+                    <div style="padding: 32px; text-align: center; background-color: #f6f8fa;">
+                        <p style="font-size: 18px; color: #1f2328;">Here is your verification code:</p>
+                        <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #ffffff; background-color: #58A6FF; padding: 16px 24px; border-radius: 8px; display: inline-block; margin: 16px 0;">
+                            ${otp}
+                        </div>
+                        <p style="font-size: 14px; color: #57606a;">This code is your key to unlock a universe of entertainment. It will expire in 1 hour.</p>
+                    </div>
+                    <div style="background-color: #161B22; color: #8B949E; padding: 16px; text-align: center; font-size: 12px;">
+                        <p>If you did not request this code, you can safely ignore this email.</p>
+                        <p>&copy; ${new Date().getFullYear()} CineStream. All Rights Reserved.</p>
+                    </div>
                 </div>
             `,
         });
@@ -249,12 +260,22 @@ router.post('/auth/send-reset-otp', rateLimiter, async (req, res) => {
                 to: email,
                 subject: 'Your CineStream Password Reset Code',
                 html: `
-                    <div style="font-family: sans-serif; text-align: center; padding: 20px; color: #333;">
-                        <h2 style="color: #0D1117;">🔐 Password Reset Request</h2>
-                        <p>Your password reset code is:</p>
-                        <p style="font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #58A6FF; background: #f0f0f0; padding: 10px 20px; border-radius: 5px; display: inline-block;">${otp}</p>
-                        <p>⚠️ This code will expire in 1 hour.</p>
-                        <p>If you did not request a password reset, you can safely ignore this email.</p>
+                    <div style="font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 12px; overflow: hidden;">
+                        <div style="background-color: #0D1117; color: #ffffff; padding: 24px; text-align: center;">
+                            <h1 style="margin: 0; font-size: 28px; font-weight: bold;">Password Reset Request</h1>
+                            <p style="margin: 8px 0 0; font-size: 16px;">We're here to help you get back into your account.</p>
+                        </div>
+                        <div style="padding: 32px; text-align: center; background-color: #f6f8fa;">
+                            <p style="font-size: 18px; color: #1f2328;">Use the following code to reset your password:</p>
+                            <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #ffffff; background-color: #FF2E63; padding: 16px 24px; border-radius: 8px; display: inline-block; margin: 16px 0;">
+                                ${otp}
+                            </div>
+                            <p style="font-size: 14px; color: #57606a;">This code is valid for 1 hour. Please use it promptly to secure your account.</p>
+                        </div>
+                        <div style="background-color: #161B22; color: #8B949E; padding: 16px; text-align: center; font-size: 12px;">
+                            <p>If you did not request a password reset, please disregard this email. Your account is safe.</p>
+                            <p>&copy; ${new Date().getFullYear()} CineStream. All Rights Reserved.</p>
+                        </div>
                     </div>
                 `,
             });

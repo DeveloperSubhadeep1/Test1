@@ -1,4 +1,5 @@
 import React, { useContext, useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import { Avatar } from '../components/Avatars';
@@ -14,6 +15,7 @@ const ProfilePage: React.FC = () => {
   const [newAvatarPreview, setNewAvatarPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   usePageMetadata({
     title: 'Your Profile',
@@ -55,6 +57,7 @@ const ProfilePage: React.FC = () => {
     await saveCustomAvatar(newAvatarPreview);
     setNewAvatarPreview(null); // Clear the preview after saving
     setLoading(false);
+    navigate('/');
   };
 
   const handleReset = async () => {
@@ -62,6 +65,7 @@ const ProfilePage: React.FC = () => {
     await saveCustomAvatar(null);
     setNewAvatarPreview(null);
     setLoading(false);
+    navigate('/');
   }
 
   const triggerFileSelect = () => {
