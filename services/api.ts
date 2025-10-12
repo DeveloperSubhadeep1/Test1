@@ -19,6 +19,8 @@ import {
   Notification,
   Collection,
   CollectionItem,
+  FavoriteItem,
+  WatchlistItem,
 } from '../types';
 import { TMDB_API_KEY, TMDB_API_BASE_URL, DB_BASE_URL } from '../constants';
 
@@ -154,7 +156,10 @@ const dbFetch = async (endpoint: string, options: RequestInit = {}) => {
 };
 
 // --- Notifications ---
-export const getNotifications = (): Promise<Notification[]> => dbFetch('/notifications');
+export const getNotifications = async (): Promise<Notification[]> => {
+    const data = await dbFetch('/notifications');
+    return data || [];
+};
 
 // --- Auth & User Profile ---
 export const apiLogin = (username: string, pass: string): Promise<UserProfile> => dbFetch('/auth/login', { method: 'POST', body: JSON.stringify({ username, password: pass }) });
@@ -179,26 +184,59 @@ export const getStoredMovie = async (tmdbId: number, type: ContentType): Promise
     const results = await dbFetch(`/stored-movies/find?tmdbId=${tmdbId}&type=${type}`);
     return results;
 };
-export const getStoredMovies = (): Promise<StoredMovie[]> => dbFetch('/stored-movies');
+export const getStoredMovies = async (): Promise<StoredMovie[]> => {
+    const data = await dbFetch('/stored-movies');
+    return data || [];
+};
 export const addStoredMovie = (movie: Omit<StoredMovie, '_id'>): Promise<StoredMovie> => dbFetch('/stored-movies', { method: 'POST', body: JSON.stringify(movie) });
 export const updateStoredMovie = (id: string, movieData: { download_links: DownloadLink[] }): Promise<StoredMovie> => 
     dbFetch(`/stored-movies/${id}`, { method: 'PATCH', body: JSON.stringify(movieData) });
 export const deleteStoredMovie = (id: string): Promise<void> => dbFetch(`/stored-movies/${id}`, { method: 'DELETE' });
-export const getSupportTickets = (): Promise<SupportTicket[]> => dbFetch('/support-tickets');
+export const getSupportTickets = async (): Promise<SupportTicket[]> => {
+    const data = await dbFetch('/support-tickets');
+    return data || [];
+};
 export const deleteSupportTicket = (id: string): Promise<void> => dbFetch(`/support-tickets/${id}`, { method: 'DELETE' });
 export const addSupportTicket = (ticketData: Omit<SupportTicket, '_id' | 'timestamp'>): Promise<SupportTicket> => dbFetch('/support-tickets', { method: 'POST', body: JSON.stringify(ticketData) });
 export const getMetrics = (): Promise<Metrics> => dbFetch('/metrics');
 export const incrementDownloadCount = (movieId: string): Promise<void> => dbFetch(`/stored-movies/${movieId}/increment`, { method: 'PATCH' });
-export const getUsers = (): Promise<AdminUserView[]> => dbFetch('/users');
+export const getUsers = async (): Promise<AdminUserView[]> => {
+    const data = await dbFetch('/users');
+    return data || [];
+};
 export const apiTestEmail = (): Promise<{ success: boolean; message: string }> => dbFetch('/admin/test-email', { method: 'POST' });
 
-// --- User Lists (History) ---
-export const getHistory = (): Promise<HistoryItem[]> => dbFetch('/history');
+// --- User Lists (Favorites, Watchlist, History) ---
+// Favorites
+export const getFavorites = async (): Promise<FavoriteItem[]> => {
+    const data = await dbFetch('/favorites');
+    return data || [];
+};
+export const addFavorite = (item: ContentItem): Promise<FavoriteItem> => dbFetch('/favorites', { method: 'POST', body: JSON.stringify(item) });
+export const removeFavorite = (tmdbId: number): Promise<void> => dbFetch(`/favorites/${tmdbId}`, { method: 'DELETE' });
+
+// Watchlist
+export const getWatchlist = async (): Promise<WatchlistItem[]> => {
+    const data = await dbFetch('/watchlist');
+    return data || [];
+};
+export const addToWatchlist = (item: ContentItem): Promise<WatchlistItem> => dbFetch('/watchlist', { method: 'POST', body: JSON.stringify(item) });
+export const removeFromWatchlist = (tmdbId: number): Promise<void> => dbFetch(`/watchlist/${tmdbId}`, { method: 'DELETE' });
+
+
+// History
+export const getHistory = async (): Promise<HistoryItem[]> => {
+    const data = await dbFetch('/history');
+    return data || [];
+};
 export const addToHistory = (item: ContentItem): Promise<HistoryItem> => dbFetch('/history', { method: 'POST', body: JSON.stringify(item) });
 export const clearHistory = (): Promise<void> => dbFetch('/history', { method: 'DELETE' });
 
 // --- Collections ---
-export const getMyCollections = (): Promise<Collection[]> => dbFetch('/collections/user');
+export const getMyCollections = async (): Promise<Collection[]> => {
+    const data = await dbFetch('/collections/user');
+    return data || [];
+};
 export const getCollectionDetails = (id: string): Promise<Collection> => dbFetch(`/collections/${id}`);
 export const createCollection = (data: { name: string; description?: string; isPublic: boolean }): Promise<Collection> => dbFetch('/collections', { method: 'POST', body: JSON.stringify(data) });
 export const updateCollection = (id: string, data: { name?: string; description?: string; isPublic?: boolean }): Promise<Collection> => dbFetch(`/collections/${id}`, { method: 'PATCH', body: JSON.stringify(data) });

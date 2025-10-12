@@ -122,8 +122,8 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) => {
                 aria-hidden="true"
               />
               <div className="flex gap-2">
-                <button type="button" onClick={triggerFileSelect} className="text-xs text-cyan hover:underline">Change</button>
-                {(newAvatarPreview || currentUser.customAvatar) && <button type="button" onClick={handleResetAvatar} className="text-xs text-danger hover:underline">Reset to Default</button>}
+                <button type="button" onClick={triggerFileSelect} className="px-3 py-1 rounded-full text-xs font-semibold bg-secondary hover:bg-gray-700 text-white transition-colors">Change</button>
+                {(newAvatarPreview || currentUser.customAvatar) && <button type="button" onClick={handleResetAvatar} className="px-3 py-1 rounded-full text-xs font-semibold bg-red-500/20 hover:bg-red-500/40 text-red-400 transition-colors">Reset</button>}
               </div>
             </div>
 

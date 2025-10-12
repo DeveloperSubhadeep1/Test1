@@ -8,15 +8,38 @@ const StoredMovie = require('../models/StoredMovie');
 const SupportTicket = require('../models/SupportTicket');
 const Collection = require('../models/Collection');
 const History = require('../models/History');
+const Favorite = require('../models/Favorite');
+const Watchlist = require('../models/Watchlist');
+
 
 // --- Helper Middleware ---
-const getUserId = (req, res, next) => {
-    const userId = req.headers['x-user-id'];
-    if (!userId) {
-        return res.status(401).json({ message: 'User ID is required for this action.' });
+const getUserId = async (req, res, next) => {
+    try {
+        const userId = req.headers['x-user-id'];
+        if (!userId) {
+            return res.status(401).json({ message: 'User ID is required for this action.' });
+        }
+
+        // The admin user is a special case and doesn't exist in the DB.
+        if (userId !== 'admin_user') {
+            const user = await User.findById(userId);
+            if (!user) {
+                // This is the likely source of the 404 error.
+                // It happens if the client has a session with a user ID that no longer exists in the database.
+                return res.status(404).json({ message: 'User not found. Your session may be invalid. Please log out and log back in.' });
+            }
+        }
+        
+        req.userId = userId;
+        next();
+    } catch (error) {
+        // Mongoose findById throws a CastError for invalid ObjectId format
+        if (error.name === 'CastError') {
+             return res.status(400).json({ message: 'Invalid User ID format.' });
+        }
+        console.error("Error in getUserId middleware:", error);
+        return res.status(500).json({ message: "Server error during user validation." });
     }
-    req.userId = userId;
-    next();
 };
 
 const requireAdmin = (req, res, next) => {
@@ -408,8 +431,39 @@ router.patch('/users/profile', getUserId, async (req, res) => {
 
 router.get('/users', getUserId, requireAdmin, async (req, res) => {
     try {
-        // Fetch all users, excluding the admin and passwords
-        const users = await User.find({ username: { $ne: 'admin' } }, '-password').lean();
+        const users = await User.aggregate([
+            { $match: { username: { $ne: 'admin' } } },
+            { $project: { password: 0, __v: 0 } },
+            {
+                $lookup: {
+                    from: 'favorites',
+                    let: { userIdString: { $toString: '$_id' } },
+                    pipeline: [
+                        { $match: { $expr: { $eq: ['$userId', '$$userIdString'] } } },
+                        { $count: 'count' }
+                    ],
+                    as: 'favorites',
+                },
+            },
+            {
+                $lookup: {
+                    from: 'watchlists',
+                    let: { userIdString: { $toString: '$_id' } },
+                    pipeline: [
+                        { $match: { $expr: { $eq: ['$userId', '$$userIdString'] } } },
+                        { $count: 'count' }
+                    ],
+                    as: 'watchlist',
+                },
+            },
+            {
+                $addFields: {
+                    favoritesCount: { $ifNull: [{ $arrayElemAt: ['$favorites.count', 0] }, 0] },
+                    watchlistCount: { $ifNull: [{ $arrayElemAt: ['$watchlist.count', 0] }, 0] },
+                },
+            },
+            { $project: { favorites: 0, watchlist: 0 } }
+        ]);
         res.json(users);
     } catch (error) {
         console.error('Error fetching users for admin:', error);
@@ -512,7 +566,32 @@ router.get('/metrics', getUserId, requireAdmin, async (req, res) => {
 });
 
 
-// --- User-specific lists (History) ---
+// --- User-specific lists (Favorites, Watchlist, History) ---
+// Favorites
+router.get('/favorites', getUserId, async (req, res) => res.json(await Favorite.find({ userId: req.userId }).sort({ dateAdded: -1 })));
+router.post('/favorites', getUserId, async (req, res) => {
+    const newItem = new Favorite({ ...req.body, userId: req.userId });
+    await newItem.save();
+    res.status(201).json(newItem);
+});
+router.delete('/favorites/:tmdbId', getUserId, async (req, res) => {
+    await Favorite.deleteOne({ userId: req.userId, id: req.params.tmdbId });
+    res.status(204).send();
+});
+
+// Watchlist
+router.get('/watchlist', getUserId, async (req, res) => res.json(await Watchlist.find({ userId: req.userId }).sort({ dateAdded: -1 })));
+router.post('/watchlist', getUserId, async (req, res) => {
+    const newItem = new Watchlist({ ...req.body, userId: req.userId });
+    await newItem.save();
+    res.status(201).json(newItem);
+});
+router.delete('/watchlist/:tmdbId', getUserId, async (req, res) => {
+    await Watchlist.deleteOne({ userId: req.userId, id: req.params.tmdbId });
+    res.status(204).send();
+});
+
+
 // History
 router.get('/history', getUserId, async (req, res) => res.json(await History.find({ userId: req.userId }).sort({ viewedAt: -1 })));
 router.post('/history', getUserId, async (req, res) => {

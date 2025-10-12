@@ -425,6 +425,16 @@ const UsersTab: React.FC = () => {
                 </div>
               </div>
             </div>
+            <div className="mt-4 pt-4 border-t border-glass-border flex justify-around text-sm text-center">
+                <div>
+                    <p className="text-muted text-xs">Favorites</p>
+                    <p className="font-bold text-white">{user.favoritesCount}</p>
+                </div>
+                <div>
+                    <p className="text-muted text-xs">Watchlist</p>
+                    <p className="font-bold text-white">{user.watchlistCount}</p>
+                </div>
+            </div>
           </div>
         ))}
       </div>
@@ -437,6 +447,8 @@ const UsersTab: React.FC = () => {
               <th scope="col" className="px-6 py-4 border-b border-glass-border">Username</th>
               <th scope="col" className="px-6 py-4 border-b border-glass-border">Email</th>
               <th scope="col" className="px-6 py-4 border-b border-glass-border">Joined</th>
+              <th scope="col" className="px-6 py-4 border-b border-glass-border">Favorites</th>
+              <th scope="col" className="px-6 py-4 border-b border-glass-border">Watchlist</th>
             </tr>
           </thead>
           <tbody className="text-gray-300">
@@ -448,6 +460,8 @@ const UsersTab: React.FC = () => {
                 </td>
                 <td className="px-6 py-4">{user.email}</td>
                 <td className="px-6 py-4">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</td>
+                <td className="px-6 py-4">{user.favoritesCount}</td>
+                <td className="px-6 py-4">{user.watchlistCount}</td>
               </tr>
             ))}
           </tbody>
