@@ -42,7 +42,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   usePageMetadata({
     title: title || 'Loading...',
     description: details?.overview || '',
-    path: `/${type}/${slug}`,
+    path: details ? `/${type}/${slug}?id=${details.id}` : `/${type}/${slug}`,
     imageUrl: posterPath,
   });
 
@@ -186,7 +186,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
 
     // Manually construct the URL to ensure it's absolute and well-formed for the Web Share API.
     // This avoids issues where window.location.href might be ambiguous or invalid.
-    const path = `/${type}/${slug}`;
+    const path = `/${type}/${slug}?id=${details.id}`;
     const cleanPathname = window.location.pathname.replace(/index\.html$/, '');
     const shareUrl = `${window.location.origin}${cleanPathname}#${path}`;
 

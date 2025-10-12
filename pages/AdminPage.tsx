@@ -195,9 +195,9 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
         ctx.scale(devicePixelRatio, devicePixelRatio);
 
         // FIX: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
-        // Add an explicit type annotation for the `sum` accumulator in the reduce function.
-        // This resolves a TypeScript inference issue where `sum` was not being correctly identified as a number.
-        const total = Object.values(metrics).reduce((sum: number, val) => sum + (Number(val) || 0), 0);
+        // This TypeScript error is caused by uncertainty over the types returned by `Object.values`.
+        // By mapping the values to numbers first, we ensure `reduce` operates on a `number[]`, resolving the issue.
+        const total = Object.values(metrics).map(v => Number(v) || 0).reduce((sum, val) => sum + val, 0);
 
         const centerX = canvasSize / 2;
         const centerY = canvasSize / 2;
