@@ -161,7 +161,8 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
         // FIX: Operator '+' cannot be applied to types 'unknown' and 'number'.
         // Explicitly cast `val` to a number to ensure type safety during the reduce operation,
         // resolving an issue where the compiler inferred `val` as `unknown`.
-        const total = values.reduce((sum, val) => sum + (Number(val) || 0), 0);
+        // FIX: Add type annotation for 'sum' accumulator to resolve TS inference error.
+        const total = values.reduce((sum: number, val) => sum + (Number(val) || 0), 0);
         const colorKeys = Object.keys(colors) as Array<keyof Metrics>;
         const finalArcData: ArcData[] = [];
         if (total > 0) {

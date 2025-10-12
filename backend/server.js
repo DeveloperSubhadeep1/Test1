@@ -4,9 +4,6 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const apiRoutes = require('./routes/api');
 
-// Set a global base directory variable for robust module pathing
-global.__basedir = __dirname;
-
 // Load environment variables from .env file
 dotenv.config();
 
