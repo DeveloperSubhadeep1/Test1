@@ -184,7 +184,7 @@ const SearchBar: React.FC = () => {
                         const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
                         const year = releaseDate ? new Date(releaseDate).getFullYear() : undefined;
                         const slug = generateSlug(title, year);
-                        navigate(`/${type}/${slug}`);
+                        navigate(`/${type}/${item.id}-${slug}`);
                     } else {
                         navigate(`/search/${encodeURIComponent(query.trim())}`);
                     }
@@ -324,7 +324,7 @@ const SearchBar: React.FC = () => {
                                 onMouseEnter={() => setActiveIndex(index)}
                             >
                                 <Link
-                                    to={`/${type}/${slug}`}
+                                    to={`/${type}/${item.id}-${slug}`}
                                     onClick={clearSuggestions}
                                     className="flex items-center space-x-4 p-3 min-w-0"
                                 >

@@ -17,7 +17,7 @@ const CastCard: React.FC<CastCardProps> = ({ person }) => {
   const slug = generateSlug(person.name);
 
   return (
-    <Link to={`/person/${slug}`} className="block text-center group">
+    <Link to={`/person/${person.id}-${slug}`} className="block text-center group">
       <div className="bg-light-secondary dark:bg-secondary rounded-lg overflow-hidden mb-2 transform group-hover:scale-105 transition-transform duration-300 shadow-lg aspect-[2/3]">
         {imageUrl ? (
           <img src={imageUrl} alt={person.name} className="w-full h-full object-cover" loading="lazy" />

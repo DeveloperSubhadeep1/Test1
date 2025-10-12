@@ -55,7 +55,7 @@ const Notifications: React.FC = () => {
                   return (
                     <li key={notif._id}>
                       <Link
-                        to={`/${notif.type}/${slug}`}
+                        to={`/${notif.type}/${notif.tmdb_id}-${slug}`}
                         onClick={() => setIsOpen(false)}
                         className="flex items-center gap-3 p-3 hover:bg-cyan/10 transition-colors"
                       >

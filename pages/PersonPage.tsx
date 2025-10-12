@@ -31,7 +31,16 @@ const PersonPage: React.FC = () => {
 
       try {
         setLoading(true);
-        const personId = await findPersonIdBySlug(slug);
+        
+        let personId: number | null = null;
+        const idMatch = slug.match(/^(\d+)/);
+
+        if (idMatch) {
+            personId = parseInt(idMatch[1], 10);
+        } else {
+            // Fallback for old URLs
+            personId = await findPersonIdBySlug(slug);
+        }
 
         if (!personId) {
           addToast("Person not found.", "error");

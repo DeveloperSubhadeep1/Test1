@@ -54,7 +54,16 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
       
       try {
         setLoading(true);
-        const tmdbId = await findIdBySlug(type, slug);
+        
+        let tmdbId: number | null = null;
+        const idMatch = slug.match(/^(\d+)/);
+
+        if (idMatch) {
+          tmdbId = parseInt(idMatch[1], 10);
+        } else {
+          // Fallback for old URLs that don't have an ID
+          tmdbId = await findIdBySlug(type, slug);
+        }
 
         if (!tmdbId) {
           addToast('Content not found.', 'error');

@@ -24,7 +24,7 @@ const MovieCard: React.FC<MovieCardProps> = ({ item, type, onRemove }) => {
   const year = releaseDate ? new Date(releaseDate).getFullYear() : undefined;
   const rating = item.vote_average.toFixed(1);
   const slug = generateSlug(title, year);
-  const linkTo = `/${type}/${slug}`;
+  const linkTo = `/${type}/${item.id}-${slug}`;
   const onWl = isOnWatchlist(item.id);
 
   const posterUrl = item.poster_path

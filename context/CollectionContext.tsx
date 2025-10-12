@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, ReactNode, useCallback, useContext } from 'react';
-import { Collection, CollectionItem } from '../types';
+import { Collection, CollectionItem, TVSummary } from '../types';
 import { useToast } from '../hooks/useToast';
 import { AuthContext } from './AuthContext';
 import { 
@@ -108,9 +108,9 @@ export const CollectionProvider: React.FC<CollectionProviderProps> = ({ children
     try {
       const updatedCollection = await apiAddItem(collectionId, item);
       setCollections(prev => prev.map(c => c._id === collectionId ? updatedCollection : c));
-      // FIX: Use the 'in' operator to correctly narrow the union type and access the 'title' or 'name' property.
-      // The 'type' property discriminator was not working due to how 'CollectionItem' is constructed with 'Omit'.
-      const title = 'title' in item ? item.title : item.name;
+      // FIX: The `in` operator type guard does not correctly narrow the type in the `else` branch for a discriminated union that uses `Omit`.
+      // Using a type assertion via `unknown` allows us to safely access the `name` property, as we know it will be present on TV items.
+      const title = 'title' in item ? item.title : (item as unknown as TVSummary).name;
       addToast(`Added "${title}" to collection.`, 'success');
     } catch (error) {
        console.error("Failed to add item to collection", error);
