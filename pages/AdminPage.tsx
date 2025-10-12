@@ -156,7 +156,8 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
     // detection is available on the first render, fixing the race condition where
     // hover wouldn't work until after the animation finished.
     const arcData = useMemo(() => {
-        const values = Object.values(metrics).map(v => v || 0);
+        // FIX: Ensure values from `Object.values` are treated as numbers to prevent type errors.
+        const values = Object.values(metrics).map(v => Number(v) || 0);
         const total = values.reduce((sum, val) => sum + val, 0);
         const colorKeys = Object.keys(colors) as Array<keyof Metrics>;
         const finalArcData: ArcData[] = [];
@@ -189,7 +190,8 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
         canvas.style.height = `${canvasSize}px`;
         ctx.scale(devicePixelRatio, devicePixelRatio);
 
-        const total = Object.values(metrics).reduce((sum, val) => sum + (val || 0), 0);
+        // FIX: Ensure values from `Object.values` are treated as numbers to prevent type errors.
+        const total = Object.values(metrics).reduce((sum, val) => sum + (Number(val) || 0), 0);
 
         const centerX = canvasSize / 2;
         const centerY = canvasSize / 2;
@@ -287,7 +289,8 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
         
         if (foundSegment) {
             setHoveredKey(foundSegment.key);
-            const value = metrics[foundSegment.key] || 0;
+            // FIX: Explicitly convert metric value to a number to prevent type errors.
+            const value = Number(metrics[foundSegment.key]) || 0;
             const label = metricConfig[foundSegment.key].label;
             onHover({
                 visible: true,
