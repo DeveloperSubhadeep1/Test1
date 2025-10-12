@@ -416,23 +416,13 @@ const UsersTab: React.FC = () => {
           <div key={user._id} className="glass-panel p-4 rounded-lg">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Avatar avatar={user.avatar} className="h-10 w-10 rounded-full" />
+                <Avatar avatar={user.avatar} customAvatar={user.customAvatar} className="h-10 w-10 rounded-full" />
                 <div>
                   <p className="font-bold text-white">{user.username}</p>
                   <p className="text-xs text-muted">
                     Joined: {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
                   </p>
                 </div>
-              </div>
-            </div>
-            <div className="mt-4 pt-4 border-t border-glass-border flex justify-around text-center text-sm">
-              <div>
-                <p className="text-muted">Favorites</p>
-                <p className="font-bold text-white">{user.favoritesCount}</p>
-              </div>
-              <div>
-                <p className="text-muted">Watchlist</p>
-                <p className="font-bold text-white">{user.watchlistCount}</p>
               </div>
             </div>
           </div>
@@ -445,8 +435,7 @@ const UsersTab: React.FC = () => {
           <thead className="text-xs uppercase text-muted">
             <tr>
               <th scope="col" className="px-6 py-4 border-b border-glass-border">Username</th>
-              <th scope="col" className="px-6 py-4 border-b border-glass-border">Favorites</th>
-              <th scope="col" className="px-6 py-4 border-b border-glass-border">Watchlist</th>
+              <th scope="col" className="px-6 py-4 border-b border-glass-border">Email</th>
               <th scope="col" className="px-6 py-4 border-b border-glass-border">Joined</th>
             </tr>
           </thead>
@@ -454,11 +443,10 @@ const UsersTab: React.FC = () => {
             {users.map(user => (
               <tr key={user._id} className="border-b border-glass-border hover:bg-cyan/10 transition-colors">
                 <td className="px-6 py-4 font-medium text-white flex items-center gap-3">
-                  <Avatar avatar={user.avatar} className="h-8 w-8 rounded-full" />
+                  <Avatar avatar={user.avatar} customAvatar={user.customAvatar} className="h-8 w-8 rounded-full" />
                   {user.username}
                 </td>
-                <td className="px-6 py-4">{user.favoritesCount}</td>
-                <td className="px-6 py-4">{user.watchlistCount}</td>
+                <td className="px-6 py-4">{user.email}</td>
                 <td className="px-6 py-4">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</td>
               </tr>
             ))}

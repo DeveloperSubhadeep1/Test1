@@ -12,8 +12,6 @@ import {
   PersonCredit,
   Genre,
   UserProfile,
-  FavoriteItem,
-  WatchlistItem,
   HistoryItem,
   ContentItem,
   DownloadLink,
@@ -173,7 +171,7 @@ export const apiSendResetOtp = (email: string): Promise<{ message: string }> =>
 export const apiResetPassword = (email: string, otp: string, newPassword: string): Promise<{ message: string }> => 
     dbFetch('/auth/reset-password', { method: 'POST', body: JSON.stringify({ email, otp, newPassword }) });
 
-export const apiUpdateUserProfile = (details: Partial<UserProfile>): Promise<UserProfile> =>
+export const apiUpdateUserProfile = (details: Partial<Omit<UserProfile, 'customAvatar'>>): Promise<UserProfile> =>
     dbFetch('/users/profile', { method: 'PATCH', body: JSON.stringify(details) });
 
 // --- Admin ---
@@ -194,15 +192,7 @@ export const incrementDownloadCount = (movieId: string): Promise<void> => dbFetc
 export const getUsers = (): Promise<AdminUserView[]> => dbFetch('/users');
 export const apiTestEmail = (): Promise<{ success: boolean; message: string }> => dbFetch('/admin/test-email', { method: 'POST' });
 
-// --- User Lists (Favorites, Watchlist, History) ---
-export const getFavorites = (): Promise<FavoriteItem[]> => dbFetch('/favorites');
-export const addFavorite = (item: ContentItem): Promise<FavoriteItem> => dbFetch('/favorites', { method: 'POST', body: JSON.stringify(item) });
-export const removeFavorite = (id: string): Promise<void> => dbFetch(`/favorites/${id}`, { method: 'DELETE' });
-
-export const getWatchlist = (): Promise<WatchlistItem[]> => dbFetch('/watchlist');
-export const addToWatchlist = (item: ContentItem): Promise<WatchlistItem> => dbFetch('/watchlist', { method: 'POST', body: JSON.stringify(item) });
-export const removeFromWatchlist = (id: string): Promise<void> => dbFetch(`/watchlist/${id}`, { method: 'DELETE' });
-
+// --- User Lists (History) ---
 export const getHistory = (): Promise<HistoryItem[]> => dbFetch('/history');
 export const addToHistory = (item: ContentItem): Promise<HistoryItem> => dbFetch('/history', { method: 'POST', body: JSON.stringify(item) });
 export const clearHistory = (): Promise<void> => dbFetch('/history', { method: 'DELETE' });

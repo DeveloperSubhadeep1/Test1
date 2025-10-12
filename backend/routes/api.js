@@ -6,8 +6,6 @@ const nodemailer = require('nodemailer');
 const User = require('../models/User');
 const StoredMovie = require('../models/StoredMovie');
 const SupportTicket = require('../models/SupportTicket');
-const Favorite = require('../models/Favorite');
-const Watchlist = require('../models/Watchlist');
 const Collection = require('../models/Collection');
 const History = require('../models/History');
 
@@ -394,12 +392,11 @@ router.patch('/users/profile', getUserId, async (req, res) => {
             return res.status(404).json({ message: 'User not found.' });
         }
 
-        const { customName, dob, gender, customAvatar } = req.body;
+        const { customName, dob, gender } = req.body;
         if (customName !== undefined) user.customName = customName;
         if (dob !== undefined) user.dob = dob;
         if (gender !== undefined) user.gender = gender;
-        if (customAvatar !== undefined) user.customAvatar = customAvatar;
-
+        
         await user.save();
         const { password, ...userProfile } = user.toObject();
         res.json(userProfile);
@@ -413,19 +410,7 @@ router.get('/users', getUserId, requireAdmin, async (req, res) => {
     try {
         // Fetch all users, excluding the admin and passwords
         const users = await User.find({ username: { $ne: 'admin' } }, '-password').lean();
-
-        // For each user, get their favorites and watchlist counts
-        const usersWithStats = await Promise.all(users.map(async (user) => {
-            const favoritesCount = await Favorite.countDocuments({ userId: user._id.toString() });
-            const watchlistCount = await Watchlist.countDocuments({ userId: user._id.toString() });
-            return {
-                ...user,
-                favoritesCount,
-                watchlistCount,
-            };
-        }));
-        
-        res.json(usersWithStats);
+        res.json(users);
     } catch (error) {
         console.error('Error fetching users for admin:', error);
         res.status(500).json({ message: 'Server error fetching user data.' });
@@ -527,40 +512,7 @@ router.get('/metrics', getUserId, requireAdmin, async (req, res) => {
 });
 
 
-// --- User-specific lists (Favorites, Watchlist, History) ---
-
-// Favorites
-router.get('/favorites', getUserId, async (req, res) => res.json(await Favorite.find({ userId: req.userId })));
-router.post('/favorites', getUserId, async (req, res) => {
-    const newFavorite = new Favorite({ ...req.body, userId: req.userId, dateAdded: new Date() });
-    await newFavorite.save();
-    res.status(201).json(newFavorite);
-});
-router.delete('/favorites/:id', getUserId, async (req, res) => {
-    const fav = await Favorite.findById(req.params.id);
-    if (fav && fav.userId === req.userId) {
-        await Favorite.findByIdAndDelete(req.params.id);
-        return res.status(204).send();
-    }
-    res.status(404).json({ message: 'Favorite item not found or you do not have permission to delete it.' });
-});
-
-// Watchlist
-router.get('/watchlist', getUserId, async (req, res) => res.json(await Watchlist.find({ userId: req.userId })));
-router.post('/watchlist', getUserId, async (req, res) => {
-    const newWatchlistItem = new Watchlist({ ...req.body, userId: req.userId, dateAdded: new Date() });
-    await newWatchlistItem.save();
-    res.status(201).json(newWatchlistItem);
-});
-router.delete('/watchlist/:id', getUserId, async (req, res) => {
-    const item = await Watchlist.findById(req.params.id);
-    if (item && item.userId === req.userId) {
-        await Watchlist.findByIdAndDelete(req.params.id);
-        return res.status(204).send();
-    }
-    res.status(404).json({ message: 'Watchlist item not found or you do not have permission to delete it.' });
-});
-
+// --- User-specific lists (History) ---
 // History
 router.get('/history', getUserId, async (req, res) => res.json(await History.find({ userId: req.userId }).sort({ viewedAt: -1 })));
 router.post('/history', getUserId, async (req, res) => {

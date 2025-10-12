@@ -47,6 +47,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const sessionUserJson = sessionStorage.getItem(SESSION_STORAGE_KEY);
       if (sessionUserJson) {
         const sessionUser: UserProfile = JSON.parse(sessionUserJson);
+        
+        // Load custom avatar from localStorage and merge
+        const avatarStorageKey = `cineStreamAvatar_${sessionUser._id}`;
+        const customAvatar = localStorage.getItem(avatarStorageKey);
+        sessionUser.customAvatar = customAvatar;
+        
         setCurrentUser(sessionUser);
       }
     } catch (error) {
@@ -59,6 +65,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const userProfile = await apiLogin(username, pass);
       
+      // Load custom avatar from localStorage and merge
+      const avatarStorageKey = `cineStreamAvatar_${userProfile._id}`;
+      const customAvatar = localStorage.getItem(avatarStorageKey);
+      userProfile.customAvatar = customAvatar;
+
       setCurrentUser(userProfile);
       sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(userProfile));
       
@@ -120,11 +131,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return false;
     }
     
+    // Separate avatar from other details that go to the backend
+    const { customAvatar, ...otherDetails } = details;
+    
     try {
-      const updatedUser = await apiUpdateUserProfile(details);
+      // 1. Update non-avatar details on the backend
+      const updatedUserFromApi = await apiUpdateUserProfile(otherDetails);
       
-      setCurrentUser(updatedUser);
-      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updatedUser));
+      // 2. Prepare the full updated user object for local state
+      let finalUpdatedUser = { ...updatedUserFromApi, customAvatar: currentUser.customAvatar };
+
+      // 3. Handle avatar update in localStorage
+      if (customAvatar !== undefined) {
+          const avatarStorageKey = `cineStreamAvatar_${currentUser._id}`;
+          if (customAvatar === null) { // Signal to reset
+              localStorage.removeItem(avatarStorageKey);
+              finalUpdatedUser.customAvatar = null;
+          } else {
+              localStorage.setItem(avatarStorageKey, customAvatar);
+              finalUpdatedUser.customAvatar = customAvatar;
+          }
+      }
+
+      // 4. Update state and sessionStorage
+      setCurrentUser(finalUpdatedUser);
+      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(finalUpdatedUser));
       
       addToast('Profile updated successfully!', 'success');
       return true;

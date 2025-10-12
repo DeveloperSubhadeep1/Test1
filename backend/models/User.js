@@ -23,10 +23,6 @@ const UserSchema = new mongoose.Schema({
     type: String,
     default: 'avatar1',
   },
-  customAvatar: {
-    type: String,
-    default: null,
-  },
   customName: {
     type: String,
     trim: true,

@@ -127,8 +127,7 @@ export interface UserProfile {
 }
 
 export interface AdminUserView extends UserProfile {
-  favoritesCount: number;
-  watchlistCount: number;
+  // favoritesCount and watchlistCount removed as they are now client-side
 }
 
 export interface Notification {
