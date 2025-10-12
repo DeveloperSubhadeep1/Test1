@@ -39,11 +39,27 @@ export interface TVDetail extends TVSummary {
 
 export type ContentType = 'movie' | 'tv';
 
-export type ContentItem = (MovieSummary | TVSummary) & { type: ContentType };
+// FIX: Corrected ContentItem to be a proper discriminated union.
+// This allows TypeScript to correctly infer whether an item is a movie or TV show
+// based on the 'type' property, which resolves type errors in other components.
+export type ContentItem = (MovieSummary & { type: 'movie' }) | (TVSummary & { type: 'tv' });
 
 export type FavoriteItem = ContentItem & { _id?: string; dateAdded: number; };
 
 export type WatchlistItem = ContentItem & { _id?: string; dateAdded: number; };
+
+export type CollectionItem = Omit<ContentItem, 'overview'>;
+
+export interface Collection {
+  _id: string;
+  userId: string;
+  name: string;
+  description?: string;
+  isPublic: boolean;
+  items: CollectionItem[];
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface DownloadLink {
   label: string;
@@ -72,6 +88,7 @@ export interface Metrics {
     totalDownloads: number;
     totalSupportTickets: number;
     totalUsers: number;
+    totalCollections: number;
 }
 
 export interface CastMember {

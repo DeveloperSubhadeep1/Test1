@@ -1,3 +1,4 @@
+
 const express = require('express');
 const router = express.Router();
 const nodemailer = require('nodemailer');
@@ -8,6 +9,7 @@ const StoredMovie = require('../models/StoredMovie');
 const SupportTicket = require('../models/SupportTicket');
 const Favorite = require('../models/Favorite');
 const Watchlist = require('../models/Watchlist');
+const Collection = require('../models/Collection');
 
 // --- Helper Middleware ---
 const getUserId = (req, res, next) => {
@@ -472,9 +474,10 @@ router.get('/metrics', getUserId, requireAdmin, async (req, res) => {
     const movies = await StoredMovie.find({});
     const ticketsCount = await SupportTicket.countDocuments();
     const usersCount = await User.countDocuments({ username: { $ne: 'admin' } });
+    const collectionsCount = await Collection.countDocuments();
     const totalLinks = movies.reduce((sum, movie) => sum + movie.download_links.length, 0);
     const totalDownloads = movies.reduce((sum, movie) => sum + movie.download_count, 0);
-    res.json({ totalLinks, totalDownloads, totalSupportTickets: ticketsCount, totalUsers: usersCount });
+    res.json({ totalLinks, totalDownloads, totalSupportTickets: ticketsCount, totalUsers: usersCount, totalCollections: collectionsCount });
 });
 
 
@@ -512,5 +515,125 @@ router.delete('/watchlist/:id', getUserId, async (req, res) => {
     res.status(404).json({ message: 'Watchlist item not found or you do not have permission to delete it.' });
 });
 
+// --- Collections ---
+// Create a new collection
+router.post('/collections', getUserId, async (req, res) => {
+    try {
+        const { name, description, isPublic } = req.body;
+        if (!name) {
+            return res.status(400).json({ message: 'Collection name is required.' });
+        }
+        const newCollection = new Collection({
+            userId: req.userId,
+            name,
+            description,
+            isPublic,
+            items: [],
+        });
+        await newCollection.save();
+        res.status(201).json(newCollection);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error creating collection.' });
+    }
+});
+
+// Get all collections for the logged-in user
+router.get('/collections/user', getUserId, async (req, res) => {
+    try {
+        const collections = await Collection.find({ userId: req.userId }).sort({ createdAt: -1 });
+        res.json(collections);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error fetching collections.' });
+    }
+});
+
+// Get a single collection's details
+router.get('/collections/:id', async (req, res) => {
+    try {
+        const collection = await Collection.findById(req.params.id);
+        if (!collection) {
+            return res.status(404).json({ message: 'Collection not found.' });
+        }
+        // Allow access if it's public, or if a user is making the request and they are the owner
+        const userId = req.headers['x-user-id'];
+        if (collection.isPublic || (userId && collection.userId === userId)) {
+            return res.json(collection);
+        }
+        return res.status(403).json({ message: 'This collection is private.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error fetching collection details.' });
+    }
+});
+
+// Update a collection
+router.patch('/collections/:id', getUserId, async (req, res) => {
+    try {
+        const collection = await Collection.findById(req.params.id);
+        if (!collection || collection.userId !== req.userId) {
+            return res.status(404).json({ message: 'Collection not found or you do not have permission to edit it.' });
+        }
+        const { name, description, isPublic } = req.body;
+        if (name) collection.name = name;
+        if (description !== undefined) collection.description = description;
+        if (isPublic !== undefined) collection.isPublic = isPublic;
+        await collection.save();
+        res.json(collection);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error updating collection.' });
+    }
+});
+
+// Delete a collection
+router.delete('/collections/:id', getUserId, async (req, res) => {
+    try {
+        const collection = await Collection.findOne({ _id: req.params.id, userId: req.userId });
+        if (!collection) {
+             return res.status(404).json({ message: 'Collection not found or you do not have permission to delete it.' });
+        }
+        await Collection.findByIdAndDelete(req.params.id);
+        res.status(204).send();
+    } catch (error) {
+         res.status(500).json({ message: 'Server error deleting collection.' });
+    }
+});
+
+// Add an item to a collection
+router.post('/collections/:id/items', getUserId, async (req, res) => {
+    try {
+        const collection = await Collection.findById(req.params.id);
+        if (!collection || collection.userId !== req.userId) {
+            return res.status(404).json({ message: 'Collection not found or you do not have permission to edit it.' });
+        }
+        
+        const newItem = req.body;
+        // Check if item already exists
+        const itemExists = collection.items.some(item => item.id === newItem.id);
+        if (itemExists) {
+            return res.status(409).json({ message: 'This item is already in the collection.' });
+        }
+        
+        collection.items.push(newItem);
+        await collection.save();
+        res.json(collection);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error adding item to collection.' });
+    }
+});
+
+// Remove an item from a collection
+router.delete('/collections/:id/items/:tmdbId', getUserId, async (req, res) => {
+    try {
+        const collection = await Collection.findById(req.params.id);
+        if (!collection || collection.userId !== req.userId) {
+            return res.status(404).json({ message: 'Collection not found or you do not have permission to edit it.' });
+        }
+        
+        collection.items = collection.items.filter(item => item.id !== parseInt(req.params.tmdbId, 10));
+        await collection.save();
+        res.json(collection);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error removing item from collection.' });
+    }
+});
 
 module.exports = router;

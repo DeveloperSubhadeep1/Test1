@@ -6,6 +6,7 @@ import { WatchlistProvider } from './context/WatchlistContext';
 import { ToastProvider } from './context/ToastContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { NotificationsProvider } from './context/NotificationsContext';
+import { CollectionProvider } from './context/CollectionContext';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -25,6 +26,8 @@ import SignupPage from './pages/SignupPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import CollectionsListPage from './pages/CollectionsListPage';
+import CollectionDetailsPage from './pages/CollectionDetailsPage';
 
 const AppLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -63,6 +66,8 @@ const AppLayout: React.FC = () => {
             <Route path="/" element={<HomePage />} />
             <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
             <Route path="/watchlist" element={<ProtectedRoute><WatchlistPage /></ProtectedRoute>} />
+            <Route path="/collections" element={<ProtectedRoute><CollectionsListPage /></ProtectedRoute>} />
+            <Route path="/collection/:id" element={<CollectionDetailsPage />} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/support" element={<SupportPage />} />
             <Route path="/genres" element={<GenresPage />} />
@@ -91,11 +96,13 @@ const App: React.FC = () => {
         <AuthProvider>
           <FavoritesProvider>
             <WatchlistProvider>
-              <NotificationsProvider>
-                <HashRouter>
-                  <AppLayout />
-                </HashRouter>
-              </NotificationsProvider>
+              <CollectionProvider>
+                <NotificationsProvider>
+                  <HashRouter>
+                    <AppLayout />
+                  </HashRouter>
+                </NotificationsProvider>
+              </CollectionProvider>
             </WatchlistProvider>
           </FavoritesProvider>
         </AuthProvider>

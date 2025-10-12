@@ -11,8 +11,9 @@ import { usePageMetadata } from '../hooks/usePageMetadata';
 import Spinner from '../components/Spinner';
 import TelegramAd from '../components/TelegramAd';
 import CastCard from '../components/CastCard';
-import { StarIcon, CalendarIcon, ClockIcon, DownloadIcon, HeartIcon, BookmarkIcon, ShareIcon, SpinnerIcon } from '../components/Icons';
+import { StarIcon, CalendarIcon, ClockIcon, DownloadIcon, HeartIcon, BookmarkIcon, ShareIcon, SpinnerIcon, PlusCircleIcon } from '../components/Icons';
 import ExpandableText from '../components/ExpandableText';
+import AddToCollectionModal from '../components/AddToCollectionModal';
 
 interface DetailsPageProps {
   type: ContentType;
@@ -35,6 +36,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   const [isPreparing, setIsPreparing] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [showLinks, setShowLinks] = useState(false);
+  const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false);
   
   const title = details ? ('title' in details ? details.title : details.name) : '';
   const posterPath = details?.poster_path ? `${TMDB_IMAGE_BASE_URL}${details.poster_path}` : undefined;
@@ -180,6 +182,14 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
       addToWatchlist(watchlistItem);
     }
   };
+
+  const handleOpenCollectionModal = () => {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: location }});
+      return;
+    }
+    setIsCollectionModalOpen(true);
+  };
   
   const handleShare = async () => {
     if (!details) return;
@@ -230,145 +240,163 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   const posterUrl = details.poster_path
     ? `${TMDB_IMAGE_BASE_URL}${details.poster_path}`
     : 'https://picsum.photos/500/750';
+    
+  const contentItemForCollection: ContentItem | null = details ? { ...details, type } : null;
 
   return (
-    <div className="flex flex-col md:flex-row gap-8">
-      <div className="md:w-1/3 flex-shrink-0">
-        <img src={posterUrl} alt={title} className="rounded-lg shadow-2xl w-full object-cover aspect-[2/3]" />
-      </div>
-      <div className="md:w-2/3">
-        <div className="flex items-start justify-between gap-4">
-            <h1 className="text-4xl font-bold text-light-text dark:text-white">{title}</h1>
-            <div className="flex items-center gap-2 flex-shrink-0">
-               <button
-                onClick={handleShare}
-                title="Share this content"
-                className="p-2 bg-light-secondary dark:bg-secondary rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                aria-label="Share"
-              >
-                <ShareIcon className="h-6 w-6 text-light-muted dark:text-muted" />
-              </button>
-              <button
-                onClick={handleWatchlistToggle}
-                title={onWl ? 'Remove from watchlist' : 'Add to watchlist'}
-                className="p-2 bg-light-secondary dark:bg-secondary rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                aria-label="Toggle Watchlist"
-              >
-                <BookmarkIcon className={`h-6 w-6 transition-all ${onWl ? 'fill-accent stroke-accent' : 'text-light-muted dark:text-muted'}`} />
-              </button>
-              <button
-                onClick={handleFavoriteToggle}
-                title={isFav ? 'Remove from favorites' : 'Add to favorites'}
-                className="p-2 bg-light-secondary dark:bg-secondary rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                aria-label="Toggle Favorite"
-              >
-                <HeartIcon className={`h-6 w-6 transition-all ${isFav ? 'fill-red-500 stroke-red-500' : 'text-light-muted dark:text-muted'}`} />
-              </button>
-            </div>
+    <>
+      {isCollectionModalOpen && contentItemForCollection && (
+        <AddToCollectionModal 
+          item={contentItemForCollection}
+          onClose={() => setIsCollectionModalOpen(false)}
+        />
+      )}
+      <div className="flex flex-col md:flex-row gap-8">
+        <div className="md:w-1/3 flex-shrink-0">
+          <img src={posterUrl} alt={title} className="rounded-lg shadow-2xl w-full object-cover aspect-[2/3]" />
         </div>
+        <div className="md:w-2/3">
+          <div className="flex items-start justify-between gap-4">
+              <h1 className="text-4xl font-bold text-light-text dark:text-white">{title}</h1>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={handleOpenCollectionModal}
+                  title="Add to collection"
+                  className="p-2 bg-light-secondary dark:bg-secondary rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  aria-label="Add to collection"
+                >
+                  <PlusCircleIcon className="h-6 w-6 text-light-muted dark:text-muted" />
+                </button>
+                <button
+                  onClick={handleWatchlistToggle}
+                  title={onWl ? 'Remove from watchlist' : 'Add to watchlist'}
+                  className="p-2 bg-light-secondary dark:bg-secondary rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  aria-label="Toggle Watchlist"
+                >
+                  <BookmarkIcon className={`h-6 w-6 transition-all ${onWl ? 'fill-accent stroke-accent' : 'text-light-muted dark:text-muted'}`} />
+                </button>
+                <button
+                  onClick={handleFavoriteToggle}
+                  title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+                  className="p-2 bg-light-secondary dark:bg-secondary rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  aria-label="Toggle Favorite"
+                >
+                  <HeartIcon className={`h-6 w-6 transition-all ${isFav ? 'fill-red-500 stroke-red-500' : 'text-light-muted dark:text-muted'}`} />
+                </button>
+                <button
+                  onClick={handleShare}
+                  title="Share"
+                  className="p-2 bg-light-secondary dark:bg-secondary rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                  aria-label="Share this content"
+                >
+                  <ShareIcon className="h-6 w-6 text-light-muted dark:text-muted" />
+                </button>
+              </div>
+          </div>
 
-        {details.tagline && <p className="text-light-muted dark:text-muted italic mt-1">"{details.tagline}"</p>}
-        <div className="flex items-center space-x-4 my-4 text-light-muted dark:text-muted">
-          <div className="flex items-center">
-            <StarIcon className="h-5 w-5 mr-1 text-yellow-400" />
-            <span className="font-bold text-light-text dark:text-white">{details.vote_average.toFixed(1)}</span> / 10
-          </div>
-          <div className="flex items-center">
-            <CalendarIcon className="h-5 w-5 mr-1" />
-            <span>{new Date(releaseDate).getFullYear()}</span>
-          </div>
-          {runtime > 0 && (
+          {details.tagline && <p className="text-light-muted dark:text-muted italic mt-1">"{details.tagline}"</p>}
+          <div className="flex items-center space-x-4 my-4 text-light-muted dark:text-muted">
             <div className="flex items-center">
-              <ClockIcon className="h-5 w-5 mr-1" />
-              <span>{runtime} min{type === 'tv' && ' / episode'}</span>
+              <StarIcon className="h-5 w-5 mr-1 text-yellow-400" />
+              <span className="font-bold text-light-text dark:text-white">{details.vote_average.toFixed(1)}</span> / 10
             </div>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2 my-4">
-          {details.genres.map(genre => (
-            <span key={genre.id} className="bg-light-secondary dark:bg-secondary text-light-text dark:text-gray-200 px-3 py-1 text-xs font-semibold rounded-full">{genre.name}</span>
-          ))}
-        </div>
-        <h2 className="text-xl font-semibold mt-6 mb-2">Overview</h2>
-        <ExpandableText text={details.overview} />
-
-        {cast.length > 0 && (
-          <div className="mt-8">
-            <h2 className="text-xl font-semibold mb-4">Cast</h2>
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
-              {cast.map(person => (
-                <CastCard key={person.id} person={person} />
-              ))}
+            <div className="flex items-center">
+              <CalendarIcon className="h-5 w-5 mr-1" />
+              <span>{new Date(releaseDate).getFullYear()}</span>
             </div>
+            {runtime > 0 && (
+              <div className="flex items-center">
+                <ClockIcon className="h-5 w-5 mr-1" />
+                <span>{runtime} min{type === 'tv' && ' / episode'}</span>
+              </div>
+            )}
           </div>
-        )}
+          <div className="flex flex-wrap gap-2 my-4">
+            {details.genres.map(genre => (
+              <span key={genre.id} className="bg-light-secondary dark:bg-secondary text-light-text dark:text-gray-200 px-3 py-1 text-xs font-semibold rounded-full">{genre.name}</span>
+            ))}
+          </div>
+          <h2 className="text-xl font-semibold mt-6 mb-2">Overview</h2>
+          <ExpandableText text={details.overview} />
 
-        <div className="mt-8">
-          <TelegramAd />
-        </div>
-
-        <div className="mt-8 bg-light-secondary dark:bg-secondary p-6 rounded-lg">
-          <h2 className="text-2xl font-bold mb-4">Download Links</h2>
-          {storedMovie && storedMovie.download_links.length > 0 ? (
-            <>
-              {isAuthenticated ? (
-                <>
-                  {!showLinks ? (
-                    <button
-                      onClick={handlePrepareDownloads}
-                      disabled={isPreparing}
-                      className="w-full flex items-center justify-center gap-2 bg-light-highlight dark:bg-highlight text-white font-bold py-3 px-4 rounded-lg hover:bg-green-600 transition-colors duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed"
-                    >
-                      {isPreparing ? (
-                        <>
-                          <SpinnerIcon className="animate-spin h-6 w-6" />
-                          <span>Generating links in {countdown}s...</span>
-                        </>
-                      ) : (
-                        <>
-                          <DownloadIcon className="h-6 w-6" />
-                          <span>Prepare Download Links</span>
-                        </>
-                      )}
-                    </button>
-                  ) : (
-                    <div className="space-y-3 animate-fade-in">
-                      {storedMovie.download_links.map((link, index) => (
-                        <button
-                          key={index}
-                          onClick={() => handleDownloadClick(link.url)}
-                          className="w-full flex items-center justify-between bg-light-accent dark:bg-accent text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-opacity"
-                        >
-                          <span>{link.label}</span>
-                          <DownloadIcon className="h-6 w-6" />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-center p-4 bg-light-primary dark:bg-primary/40 rounded-md border border-light-border dark:border-glass-border">
-                    <h3 className="font-bold text-lg text-light-text dark:text-white mb-2">Login to Download</h3>
-                    <p className="text-light-muted dark:text-muted mb-4">
-                        Please log in or create a free account to prepare and view the download links for this content.
-                    </p>
-                    <Link
-                        to="/login"
-                        state={{ from: location }}
-                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-light-accent dark:bg-accent text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-opacity"
-                    >
-                        <DownloadIcon className="h-6 w-6" />
-                        <span>Log In or Sign Up to Download</span>
-                    </Link>
-                </div>
-              )}
-            </>
-          ) : (
-            <p className="text-light-muted dark:text-muted">No download links available yet. Please check back later.</p>
+          {cast.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-xl font-semibold mb-4">Cast</h2>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+                {cast.map(person => (
+                  <CastCard key={person.id} person={person} />
+                ))}
+              </div>
+            </div>
           )}
+
+          <div className="mt-8">
+            <TelegramAd />
+          </div>
+
+          <div className="mt-8 bg-light-secondary dark:bg-secondary p-6 rounded-lg">
+            <h2 className="text-2xl font-bold mb-4">Download Links</h2>
+            {storedMovie && storedMovie.download_links.length > 0 ? (
+              <>
+                {isAuthenticated ? (
+                  <>
+                    {!showLinks ? (
+                      <button
+                        onClick={handlePrepareDownloads}
+                        disabled={isPreparing}
+                        className="w-full flex items-center justify-center gap-2 bg-light-highlight dark:bg-highlight text-white font-bold py-3 px-4 rounded-lg hover:bg-green-600 transition-colors duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed"
+                      >
+                        {isPreparing ? (
+                          <>
+                            <SpinnerIcon className="animate-spin h-6 w-6" />
+                            <span>Generating links in {countdown}s...</span>
+                          </>
+                        ) : (
+                          <>
+                            <DownloadIcon className="h-6 w-6" />
+                            <span>Prepare Download Links</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <div className="space-y-3 animate-fade-in">
+                        {storedMovie.download_links.map((link, index) => (
+                          <button
+                            key={index}
+                            onClick={() => handleDownloadClick(link.url)}
+                            className="w-full flex items-center justify-between bg-light-accent dark:bg-accent text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-opacity"
+                          >
+                            <span>{link.label}</span>
+                            <DownloadIcon className="h-6 w-6" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center p-4 bg-light-primary dark:bg-primary/40 rounded-md border border-light-border dark:border-glass-border">
+                      <h3 className="font-bold text-lg text-light-text dark:text-white mb-2">Login to Download</h3>
+                      <p className="text-light-muted dark:text-muted mb-4">
+                          Please log in or create a free account to prepare and view the download links for this content.
+                      </p>
+                      <Link
+                          to="/login"
+                          state={{ from: location }}
+                          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-light-accent dark:bg-accent text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-opacity"
+                      >
+                          <DownloadIcon className="h-6 w-6" />
+                          <span>Log In or Sign Up to Download</span>
+                      </Link>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-light-muted dark:text-muted">No download links available yet. Please check back later.</p>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

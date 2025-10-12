@@ -4,15 +4,16 @@ import { MovieSummary, TVSummary } from '../types';
 import { TMDB_IMAGE_BASE_URL_MEDIUM } from '../constants';
 import { WatchlistContext } from '../context/WatchlistContext';
 import { AuthContext } from '../context/AuthContext';
-import { StarIcon, CalendarIcon, BookmarkIcon, FilmIcon, TvIcon } from './Icons';
+import { StarIcon, CalendarIcon, BookmarkIcon, FilmIcon, TvIcon, XCircleIcon } from './Icons';
 import { generateSlug } from '../utils';
 
 interface MovieCardProps {
   item: MovieSummary | TVSummary;
   type: 'movie' | 'tv';
+  onRemove?: (tmdbId: number) => void;
 }
 
-const MovieCard: React.FC<MovieCardProps> = ({ item, type }) => {
+const MovieCard: React.FC<MovieCardProps> = ({ item, type, onRemove }) => {
   const { addToWatchlist, removeFromWatchlist, isOnWatchlist } = useContext(WatchlistContext);
   const { isAuthenticated } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -47,6 +48,14 @@ const MovieCard: React.FC<MovieCardProps> = ({ item, type }) => {
     }
   };
 
+  const handleRemoveClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onRemove) {
+        onRemove(item.id);
+    }
+  };
+
   return (
     <Link to={linkTo} className="group bg-light-secondary dark:bg-secondary rounded-lg shadow-lg overflow-hidden transform hover:-translate-y-2 transition-transform duration-300 block">
       <div className="relative">
@@ -62,14 +71,25 @@ const MovieCard: React.FC<MovieCardProps> = ({ item, type }) => {
             <TvIcon className="h-4 w-4" />
           )}
         </div>
-        <button
-          onClick={handleWatchlistToggle}
-          className="absolute top-2 right-2 z-10 p-1.5 bg-black/60 backdrop-blur-sm rounded-full text-white transition-all duration-300 hover:bg-light-accent/80 dark:hover:bg-accent/80"
-          title={onWl ? 'Remove from watchlist' : 'Add to watchlist'}
-          aria-label="Toggle Watchlist"
-        >
-          <BookmarkIcon className={`h-5 w-5 ${onWl ? 'fill-accent stroke-accent' : ''}`} />
-        </button>
+        {onRemove ? (
+             <button
+                onClick={handleRemoveClick}
+                className="absolute top-2 right-2 z-10 p-1.5 bg-black/60 backdrop-blur-sm rounded-full text-white transition-all duration-300 hover:bg-red-500/80"
+                title="Remove from collection"
+                aria-label="Remove from collection"
+            >
+                <XCircleIcon className="h-5 w-5" />
+            </button>
+        ) : (
+            <button
+              onClick={handleWatchlistToggle}
+              className="absolute top-2 right-2 z-10 p-1.5 bg-black/60 backdrop-blur-sm rounded-full text-white transition-all duration-300 hover:bg-light-accent/80 dark:hover:bg-accent/80"
+              title={onWl ? 'Remove from watchlist' : 'Add to watchlist'}
+              aria-label="Toggle Watchlist"
+            >
+              <BookmarkIcon className={`h-5 w-5 ${onWl ? 'fill-accent stroke-accent' : ''}`} />
+            </button>
+        )}
         <div className="absolute bottom-0 left-0 p-4">
           <h3 className="text-white font-bold text-lg group-hover:text-accent transition-colors">{title}</h3>
           <div className="flex items-center text-gray-300 dark:text-muted text-sm mt-1 space-x-4">

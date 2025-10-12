@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { FilmIcon, HomeIcon, HeartIcon, BookmarkIcon, UserCogIcon, GridIcon, XIcon } from './Icons';
+import { FilmIcon, HomeIcon, HeartIcon, BookmarkIcon, UserCogIcon, GridIcon, XIcon, LayersIcon } from './Icons';
 
 interface SidebarProps {
   onLinkClick?: () => void;
@@ -50,6 +50,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onLinkClick, onClose }) => {
         <NavLink to="/watchlist" className={navLinkClass} onClick={onLinkClick}>
             <BookmarkIcon className="h-5 w-5" />
             <span>Watchlist</span>
+        </NavLink>
+        <NavLink to="/collections" className={navLinkClass} onClick={onLinkClick}>
+            <LayersIcon className="h-5 w-5" />
+            <span>My Collections</span>
         </NavLink>
         {isAdmin && (
           <NavLink to="/admin" className={navLinkClass} onClick={onLinkClick}>

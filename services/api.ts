@@ -18,6 +18,8 @@ import {
   DownloadLink,
   AdminUserView,
   Notification,
+  Collection,
+  CollectionItem,
 } from '../types';
 import { TMDB_API_KEY, TMDB_API_BASE_URL, DB_BASE_URL } from '../constants';
 
@@ -196,3 +198,12 @@ export const removeFavorite = (id: string): Promise<void> => dbFetch(`/favorites
 export const getWatchlist = (): Promise<WatchlistItem[]> => dbFetch('/watchlist');
 export const addToWatchlist = (item: ContentItem): Promise<WatchlistItem> => dbFetch('/watchlist', { method: 'POST', body: JSON.stringify(item) });
 export const removeFromWatchlist = (id: string): Promise<void> => dbFetch(`/watchlist/${id}`, { method: 'DELETE' });
+
+// --- Collections ---
+export const getMyCollections = (): Promise<Collection[]> => dbFetch('/collections/user');
+export const getCollectionDetails = (id: string): Promise<Collection> => dbFetch(`/collections/${id}`);
+export const createCollection = (data: { name: string; description?: string; isPublic: boolean }): Promise<Collection> => dbFetch('/collections', { method: 'POST', body: JSON.stringify(data) });
+export const updateCollection = (id: string, data: { name?: string; description?: string; isPublic?: boolean }): Promise<Collection> => dbFetch(`/collections/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+export const deleteCollection = (id: string): Promise<void> => dbFetch(`/collections/${id}`, { method: 'DELETE' });
+export const addItemToCollection = (collectionId: string, item: CollectionItem): Promise<Collection> => dbFetch(`/collections/${collectionId}/items`, { method: 'POST', body: JSON.stringify(item) });
+export const removeItemFromCollection = (collectionId: string, tmdbId: number): Promise<Collection> => dbFetch(`/collections/${collectionId}/items/${tmdbId}`, { method: 'DELETE' });
