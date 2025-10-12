@@ -7,6 +7,7 @@ import { ToastProvider } from './context/ToastContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { NotificationsProvider } from './context/NotificationsContext';
 import { CollectionProvider } from './context/CollectionContext';
+import { HistoryProvider } from './context/HistoryContext';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -98,9 +99,11 @@ const App: React.FC = () => {
             <WatchlistProvider>
               <CollectionProvider>
                 <NotificationsProvider>
-                  <HashRouter>
-                    <AppLayout />
-                  </HashRouter>
+                  <HistoryProvider>
+                    <HashRouter>
+                      <AppLayout />
+                    </HashRouter>
+                  </HistoryProvider>
                 </NotificationsProvider>
               </CollectionProvider>
             </WatchlistProvider>

@@ -23,6 +23,21 @@ const UserSchema = new mongoose.Schema({
     type: String,
     default: 'avatar1',
   },
+  customAvatar: {
+    type: String,
+    default: null,
+  },
+  customName: {
+    type: String,
+    trim: true,
+  },
+  dob: {
+    type: Date,
+  },
+  gender: {
+    type: String,
+    enum: ['Male', 'Female', 'Other', 'Prefer not to say', ''],
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', UserSchema);

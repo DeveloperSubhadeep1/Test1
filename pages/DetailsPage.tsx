@@ -5,6 +5,7 @@ import { ContentType, MovieDetail, StoredMovie, TVDetail, CastMember, ContentIte
 import { TMDB_IMAGE_BASE_URL } from '../constants';
 import { FavoritesContext } from '../context/FavoritesContext';
 import { WatchlistContext } from '../context/WatchlistContext';
+import { HistoryContext } from '../context/HistoryContext';
 import { AuthContext } from '../context/AuthContext';
 import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
@@ -27,6 +28,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   const [loading, setLoading] = useState(true);
   const { addFavorite, removeFavorite, isFavorite } = useContext(FavoritesContext);
   const { addToWatchlist, removeFromWatchlist, isOnWatchlist } = useContext(WatchlistContext);
+  const { addToHistory } = useContext(HistoryContext);
   const { isAuthenticated } = useContext(AuthContext);
   const { addToast } = useToast();
   const location = useLocation();
@@ -153,7 +155,9 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   };
 
   const handleDownloadClick = async (url: string) => {
-    if (storedMovie) {
+    if (storedMovie && details) {
+      // Add to viewing history
+      addToHistory({ ...details, type });
       try {
         await incrementDownloadCount(storedMovie._id);
       } catch (error) {

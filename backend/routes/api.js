@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 const nodemailer = require('nodemailer');
@@ -10,6 +9,7 @@ const SupportTicket = require('../models/SupportTicket');
 const Favorite = require('../models/Favorite');
 const Watchlist = require('../models/Watchlist');
 const Collection = require('../models/Collection');
+const History = require('../models/History');
 
 // --- Helper Middleware ---
 const getUserId = (req, res, next) => {
@@ -386,7 +386,29 @@ router.post('/admin/test-email', getUserId, requireAdmin, async (req, res) => {
     }
 });
 
-// --- User Management (Admin) ---
+// --- User Management ---
+router.patch('/users/profile', getUserId, async (req, res) => {
+    try {
+        const user = await User.findById(req.userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        const { customName, dob, gender, customAvatar } = req.body;
+        if (customName !== undefined) user.customName = customName;
+        if (dob !== undefined) user.dob = dob;
+        if (gender !== undefined) user.gender = gender;
+        if (customAvatar !== undefined) user.customAvatar = customAvatar;
+
+        await user.save();
+        const { password, ...userProfile } = user.toObject();
+        res.json(userProfile);
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        res.status(500).json({ message: 'Server error updating profile.' });
+    }
+});
+
 router.get('/users', getUserId, requireAdmin, async (req, res) => {
     try {
         // Fetch all users, excluding the admin and passwords
@@ -451,6 +473,30 @@ router.delete('/stored-movies/:id', getUserId, requireAdmin, async (req, res) =>
     res.status(204).send();
 });
 router.patch('/stored-movies/:id/increment', async (req, res) => {
+    // Also add to user history if a user is logged in
+    const userId = req.headers['x-user-id'];
+    if (userId) {
+        try {
+            const movie = await StoredMovie.findById(req.params.id);
+            if (movie) {
+                 // Use updateOne with upsert to avoid creating duplicates
+                await History.updateOne(
+                    { userId, id: movie.tmdb_id },
+                    { 
+                        $set: {
+                            ...movie.toObject(),
+                            userId: userId,
+                            id: movie.tmdb_id,
+                            viewedAt: new Date()
+                        },
+                    },
+                    { upsert: true }
+                );
+            }
+        } catch (histError) {
+            console.error("Could not update history on download increment", histError);
+        }
+    }
     await StoredMovie.findByIdAndUpdate(req.params.id, { $inc: { download_count: 1 } });
     res.status(204).send();
 });
@@ -481,7 +527,7 @@ router.get('/metrics', getUserId, requireAdmin, async (req, res) => {
 });
 
 
-// --- User-specific lists (Favorites & Watchlist) ---
+// --- User-specific lists (Favorites, Watchlist, History) ---
 
 // Favorites
 router.get('/favorites', getUserId, async (req, res) => res.json(await Favorite.find({ userId: req.userId })));
@@ -514,6 +560,25 @@ router.delete('/watchlist/:id', getUserId, async (req, res) => {
     }
     res.status(404).json({ message: 'Watchlist item not found or you do not have permission to delete it.' });
 });
+
+// History
+router.get('/history', getUserId, async (req, res) => res.json(await History.find({ userId: req.userId }).sort({ viewedAt: -1 })));
+router.post('/history', getUserId, async (req, res) => {
+    // Use updateOne with upsert to either create a new history item or update the timestamp of an existing one.
+    // This prevents the history from being cluttered with duplicate entries for the same item.
+    const item = { ...req.body, userId: req.userId };
+    const updatedHistoryItem = await History.findOneAndUpdate(
+        { userId: req.userId, id: item.id },
+        { ...item, viewedAt: new Date() },
+        { new: true, upsert: true }
+    );
+    res.status(201).json(updatedHistoryItem);
+});
+router.delete('/history', getUserId, async (req, res) => {
+    await History.deleteMany({ userId: req.userId });
+    res.status(204).send();
+});
+
 
 // --- Collections ---
 // Create a new collection

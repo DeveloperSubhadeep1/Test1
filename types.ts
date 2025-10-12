@@ -48,6 +48,8 @@ export type FavoriteItem = ContentItem & { _id?: string; dateAdded: number; };
 
 export type WatchlistItem = ContentItem & { _id?: string; dateAdded: number; };
 
+export type HistoryItem = ContentItem & { _id?: string; viewedAt: string; };
+
 export type CollectionItem = Omit<ContentItem, 'overview'>;
 
 export interface Collection {
@@ -118,6 +120,9 @@ export interface UserProfile {
   email?: string;
   avatar: string; // Default avatar ID from DB
   customAvatar?: string | null; // Custom avatar from localStorage
+  customName?: string;
+  dob?: string; // Stored as ISO string
+  gender?: 'Male' | 'Female' | 'Other' | 'Prefer not to say';
   createdAt?: string;
 }
 

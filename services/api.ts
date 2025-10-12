@@ -14,6 +14,7 @@ import {
   UserProfile,
   FavoriteItem,
   WatchlistItem,
+  HistoryItem,
   ContentItem,
   DownloadLink,
   AdminUserView,
@@ -157,7 +158,7 @@ const dbFetch = async (endpoint: string, options: RequestInit = {}) => {
 // --- Notifications ---
 export const getNotifications = (): Promise<Notification[]> => dbFetch('/notifications');
 
-// --- Auth ---
+// --- Auth & User Profile ---
 export const apiLogin = (username: string, pass: string): Promise<UserProfile> => dbFetch('/auth/login', { method: 'POST', body: JSON.stringify({ username, password: pass }) });
 
 export const apiSendOtp = (username: string, email: string, pass: string): Promise<{ message: string }> => 
@@ -171,6 +172,9 @@ export const apiSendResetOtp = (email: string): Promise<{ message: string }> =>
 
 export const apiResetPassword = (email: string, otp: string, newPassword: string): Promise<{ message: string }> => 
     dbFetch('/auth/reset-password', { method: 'POST', body: JSON.stringify({ email, otp, newPassword }) });
+
+export const apiUpdateUserProfile = (details: Partial<UserProfile>): Promise<UserProfile> =>
+    dbFetch('/users/profile', { method: 'PATCH', body: JSON.stringify(details) });
 
 // --- Admin ---
 export const getStoredMovie = async (tmdbId: number, type: ContentType): Promise<StoredMovie | null> => {
@@ -190,7 +194,7 @@ export const incrementDownloadCount = (movieId: string): Promise<void> => dbFetc
 export const getUsers = (): Promise<AdminUserView[]> => dbFetch('/users');
 export const apiTestEmail = (): Promise<{ success: boolean; message: string }> => dbFetch('/admin/test-email', { method: 'POST' });
 
-// --- User Lists (Favorites & Watchlist) ---
+// --- User Lists (Favorites, Watchlist, History) ---
 export const getFavorites = (): Promise<FavoriteItem[]> => dbFetch('/favorites');
 export const addFavorite = (item: ContentItem): Promise<FavoriteItem> => dbFetch('/favorites', { method: 'POST', body: JSON.stringify(item) });
 export const removeFavorite = (id: string): Promise<void> => dbFetch(`/favorites/${id}`, { method: 'DELETE' });
@@ -198,6 +202,10 @@ export const removeFavorite = (id: string): Promise<void> => dbFetch(`/favorites
 export const getWatchlist = (): Promise<WatchlistItem[]> => dbFetch('/watchlist');
 export const addToWatchlist = (item: ContentItem): Promise<WatchlistItem> => dbFetch('/watchlist', { method: 'POST', body: JSON.stringify(item) });
 export const removeFromWatchlist = (id: string): Promise<void> => dbFetch(`/watchlist/${id}`, { method: 'DELETE' });
+
+export const getHistory = (): Promise<HistoryItem[]> => dbFetch('/history');
+export const addToHistory = (item: ContentItem): Promise<HistoryItem> => dbFetch('/history', { method: 'POST', body: JSON.stringify(item) });
+export const clearHistory = (): Promise<void> => dbFetch('/history', { method: 'DELETE' });
 
 // --- Collections ---
 export const getMyCollections = (): Promise<Collection[]> => dbFetch('/collections/user');
