@@ -88,10 +88,14 @@ export interface SupportTicket {
 export interface Metrics {
     totalLinks: number;
     totalDownloads: number;
-
     totalSupportTickets: number;
     totalUsers: number;
     totalCollections: number;
+}
+
+export interface DbStats {
+    usedBytes: number;
+    totalBytes: number;
 }
 
 export interface CastMember {

@@ -1,7 +1,9 @@
 
+
 const express = require('express');
 const router = express.Router();
 const nodemailer = require('nodemailer');
+const mongoose = require('mongoose');
 
 // Import Mongoose Models
 const User = require('../models/User');
@@ -585,6 +587,20 @@ router.get('/metrics', getUserId, requireAdmin, async (req, res) => {
     const totalLinks = movies.reduce((sum, movie) => sum + movie.download_links.length, 0);
     const totalDownloads = movies.reduce((sum, movie) => sum + movie.download_count, 0);
     res.json({ totalLinks, totalDownloads, totalSupportTickets: ticketsCount, totalUsers: usersCount, totalCollections: collectionsCount });
+});
+
+// --- Database Stats ---
+router.get('/db-stats', getUserId, requireAdmin, async (req, res) => {
+    try {
+        const stats = await mongoose.connection.db.stats();
+        const usedBytes = stats.storageSize || 0;
+        // Free tier of MongoDB Atlas is 512MB
+        const totalBytes = 512 * 1024 * 1024; 
+        res.json({ usedBytes, totalBytes });
+    } catch (error) {
+        console.error('Error fetching database stats:', error);
+        res.status(500).json({ message: 'Server error fetching database stats.' });
+    }
 });
 
 

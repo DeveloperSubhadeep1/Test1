@@ -12,6 +12,7 @@ import {
   addStoredMovie,
   searchTMDB,
   apiTestEmail,
+  getDbStats,
 } from '../services/api';
 import {
   Metrics,
@@ -22,6 +23,7 @@ import {
   MovieSummary,
   TVSummary,
   ContentType,
+  DbStats,
 } from '../types';
 import Spinner from '../components/Spinner';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -187,7 +189,7 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
         if (!ctx) return;
         
         const devicePixelRatio = window.devicePixelRatio || 1;
-        const canvasSize = 250;
+        const canvasSize = 220;
         canvas.width = canvasSize * devicePixelRatio;
         canvas.height = canvasSize * devicePixelRatio;
         canvas.style.width = `${canvasSize}px`;
@@ -201,8 +203,8 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
 
         const centerX = canvasSize / 2;
         const centerY = canvasSize / 2;
-        const radius = 90;
-        const defaultLineWidth = 30;
+        const radius = 80;
+        const defaultLineWidth = 28;
         
         const textColor = '#E5E7EB';
         const emptyColor = '#374151';
@@ -249,8 +251,8 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
             
             ctx.fillStyle = textColor;
             ctx.textAlign = 'center';
-            ctx.font = 'bold 42px Rajdhani';
-            ctx.fillText(Math.round(total * progress).toLocaleString(), centerX, centerY + 15);
+            ctx.font = 'bold 38px Rajdhani';
+            ctx.fillText(Math.round(total * progress).toLocaleString(), centerX, centerY + 12);
 
             if (progress < 1) {
                 animationFrameId = requestAnimationFrame(animate);
@@ -268,11 +270,11 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         
-        const canvasSize = 250;
+        const canvasSize = 220;
         const centerX = canvasSize / 2;
         const centerY = canvasSize / 2;
-        const radius = 90;
-        const halfLineWidth = 15;
+        const radius = 80;
+        const halfLineWidth = 14;
         
         const dx = x - centerX;
         const dy = y - centerY;
@@ -318,6 +320,68 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
     return <canvas ref={canvasRef} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} className="drop-shadow-[0_0_15px_rgba(8,217,214,0.4)]"></canvas>;
 };
 
+const DatabaseUsageChart: React.FC<{ usedBytes: number; totalBytes: number }> = ({ usedBytes, totalBytes }) => {
+    const [isAnimated, setIsAnimated] = useState(false);
+    
+    useEffect(() => {
+        const timer = setTimeout(() => setIsAnimated(true), 100);
+        return () => clearTimeout(timer);
+    }, []);
+
+    const formatBytes = (bytes: number) => {
+        if (bytes === 0) return '0 B';
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return `${parseFloat((bytes / Math.pow(1024, i)).toFixed(1))} ${['B', 'KB', 'MB', 'GB', 'TB'][i]}`;
+    };
+
+    const usedPercent = totalBytes > 0 ? (usedBytes / totalBytes) * 100 : 0;
+    
+    const radius = 50;
+    const circumference = 2 * Math.PI * radius;
+    const usedOffset = circumference - (usedPercent / 100) * circumference;
+
+    const usedColor = '#8B949E'; // Muted Gray
+    const freeColor = '#238636'; // Highlight Green
+
+    return (
+        <div className="flex flex-col items-center justify-center gap-2 text-center">
+            <h3 className="font-bold text-lg text-white">Database Usage</h3>
+            <div className="relative w-40 h-40">
+                <svg className="w-full h-full" viewBox="0 0 120 120">
+                    <circle
+                        cx="60"
+                        cy="60"
+                        r={radius}
+                        fill="transparent"
+                        stroke={freeColor}
+                        strokeOpacity="0.3"
+                        strokeWidth="12"
+                    />
+                    <circle
+                        cx="60"
+                        cy="60"
+                        r={radius}
+                        fill="transparent"
+                        stroke={usedColor}
+                        strokeWidth="12"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={isAnimated ? usedOffset : circumference}
+                        strokeLinecap="round"
+                        transform="rotate(-90 60 60)"
+                        className="transition-all duration-1000 ease-out"
+                    />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-2xl font-bold text-white">{usedPercent.toFixed(1)}%</span>
+                    <span className="text-sm text-muted">Used</span>
+                </div>
+            </div>
+            <div className="text-sm font-semibold text-gray-300">
+                <span style={{ color: usedColor }}>{formatBytes(usedBytes)}</span> / <span style={{ color: freeColor }}>{formatBytes(totalBytes)}</span>
+            </div>
+        </div>
+    );
+};
 
 interface TooltipData {
   visible: boolean;
@@ -327,12 +391,28 @@ interface TooltipData {
 }
 const DashboardTab: React.FC = () => {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [dbStats, setDbStats] = useState<DbStats | null>(null);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
   const [tooltip, setTooltip] = useState<TooltipData>({ visible: false, content: '', x: 0, y: 0 });
 
   useEffect(() => {
-    getMetrics().then(setMetrics).catch(() => addToast('Failed to load site metrics.', 'error')).finally(() => setLoading(false));
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+            const [metricsData, dbStatsData] = await Promise.all([
+                getMetrics(),
+                getDbStats()
+            ]);
+            setMetrics(metricsData);
+            setDbStats(dbStatsData);
+        } catch (err) {
+            addToast('Failed to load dashboard data.', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+    fetchData();
   }, [addToast]);
   
   const metricConfig = {
@@ -343,7 +423,6 @@ const DashboardTab: React.FC = () => {
   };
 
   if (loading) return <Spinner />;
-  if (!metrics) return <p>Could not load metrics.</p>;
   
   const chartColors = {
       totalLinks: metricConfig.totalLinks.color,
@@ -365,7 +444,7 @@ const DashboardTab: React.FC = () => {
           </div>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-          {(Object.keys(metricConfig) as Array<keyof Metrics>).map(key => (
+          {metrics && (Object.keys(metricConfig) as Array<keyof Metrics>).map(key => (
               <MetricCard 
                   key={key}
                   label={metricConfig[key].label}
@@ -374,17 +453,22 @@ const DashboardTab: React.FC = () => {
                   icon={metricConfig[key].icon}
               />
           ))}
-          <div className="md:col-span-2 xl:col-span-2 glass-panel p-6 rounded-lg flex flex-col sm:flex-row items-center justify-center gap-6">
-              <CircularChart metrics={metrics} colors={chartColors} onHover={setTooltip} metricConfig={metricConfig} />
-              <div className="flex flex-col gap-4">
-                  <h3 className="font-bold text-lg text-white text-center sm:text-left">Platform Overview</h3>
-                  {(Object.keys(chartColors) as Array<keyof Metrics>).map(key => (
-                      <div key={key} className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: chartColors[key] }}></div>
-                          <span className="text-sm text-gray-300">{metricConfig[key].label}</span>
-                      </div>
-                  ))}
-              </div>
+          <div className="md:col-span-2 xl:col-span-2 glass-panel p-6 rounded-lg flex flex-col items-center justify-center">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
+                {metrics && <CircularChart metrics={metrics} colors={chartColors} onHover={setTooltip} metricConfig={metricConfig} />}
+                {dbStats && <DatabaseUsageChart usedBytes={dbStats.usedBytes} totalBytes={dbStats.totalBytes} />}
+            </div>
+            <div className="mt-6 pt-4 border-t border-glass-border w-full">
+                <h3 className="font-bold text-base text-white text-center mb-3">Platform Overview</h3>
+                <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+                    {(Object.keys(chartColors) as Array<keyof Metrics>).map(key => (
+                        <div key={key} className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: chartColors[key] }}></div>
+                            <span className="text-sm text-gray-300">{metricConfig[key].label}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
           </div>
           <div className="md:col-span-2 xl:col-span-2">
               <TopContentBarChart />
