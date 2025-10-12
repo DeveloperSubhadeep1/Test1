@@ -146,6 +146,13 @@ const dbFetch = async (endpoint: string, options: RequestInit = {}) => {
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: response.statusText }));
+        
+        // When the server returns a 404 for a user that doesn't exist, it means the client's session is invalid.
+        // Dispatch a global event so the AuthContext can catch it and log the user out automatically.
+        if (response.status === 404 && errorData.message?.includes('User not found')) {
+            window.dispatchEvent(new CustomEvent('invalid-session'));
+        }
+
         throw new Error(errorData.message || `API request failed with status ${response.status}`);
     }
     

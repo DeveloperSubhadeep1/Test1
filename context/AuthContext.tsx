@@ -7,7 +7,7 @@ const SESSION_STORAGE_KEY = 'cineStreamSession';
 
 interface UpdateDetailsPayload {
     customName?: string;
-    dob?: string;
+    dob?: string | null;
     gender?: 'Male' | 'Female' | 'Other' | 'Prefer not to say';
     customAvatar?: string | null;
 }
@@ -125,6 +125,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     addToast("You've been logged out.", 'info');
   }, [addToast]);
   
+  // Add a global listener to handle invalid sessions detected by the API service.
+  useEffect(() => {
+    const handleInvalidSession = () => {
+      // Check if there's a session to prevent logging out multiple times
+      // if several API calls fail at once.
+      if (sessionStorage.getItem(SESSION_STORAGE_KEY)) {
+        addToast("Your session has expired. Please log in again.", 'error');
+        logout();
+      }
+    };
+
+    window.addEventListener('invalid-session', handleInvalidSession);
+
+    return () => {
+      window.removeEventListener('invalid-session', handleInvalidSession);
+    };
+  }, [logout, addToast]);
+
   const updateProfileDetails = useCallback(async (details: UpdateDetailsPayload): Promise<boolean> => {
     if (!currentUser) {
       addToast('You must be logged in to update your profile.', 'error');

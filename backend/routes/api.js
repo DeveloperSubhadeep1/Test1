@@ -417,7 +417,11 @@ router.patch('/users/profile', getUserId, async (req, res) => {
 
         const { customName, dob, gender } = req.body;
         if (customName !== undefined) user.customName = customName;
-        if (dob !== undefined) user.dob = dob;
+        if (dob !== undefined) {
+            // If an empty string or null is passed for dob, treat it as clearing the date.
+            // Mongoose will correctly cast a valid date string.
+            user.dob = dob || null;
+        }
         if (gender !== undefined) user.gender = gender;
         
         await user.save();

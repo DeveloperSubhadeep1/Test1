@@ -63,7 +63,7 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) => {
 
     const payload: Partial<UserProfile> = {
       ...formData,
-      dob: formData.dob ? new Date(formData.dob).toISOString() : undefined
+      dob: formData.dob ? new Date(formData.dob).toISOString() : null
     };
     
     if (newAvatarPreview) {
