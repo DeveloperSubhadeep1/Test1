@@ -196,7 +196,13 @@ router.post('/auth/send-otp', rateLimiter, async (req, res) => {
 
     } catch (error) {
         console.error('Error sending OTP:', error);
-        res.status(500).json({ message: 'Server error while sending OTP.' });
+        let message = 'Server error while sending OTP.';
+        if (error.code === 'EAUTH' || error.responseCode === 535) {
+            message = 'Email service authentication failed. The server is misconfigured. Please contact the site administrator.';
+        } else if (error.code === 'ETIMEDOUT') {
+            message = 'Connection to email service timed out. Please try again later.';
+        }
+        res.status(500).json({ message });
     }
 });
 
@@ -285,7 +291,13 @@ router.post('/auth/send-reset-otp', rateLimiter, async (req, res) => {
 
     } catch (error) {
         console.error('Error sending password reset OTP:', error);
-        res.status(500).json({ message: 'Server error while sending password reset code.' });
+        let message = 'Server error while sending password reset code.';
+        if (error.code === 'EAUTH' || error.responseCode === 535) {
+            message = 'Email service authentication failed. The server is misconfigured. Please contact the site administrator.';
+        } else if (error.code === 'ETIMEDOUT') {
+            message = 'Connection to email service timed out. Please try again later.';
+        }
+        res.status(500).json({ message });
     }
 });
 
