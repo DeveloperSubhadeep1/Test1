@@ -40,6 +40,7 @@ import {
   LinkIcon,
   SettingsIcon,
   SpinnerIcon,
+  DatabaseIcon,
 } from '../components/Icons';
 import { useDebounce } from '../hooks/useDebounce';
 import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
@@ -154,18 +155,12 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
-    // Use useMemo to calculate arc data immediately. This ensures the data for hit
-    // detection is available on the first render, fixing the race condition where
-    // hover wouldn't work until after the animation finished.
     const arcData = useMemo(() => {
-        // FIX: Ensure values from `Object.values` are treated as numbers to prevent type errors.
-        const values = Object.values(metrics).map(v => Number(v) || 0);
-        // FIX: Operator '+' cannot be applied to types 'unknown' and 'number'.
-        // Explicitly cast `val` to a number to ensure type safety during the reduce operation,
-        // resolving an issue where the compiler inferred `val` as `unknown`.
-        // FIX: Add type annotation for 'sum' accumulator to resolve TS inference error.
-        const total = values.reduce((sum: number, val) => sum + (Number(val) || 0), 0);
         const colorKeys = Object.keys(colors) as Array<keyof Metrics>;
+        // FIX: Calculate total based ONLY on the metrics that will be displayed in the chart.
+        // This ensures the chart segments add up to a full circle (100%).
+        const total = colorKeys.reduce((sum, key) => sum + (Number(metrics[key]) || 0), 0);
+        
         const finalArcData: ArcData[] = [];
         if (total > 0) {
             let currentAngle = -Math.PI / 2; // Start at 12 o'clock
@@ -196,10 +191,10 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
         canvas.style.height = `${canvasSize}px`;
         ctx.scale(devicePixelRatio, devicePixelRatio);
 
-        // FIX: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
-        // This TypeScript error is caused by uncertainty over the types returned by `Object.values`.
-        // By mapping the values to numbers first, we ensure `reduce` operates on a `number[]`, resolving the issue.
-        const total = Object.values(metrics).map(v => Number(v) || 0).reduce((sum, val) => sum + val, 0);
+        // FIX: Re-calculate total based on displayed metrics to match the arc calculation,
+        // ensuring the number in the center is also correct.
+        const colorKeys = Object.keys(colors) as Array<keyof Metrics>;
+        const total = colorKeys.reduce((sum, key) => sum + (Number(metrics[key]) || 0), 0);
 
         const centerX = canvasSize / 2;
         const centerY = canvasSize / 2;
@@ -297,7 +292,6 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
         
         if (foundSegment) {
             setHoveredKey(foundSegment.key);
-            // FIX: Explicitly convert metric value to a number to prevent type errors.
             const value = Number(metrics[foundSegment.key]) || 0;
             const label = metricConfig[foundSegment.key].label;
             onHover({
@@ -320,69 +314,6 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
     return <canvas ref={canvasRef} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} className="drop-shadow-[0_0_15px_rgba(8,217,214,0.4)]"></canvas>;
 };
 
-const DatabaseUsageChart: React.FC<{ usedBytes: number; totalBytes: number }> = ({ usedBytes, totalBytes }) => {
-    const [isAnimated, setIsAnimated] = useState(false);
-    
-    useEffect(() => {
-        const timer = setTimeout(() => setIsAnimated(true), 100);
-        return () => clearTimeout(timer);
-    }, []);
-
-    const formatBytes = (bytes: number) => {
-        if (bytes === 0) return '0 B';
-        const i = Math.floor(Math.log(bytes) / Math.log(1024));
-        return `${parseFloat((bytes / Math.pow(1024, i)).toFixed(1))} ${['B', 'KB', 'MB', 'GB', 'TB'][i]}`;
-    };
-
-    const usedPercent = totalBytes > 0 ? (usedBytes / totalBytes) * 100 : 0;
-    
-    const radius = 50;
-    const circumference = 2 * Math.PI * radius;
-    const usedOffset = circumference - (usedPercent / 100) * circumference;
-
-    const usedColor = '#8B949E'; // Muted Gray
-    const freeColor = '#238636'; // Highlight Green
-
-    return (
-        <div className="flex flex-col items-center justify-center gap-2 text-center">
-            <h3 className="font-bold text-lg text-white">Database Usage</h3>
-            <div className="relative w-40 h-40">
-                <svg className="w-full h-full" viewBox="0 0 120 120">
-                    <circle
-                        cx="60"
-                        cy="60"
-                        r={radius}
-                        fill="transparent"
-                        stroke={freeColor}
-                        strokeOpacity="0.3"
-                        strokeWidth="12"
-                    />
-                    <circle
-                        cx="60"
-                        cy="60"
-                        r={radius}
-                        fill="transparent"
-                        stroke={usedColor}
-                        strokeWidth="12"
-                        strokeDasharray={circumference}
-                        strokeDashoffset={isAnimated ? usedOffset : circumference}
-                        strokeLinecap="round"
-                        transform="rotate(-90 60 60)"
-                        className="transition-all duration-1000 ease-out"
-                    />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-2xl font-bold text-white">{usedPercent.toFixed(1)}%</span>
-                    <span className="text-sm text-muted">Used</span>
-                </div>
-            </div>
-            <div className="text-sm font-semibold text-gray-300">
-                <span style={{ color: usedColor }}>{formatBytes(usedBytes)}</span> / <span style={{ color: freeColor }}>{formatBytes(totalBytes)}</span>
-            </div>
-        </div>
-    );
-};
-
 interface TooltipData {
   visible: boolean;
   content: string;
@@ -391,7 +322,6 @@ interface TooltipData {
 }
 const DashboardTab: React.FC = () => {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [dbStats, setDbStats] = useState<DbStats | null>(null);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
   const [tooltip, setTooltip] = useState<TooltipData>({ visible: false, content: '', x: 0, y: 0 });
@@ -400,12 +330,8 @@ const DashboardTab: React.FC = () => {
     const fetchData = async () => {
         try {
             setLoading(true);
-            const [metricsData, dbStatsData] = await Promise.all([
-                getMetrics(),
-                getDbStats()
-            ]);
+            const metricsData = await getMetrics();
             setMetrics(metricsData);
-            setDbStats(dbStatsData);
         } catch (err) {
             addToast('Failed to load dashboard data.', 'error');
         } finally {
@@ -420,6 +346,7 @@ const DashboardTab: React.FC = () => {
       totalDownloads: { label: 'Total Downloads', color: '#9A16DD', icon: <DownloadIcon className="h-5 w-5" /> },
       totalUsers: { label: 'Total Users', color: '#8B949E', icon: <UsersIcon className="h-5 w-5" /> },
       totalSupportTickets: { label: 'Support Tickets', color: '#FF2E63', icon: <MessageSquareIcon className="h-5 w-5" /> },
+      // Note: totalCollections is available in `metrics` but not displayed here as a card or in the chart legend.
   };
 
   if (loading) return <Spinner />;
@@ -453,11 +380,10 @@ const DashboardTab: React.FC = () => {
                   icon={metricConfig[key].icon}
               />
           ))}
-          <div className="md:col-span-2 xl:col-span-2 glass-panel p-6 rounded-lg flex flex-col items-center justify-center">
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
-                {metrics && <CircularChart metrics={metrics} colors={chartColors} onHover={setTooltip} metricConfig={metricConfig} />}
-                {dbStats && <DatabaseUsageChart usedBytes={dbStats.usedBytes} totalBytes={dbStats.totalBytes} />}
-            </div>
+      </div>
+       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-6">
+          <div className="xl:col-span-1 glass-panel p-6 rounded-lg flex flex-col items-center justify-center">
+            {metrics && <CircularChart metrics={metrics} colors={chartColors} onHover={setTooltip} metricConfig={metricConfig} />}
             <div className="mt-6 pt-4 border-t border-glass-border w-full">
                 <h3 className="font-bold text-base text-white text-center mb-3">Platform Overview</h3>
                 <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
@@ -470,7 +396,7 @@ const DashboardTab: React.FC = () => {
                 </div>
             </div>
           </div>
-          <div className="md:col-span-2 xl:col-span-2">
+          <div className="xl:col-span-2">
               <TopContentBarChart />
           </div>
       </div>
@@ -627,6 +553,106 @@ const SupportTicketsTab: React.FC = () => {
     </>
   );
 };
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Database Tab
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+const DatabaseUsageChart: React.FC<{ usedBytes: number; totalBytes: number }> = ({ usedBytes, totalBytes }) => {
+    const [isAnimated, setIsAnimated] = useState(false);
+    
+    useEffect(() => {
+        const timer = setTimeout(() => setIsAnimated(true), 100);
+        return () => clearTimeout(timer);
+    }, []);
+
+    const formatBytes = (bytes: number) => {
+        if (bytes === 0) return '0 B';
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return `${parseFloat((bytes / Math.pow(1024, i)).toFixed(1))} ${['B', 'KB', 'MB', 'GB', 'TB'][i]}`;
+    };
+
+    const usedPercent = totalBytes > 0 ? (usedBytes / totalBytes) * 100 : 0;
+    
+    const radius = 80;
+    const circumference = 2 * Math.PI * radius;
+    const usedOffset = circumference - (usedPercent / 100) * circumference;
+
+    const usedColor = '#8B949E'; // Muted Gray
+    const freeColor = '#238636'; // Highlight Green
+
+    return (
+        <div className="flex flex-col items-center justify-center gap-4 text-center">
+            <h3 className="text-2xl font-bold text-white">Database Storage</h3>
+            <div className="relative w-56 h-56">
+                <svg className="w-full h-full" viewBox="0 0 200 200">
+                    <circle
+                        cx="100"
+                        cy="100"
+                        r={radius}
+                        fill="transparent"
+                        stroke={freeColor}
+                        strokeOpacity="0.2"
+                        strokeWidth="20"
+                    />
+                    <circle
+                        cx="100"
+                        cy="100"
+                        r={radius}
+                        fill="transparent"
+                        stroke={usedColor}
+                        strokeWidth="20"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={isAnimated ? usedOffset : circumference}
+                        strokeLinecap="round"
+                        transform="rotate(-90 100 100)"
+                        className="transition-all duration-1000 ease-out"
+                    />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-4xl font-bold text-white">{usedPercent.toFixed(1)}%</span>
+                    <span className="text-base text-muted">Used</span>
+                </div>
+            </div>
+            <div className="text-lg font-semibold text-gray-300">
+                <span style={{ color: usedColor }}>{formatBytes(usedBytes)}</span> / <span style={{ color: freeColor }}>{formatBytes(totalBytes)}</span>
+            </div>
+        </div>
+    );
+};
+
+const DatabaseTab: React.FC = () => {
+  const [dbStats, setDbStats] = useState<DbStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { addToast } = useToast();
+
+  useEffect(() => {
+    const fetchData = async () => {
+        try {
+            setLoading(true);
+            const dbStatsData = await getDbStats();
+            setDbStats(dbStatsData);
+        } catch (err) {
+            addToast('Failed to load database stats.', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+    fetchData();
+  }, [addToast]);
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div className="glass-panel p-6 rounded-lg flex flex-col items-center justify-center min-h-[50vh]">
+        {dbStats ? (
+            <DatabaseUsageChart usedBytes={dbStats.usedBytes} totalBytes={dbStats.totalBytes} />
+        ) : (
+            <p className="text-muted">Could not load database statistics.</p>
+        )}
+    </div>
+  );
+};
+
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Movies Tab and Modals
@@ -1116,6 +1142,7 @@ const AdminPage: React.FC = () => {
       case 'movies': return <MoviesTab />;
       case 'users': return <UsersTab />;
       case 'tickets': return <SupportTicketsTab />;
+      case 'database': return <DatabaseTab />;
       case 'diagnostics': return <DiagnosticsTab />;
       default: return null;
     }
@@ -1130,6 +1157,7 @@ const AdminPage: React.FC = () => {
           <TabButton name="movies" activeTab={activeTab} setActiveTab={setActiveTab} label="Content Links" />
           <TabButton name="users" activeTab={activeTab} setActiveTab={setActiveTab} label="Users" />
           <TabButton name="tickets" activeTab={activeTab} setActiveTab={setActiveTab} label="Support Tickets" />
+          <TabButton name="database" activeTab={activeTab} setActiveTab={setActiveTab} label="Database" />
           <TabButton name="diagnostics" activeTab={activeTab} setActiveTab={setActiveTab} label="Diagnostics" />
         </div>
       </div>
