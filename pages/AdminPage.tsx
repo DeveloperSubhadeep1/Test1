@@ -416,7 +416,7 @@ const UsersTab: React.FC = () => {
           <div key={user._id} className="glass-panel p-4 rounded-lg">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Avatar avatar={user.avatar} customAvatar={user.customAvatar} className="h-10 w-10 rounded-full" />
+                <Avatar avatar={user.avatar} className="h-10 w-10 rounded-full" />
                 <div>
                   <p className="font-bold text-white">{user.username}</p>
                   <p className="text-xs text-muted">
@@ -455,7 +455,7 @@ const UsersTab: React.FC = () => {
             {users.map(user => (
               <tr key={user._id} className="border-b border-glass-border hover:bg-cyan/10 transition-colors">
                 <td className="px-6 py-4 font-medium text-white flex items-center gap-3">
-                  <Avatar avatar={user.avatar} customAvatar={user.customAvatar} className="h-8 w-8 rounded-full" />
+                  <Avatar avatar={user.avatar} className="h-8 w-8 rounded-full" />
                   {user.username}
                 </td>
                 <td className="px-6 py-4">{user.email}</td>

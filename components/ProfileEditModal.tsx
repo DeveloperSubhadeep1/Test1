@@ -1,16 +1,12 @@
-import React, { useState, useContext, useRef } from 'react';
+import React, { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useToast } from '../hooks/useToast';
-import { Avatar } from './Avatars';
-import { XIcon, EditIcon, SpinnerIcon } from './Icons';
-import { UserProfile } from '../types';
+import { Avatar, avatarSvgs } from './Avatars';
+import { XIcon, SpinnerIcon } from './Icons';
 
 interface ProfileEditModalProps {
   onClose: () => void;
 }
-
-const MAX_AVATAR_SIZE_MB = 10;
-const MAX_AVATAR_SIZE_BYTES = MAX_AVATAR_SIZE_MB * 1024 * 1024;
 
 const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) => {
   const { currentUser, updateProfileDetails } = useContext(AuthContext);
@@ -21,9 +17,8 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) => {
     dob: currentUser?.dob ? currentUser.dob.split('T')[0] : '', // Format for date input
     gender: currentUser?.gender || '',
   });
-  const [newAvatarPreview, setNewAvatarPreview] = useState<string | null>(null);
+  const [selectedAvatar, setSelectedAvatar] = useState(currentUser?.avatar || 'avatar1');
   const [loading, setLoading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!currentUser) return null;
 
@@ -31,59 +26,38 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
-  
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      addToast('Invalid file type. Please select an image file.', 'error');
-      return;
-    }
-
-    if (file.size > MAX_AVATAR_SIZE_BYTES) {
-      addToast(`File is too large. Please select an image smaller than ${MAX_AVATAR_SIZE_MB}MB.`, 'error');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setNewAvatarPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
-  
-  const handleResetAvatar = () => {
-    setNewAvatarPreview('reset'); // Use 'reset' as a signal to remove custom avatar
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    const payload: Partial<UserProfile> = {
-      ...formData,
-      dob: formData.dob ? new Date(formData.dob).toISOString() : null
+    const dataToUpdate: {
+        customName: string;
+        gender?: 'Male' | 'Female' | 'Other' | 'Prefer not to say' | '';
+        avatar: string;
+        dob: string | null;
+    } = {
+        customName: formData.customName,
+        gender: formData.gender as any,
+        avatar: selectedAvatar,
+        dob: null, // Default to null
     };
-    
-    if (newAvatarPreview) {
-        payload.customAvatar = newAvatarPreview === 'reset' ? null : newAvatarPreview;
+
+    // Robustly handle the date to prevent crashes from invalid date strings,
+    // which was preventing the entire profile update (including avatar) from succeeding.
+    if (formData.dob && /^\d{4}-\d{2}-\d{2}$/.test(formData.dob)) {
+        const date = new Date(formData.dob);
+        if (!isNaN(date.getTime())) {
+            dataToUpdate.dob = date.toISOString();
+        }
     }
 
-    const success = await updateProfileDetails(payload);
+    const success = await updateProfileDetails(dataToUpdate);
     setLoading(false);
     if (success) {
       onClose();
     }
   };
-
-  const triggerFileSelect = () => {
-    fileInputRef.current?.click();
-  };
-  
-  const currentAvatarDisplay = newAvatarPreview === 'reset' 
-      ? null 
-      : newAvatarPreview || currentUser.customAvatar;
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
@@ -97,33 +71,20 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) => {
           </div>
 
           <div className="p-6 space-y-4">
-            <div className="flex flex-col items-center gap-4">
-              <div className="relative group">
-                <Avatar 
-                  avatar={currentUser.avatar}
-                  customAvatar={currentAvatarDisplay}
-                  className="h-24 w-24 rounded-full" 
-                />
-                <button
-                  type="button"
-                  onClick={triggerFileSelect}
-                  className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                  aria-label="Change avatar"
-                >
-                  <EditIcon className="h-6 w-6 text-white" />
-                </button>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-                aria-hidden="true"
-              />
-              <div className="flex gap-2">
-                <button type="button" onClick={triggerFileSelect} className="px-3 py-1 rounded-full text-xs font-semibold bg-secondary hover:bg-gray-700 text-white transition-colors">Change</button>
-                {(newAvatarPreview || currentUser.customAvatar) && <button type="button" onClick={handleResetAvatar} className="px-3 py-1 rounded-full text-xs font-semibold bg-red-500/20 hover:bg-red-500/40 text-red-400 transition-colors">Reset</button>}
+            <div>
+              <label className="block text-sm font-medium text-light-muted dark:text-muted mb-2">Choose your avatar</label>
+              <div className="grid grid-cols-6 sm:grid-cols-8 gap-2 max-h-48 overflow-y-auto p-2 bg-primary/50 rounded-lg">
+                {Object.keys(avatarSvgs).map(avatarId => (
+                  <button
+                    key={avatarId}
+                    type="button"
+                    onClick={() => setSelectedAvatar(avatarId)}
+                    className={`p-1 rounded-full transition-all duration-200 ${selectedAvatar === avatarId ? 'ring-2 ring-offset-2 ring-offset-secondary ring-cyan scale-110' : 'hover:scale-110 hover:ring-2 hover:ring-cyan/50'}`}
+                    aria-label={`Select avatar ${avatarId}`}
+                  >
+                    <Avatar avatar={avatarId} className="h-10 w-10" />
+                  </button>
+                ))}
               </div>
             </div>
 

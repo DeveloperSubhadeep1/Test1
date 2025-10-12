@@ -88,6 +88,7 @@ export interface SupportTicket {
 export interface Metrics {
     totalLinks: number;
     totalDownloads: number;
+
     totalSupportTickets: number;
     totalUsers: number;
     totalCollections: number;
@@ -118,11 +119,10 @@ export interface UserProfile {
   _id: string;
   username: string;
   email?: string;
-  avatar: string; // Default avatar ID from DB
-  customAvatar?: string | null; // Custom avatar from localStorage
+  avatar: string; // Avatar ID from DB
   customName?: string;
   dob?: string; // Stored as ISO string
-  gender?: 'Male' | 'Female' | 'Other' | 'Prefer not to say';
+  gender?: 'Male' | 'Female' | 'Other' | 'Prefer not to say' | '';
   createdAt?: string;
 }
 

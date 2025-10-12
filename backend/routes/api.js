@@ -415,20 +415,37 @@ router.patch('/users/profile', getUserId, async (req, res) => {
             return res.status(404).json({ message: 'User not found.' });
         }
 
-        const { customName, dob, gender } = req.body;
-        if (customName !== undefined) user.customName = customName;
-        if (dob !== undefined) {
-            // If an empty string or null is passed for dob, treat it as clearing the date.
-            // Mongoose will correctly cast a valid date string.
-            user.dob = dob || null;
-        }
+        const { customName, dob, gender, avatar } = req.body;
+        if (customName !== undefined) user.customName = customName.trim();
+        if (avatar !== undefined) user.avatar = avatar;
         if (gender !== undefined) user.gender = gender;
+        
+        // Explicitly handle Date of Birth to prevent Mongoose CastErrors
+        // that would trigger a generic 500 error.
+        if (dob !== undefined) {
+            // Allow clearing the date
+            if (dob === null || dob === '') {
+                user.dob = null;
+            } else {
+                const date = new Date(dob);
+                // Check if the provided date string is valid
+                if (isNaN(date.getTime())) {
+                    // If invalid, send a specific error back to the client.
+                    return res.status(400).json({ message: 'Invalid Date of Birth format provided.' });
+                }
+                user.dob = date;
+            }
+        }
         
         await user.save();
         const { password, ...userProfile } = user.toObject();
         res.json(userProfile);
     } catch (error) {
         console.error('Error updating profile:', error);
+        // Catch Mongoose validation errors (e.g., for the gender enum)
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ message: Object.values(error.errors).map(e => e.message).join(', ') });
+        }
         res.status(500).json({ message: 'Server error updating profile.' });
     }
 });

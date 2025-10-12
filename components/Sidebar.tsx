@@ -53,7 +53,6 @@ const Sidebar: React.FC<SidebarProps> = ({ onLinkClick, onClose }) => {
             <NavLink to="/profile" onClick={onLinkClick} className="flex items-center gap-3 flex-grow min-w-0">
               <Avatar 
                 avatar={currentUser.avatar}
-                customAvatar={currentUser.customAvatar}
                 className="h-9 w-9 rounded-full flex-shrink-0"
               />
               <div className="min-w-0">

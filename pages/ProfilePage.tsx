@@ -105,7 +105,6 @@ const ProfilePage: React.FC = () => {
         <header className="flex flex-col sm:flex-row items-center gap-6">
           <Avatar 
             avatar={currentUser.avatar}
-            customAvatar={currentUser.customAvatar}
             className="h-28 w-28 sm:h-36 sm:w-36 rounded-full flex-shrink-0 shadow-lg" 
           />
           <div className="text-center sm:text-left">

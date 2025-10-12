@@ -130,8 +130,8 @@ export const getAllGenres = async (): Promise<Genre[]> => {
 const dbFetch = async (endpoint: string, options: RequestInit = {}) => {
     const url = `${DB_BASE_URL}${endpoint}`;
     
-    const sessionUser = sessionStorage.getItem('cineStreamSession');
-    const user = sessionUser ? JSON.parse(sessionUser) : null;
+    const userJson = localStorage.getItem('cineStreamUser');
+    const user = userJson ? JSON.parse(userJson) : null;
 
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
