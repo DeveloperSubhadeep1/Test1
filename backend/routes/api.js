@@ -3,11 +3,11 @@ const router = express.Router();
 const nodemailer = require('nodemailer');
 
 // Import Mongoose Models
-const User = require('../models/User');
-const StoredMovie = require('../models/StoredMovie');
-const SupportTicket = require('../models/SupportTicket');
-const Favorite = require('../models/Favorite');
-const Watchlist = require('../models/Watchlist');
+const User = require(`${__basedir}/models/User`);
+const StoredMovie = require(`${__basedir}/models/StoredMovie`);
+const SupportTicket = require(`${__basedir}/models/SupportTicket`);
+const Favorite = require(`${__basedir}/models/Favorite`);
+const Watchlist = require(`${__basedir}/models/Watchlist`);
 
 // --- Helper Middleware ---
 const getUserId = (req, res, next) => {
