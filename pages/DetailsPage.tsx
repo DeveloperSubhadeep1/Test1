@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { getDetails, getStoredMovie, incrementDownloadCount, getCredits, findIdBySlug } from '../services/api';
 import { ContentType, MovieDetail, StoredMovie, TVDetail, CastMember, ContentItem } from '../types';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
@@ -29,6 +29,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   const { isAuthenticated } = useContext(AuthContext);
   const { addToast } = useToast();
   const location = useLocation();
+  const navigate = useNavigate();
   
   // States for download countdown
   const [isPreparing, setIsPreparing] = useState(false);
@@ -153,6 +154,10 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   };
 
   const handleFavoriteToggle = () => {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: location } });
+      return;
+    }
     if (!details) return;
     const favoriteItem: ContentItem = { ...details, type: type };
     if (isFavorite(details.id)) {
@@ -163,6 +168,10 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   };
 
   const handleWatchlistToggle = () => {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: location } });
+      return;
+    }
     if (!details) return;
     const watchlistItem: ContentItem = { ...details, type: type };
     if (isOnWatchlist(details.id)) {

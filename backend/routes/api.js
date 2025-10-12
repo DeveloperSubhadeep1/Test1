@@ -70,7 +70,7 @@ setInterval(() => {
 // e.g., 'testuser': { otp: '123', expiry: ..., type: 'signup', email: '...', password: '...' }
 // e.g., 'test@test.com': { otp: '456', expiry: ..., type: 'reset' }
 const otpStore = {};
-const OTP_EXPIRY_DURATION = 5 * 60 * 1000; // 5 minutes
+const OTP_EXPIRY_DURATION = 60 * 60 * 1000; // 1 hour
 
 // Generate a 6-digit OTP
 function generateOTP() {
@@ -176,7 +176,7 @@ router.post('/auth/send-otp', rateLimiter, async (req, res) => {
                     <h2 style="color: #0D1117;">🔐 Welcome to CineStream!</h2>
                     <p>Your verification code is:</p>
                     <p style="font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #58A6FF; background: #f0f0f0; padding: 10px 20px; border-radius: 5px; display: inline-block;">${otp}</p>
-                    <p>⚠️ This code will expire in 5 minutes.</p>
+                    <p>⚠️ This code will expire in 1 hour.</p>
                 </div>
             `,
         });
@@ -253,7 +253,7 @@ router.post('/auth/send-reset-otp', rateLimiter, async (req, res) => {
                         <h2 style="color: #0D1117;">🔐 Password Reset Request</h2>
                         <p>Your password reset code is:</p>
                         <p style="font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #58A6FF; background: #f0f0f0; padding: 10px 20px; border-radius: 5px; display: inline-block;">${otp}</p>
-                        <p>⚠️ This code will expire in 5 minutes.</p>
+                        <p>⚠️ This code will expire in 1 hour.</p>
                         <p>If you did not request a password reset, you can safely ignore this email.</p>
                     </div>
                 `,

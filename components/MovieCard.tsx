@@ -1,8 +1,9 @@
 import React, { useContext } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { MovieSummary, TVSummary } from '../types';
 import { TMDB_IMAGE_BASE_URL_MEDIUM } from '../constants';
 import { WatchlistContext } from '../context/WatchlistContext';
+import { AuthContext } from '../context/AuthContext';
 import { StarIcon, CalendarIcon, BookmarkIcon, FilmIcon, TvIcon } from './Icons';
 import { generateSlug } from '../utils';
 
@@ -13,6 +14,9 @@ interface MovieCardProps {
 
 const MovieCard: React.FC<MovieCardProps> = ({ item, type }) => {
   const { addToWatchlist, removeFromWatchlist, isOnWatchlist } = useContext(WatchlistContext);
+  const { isAuthenticated } = useContext(AuthContext);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const title = 'title' in item ? item.title : item.name;
   const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
@@ -29,6 +33,12 @@ const MovieCard: React.FC<MovieCardProps> = ({ item, type }) => {
   const handleWatchlistToggle = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: location } });
+      return;
+    }
+
     const watchlistItem = { ...item, type };
     if (onWl) {
       removeFromWatchlist(item.id);

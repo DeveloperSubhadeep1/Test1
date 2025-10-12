@@ -53,7 +53,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
 
   const addFavorite = useCallback(async (item: ContentItem) => {
     if (!currentUser) {
-      addToast('You must be logged in to add favorites.', 'error');
       return;
     }
     if (favorites.some(fav => fav.id === item.id)) return;

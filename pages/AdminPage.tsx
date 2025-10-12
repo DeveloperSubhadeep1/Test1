@@ -194,7 +194,6 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
         canvas.style.height = `${canvasSize}px`;
         ctx.scale(devicePixelRatio, devicePixelRatio);
 
-        // FIX: Ensure values from `Object.values` are treated as numbers to prevent type errors.
         // FIX: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
         // Add an explicit type annotation for the `sum` accumulator in the reduce function.
         // This resolves a TypeScript inference issue where `sum` was not being correctly identified as a number.

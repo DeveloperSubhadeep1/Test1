@@ -53,7 +53,6 @@ export const WatchlistProvider: React.FC<WatchlistProviderProps> = ({ children }
 
   const addToWatchlist = useCallback(async (item: ContentItem) => {
     if (!currentUser) {
-      addToast('You must be logged in to add to your watchlist.', 'error');
       return;
     }
     if (watchlist.some(watch => watch.id === item.id)) return;
