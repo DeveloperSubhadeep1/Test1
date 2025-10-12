@@ -158,7 +158,10 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
     const arcData = useMemo(() => {
         // FIX: Ensure values from `Object.values` are treated as numbers to prevent type errors.
         const values = Object.values(metrics).map(v => Number(v) || 0);
-        const total = values.reduce((sum, val) => sum + val, 0);
+        // FIX: Operator '+' cannot be applied to types 'unknown' and 'number'.
+        // Explicitly cast `val` to a number to ensure type safety during the reduce operation,
+        // resolving an issue where the compiler inferred `val` as `unknown`.
+        const total = values.reduce((sum, val) => sum + (Number(val) || 0), 0);
         const colorKeys = Object.keys(colors) as Array<keyof Metrics>;
         const finalArcData: ArcData[] = [];
         if (total > 0) {
@@ -191,7 +194,10 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
         ctx.scale(devicePixelRatio, devicePixelRatio);
 
         // FIX: Ensure values from `Object.values` are treated as numbers to prevent type errors.
-        const total = Object.values(metrics).reduce((sum, val) => sum + (Number(val) || 0), 0);
+        // FIX: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+        // Add an explicit type annotation for the `sum` accumulator in the reduce function.
+        // This resolves a TypeScript inference issue where `sum` was not being correctly identified as a number.
+        const total = Object.values(metrics).reduce((sum: number, val) => sum + (Number(val) || 0), 0);
 
         const centerX = canvasSize / 2;
         const centerY = canvasSize / 2;

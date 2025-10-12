@@ -19,7 +19,7 @@ services:
     # https://www.koyeb.com/docs/languages/node-js
     git:
       branch: main
-      repository: https://github.com/DeveloperSubhadeep1/Test1.git # <-- IMPORTANT: Replace with your GitHub repository URL
+      repository: github.com/your-username/your-repo.git # <-- IMPORTANT: Replace with your GitHub repository URL
       # The root directory of the backend service.
       # All commands will be executed from this directory.
       root: /backend
