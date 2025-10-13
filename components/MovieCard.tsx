@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { MovieSummary, TVSummary } from '../types';
+import { MovieSummary, TVSummary, ContentItem } from '../types';
 import { TMDB_IMAGE_BASE_URL_MEDIUM } from '../constants';
 import { WatchlistContext } from '../context/WatchlistContext';
 import { AuthContext } from '../context/AuthContext';
@@ -40,7 +40,9 @@ const MovieCard: React.FC<MovieCardProps> = ({ item, type, onRemove }) => {
       return;
     }
 
-    const watchlistItem = { ...item, type };
+    // FIX: Cast to ContentItem to resolve discriminated union issue.
+    // TypeScript struggles to infer the correct discriminated union type when spreading a union of objects.
+    const watchlistItem = { ...item, type } as ContentItem;
     if (onWl) {
       removeFromWatchlist(item.id);
     } else {

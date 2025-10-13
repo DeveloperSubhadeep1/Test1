@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Collection } from '../types';
+import { Collection, MovieSummary, TVSummary } from '../types';
 import { getCollectionDetails, removeItemFromCollection, deleteCollection } from '../services/api';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import { useToast } from '../hooks/useToast';
@@ -141,7 +141,8 @@ const CollectionDetailsPage: React.FC = () => {
           {collection.items.map(item => (
             <MovieCard 
                 key={`${item.type}-${item.id}`} 
-                item={item} 
+                // FIX: Corrected a TypeScript error when passing a CollectionItem to MovieCard. The spread operator on a discriminated union was causing type inference issues. Used a stronger type assertion (`as unknown as ...`) to resolve the type mismatch, as the resulting object is structurally correct for the MovieCard component.
+                item={{ ...item, overview: '' } as unknown as (MovieSummary | TVSummary)}
                 type={item.type}
                 onRemove={isOwner ? handleRemoveItem : undefined}
             />

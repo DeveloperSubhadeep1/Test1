@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { getDetails, getStoredMovie, incrementDownloadCount, getCredits, findIdBySlug } from '../services/api';
-import { ContentType, MovieDetail, StoredMovie, TVDetail, CastMember, ContentItem } from '../types';
+import { ContentType, MovieDetail, StoredMovie, TVDetail, CastMember, ContentItem, Genre } from '../types';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
 import { FavoritesContext } from '../context/FavoritesContext';
 import { WatchlistContext } from '../context/WatchlistContext';
@@ -157,7 +157,8 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   const handleDownloadClick = async (url: string) => {
     if (storedMovie && details) {
       // Add to viewing history
-      addToHistory({ ...details, type });
+      // FIX: Cast to ContentItem to resolve discriminated union issue.
+      addToHistory({ ...details, type } as ContentItem);
       try {
         await incrementDownloadCount(storedMovie._id);
       } catch (error) {
@@ -174,7 +175,8 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
       return;
     }
     if (!details) return;
-    const favoriteItem: ContentItem = { ...details, type: type };
+    // FIX: Cast to ContentItem to resolve discriminated union issue.
+    const favoriteItem = { ...details, type } as ContentItem;
     if (isFavorite(details.id)) {
       removeFavorite(details.id);
     } else {
@@ -188,7 +190,8 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
       return;
     }
     if (!details) return;
-    const watchlistItem: ContentItem = { ...details, type: type };
+    // FIX: Cast to ContentItem to resolve discriminated union issue.
+    const watchlistItem = { ...details, type } as ContentItem;
     if (isOnWatchlist(details.id)) {
       removeFromWatchlist(details.id);
     } else {
@@ -254,7 +257,8 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
     ? `${TMDB_IMAGE_BASE_URL}${details.poster_path}`
     : 'https://picsum.photos/500/750';
     
-  const contentItemForCollection: ContentItem | null = details ? { ...details, type } : null;
+  // FIX: Cast to ContentItem to resolve discriminated union issue.
+  const contentItemForCollection: ContentItem | null = details ? { ...details, type } as ContentItem : null;
 
   return (
     <>

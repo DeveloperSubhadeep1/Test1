@@ -18,35 +18,60 @@ interface TurnstileProps {
 const Turnstile: React.FC<TurnstileProps> = ({ 
     onSuccess, 
     onExpire, 
-    siteKey = '0x4AAAAAAB6QOuyxQZcdRNSZ', // Cloudflare's "always passes" test key for development
+    siteKey = '1x00000000000000000000AA', // Cloudflare's "always passes" test key for development
 }) => {
   const ref = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string | null>(null); // Use a ref to avoid re-renders on widgetId change
   const { theme } = useContext(ThemeContext);
 
   useEffect(() => {
-    // Wait for the Turnstile script to load.
-    if (!window.turnstile) {
-        return;
-    }
-      
-    if (!ref.current) {
-      return;
-    }
+    let intervalId: ReturnType<typeof setInterval> | null = null;
 
-    const widgetId = window.turnstile.render(ref.current, {
-      sitekey: siteKey,
-      callback: (token: string) => onSuccess(token),
-      'expired-callback': () => {
-        onExpire?.();
-        // The token expired, so we reset it in the parent component.
-        onSuccess(''); 
-      },
-      theme: theme,
-    });
+    const render = () => {
+      if (!ref.current || !window.turnstile) {
+        return;
+      }
+
+      // If a widget already exists, remove it. This handles theme changes.
+      if (widgetIdRef.current) {
+        window.turnstile.remove(widgetIdRef.current);
+      }
+      
+      widgetIdRef.current = window.turnstile.render(ref.current, {
+        sitekey: siteKey,
+        callback: (token: string) => onSuccess(token),
+        'expired-callback': () => {
+          onExpire?.();
+          // The token expired, so we reset it in the parent component.
+          onSuccess(''); 
+        },
+        theme: theme,
+      });
+    };
+
+    // If turnstile is already loaded, render it.
+    if (window.turnstile) {
+      render();
+    } else {
+      // If not, poll for the script to load.
+      intervalId = setInterval(() => {
+        if (window.turnstile) {
+          if (intervalId) clearInterval(intervalId);
+          render();
+        }
+      }, 200);
+    }
 
     return () => {
-      if (window.turnstile) {
-        window.turnstile.remove(widgetId);
+      if (intervalId) clearInterval(intervalId);
+      if (widgetIdRef.current && window.turnstile) {
+        try {
+          // The widget might have already been removed by an unmount/remount cycle.
+          // Adding a try-catch to prevent errors on cleanup.
+          window.turnstile.remove(widgetIdRef.current);
+        } catch (error) {
+            console.warn('Turnstile widget cleanup failed:', error);
+        }
       }
     };
   }, [onSuccess, onExpire, siteKey, theme]);

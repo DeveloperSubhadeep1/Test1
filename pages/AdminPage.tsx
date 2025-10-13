@@ -146,8 +146,9 @@ interface ArcData {
 }
 interface CircularChartProps {
   metrics: Metrics;
-  colors: Record<keyof Metrics, string>;
-  metricConfig: Record<keyof Metrics, { label: string; color: string; icon: React.ReactNode }>;
+  // FIX: Make props Partial as the component is designed to handle a subset of metrics.
+  colors: Partial<Record<keyof Metrics, string>>;
+  metricConfig: Partial<Record<keyof Metrics, { label: string; color: string; icon: React.ReactNode }>>;
   onHover: (tooltipData: TooltipData) => void;
 }
 
@@ -239,7 +240,8 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
                 const animatedEndAngle = arc.startAngle + (arc.endAngle - arc.startAngle) * progress;
                 ctx.beginPath();
                 ctx.arc(centerX, centerY, radius, arc.startAngle, animatedEndAngle);
-                ctx.strokeStyle = colors[arc.key];
+                // FIX: Add non-null assertion as `colors` is Partial but logic ensures key exists.
+                ctx.strokeStyle = colors[arc.key]!;
                 ctx.lineWidth = arc.key === hoveredKey ? defaultLineWidth + 4 : defaultLineWidth;
                 ctx.stroke();
             });
@@ -293,7 +295,8 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
         if (foundSegment) {
             setHoveredKey(foundSegment.key);
             const value = Number(metrics[foundSegment.key]) || 0;
-            const label = metricConfig[foundSegment.key].label;
+            // FIX: Add non-null assertion as logic ensures metricConfig has the same keys as colors.
+            const label = metricConfig[foundSegment.key]!.label;
             onHover({
                 visible: true,
                 content: `${label}: ${value.toLocaleString()}`,
@@ -371,7 +374,7 @@ const DashboardTab: React.FC = () => {
           </div>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-          {metrics && (Object.keys(metricConfig) as Array<keyof Metrics>).map(key => (
+          {metrics && (Object.keys(metricConfig) as Array<keyof typeof metricConfig>).map(key => (
               <MetricCard 
                   key={key}
                   label={metricConfig[key].label}
@@ -387,7 +390,7 @@ const DashboardTab: React.FC = () => {
             <div className="mt-6 pt-4 border-t border-glass-border w-full">
                 <h3 className="font-bold text-base text-white text-center mb-3">Platform Overview</h3>
                 <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
-                    {(Object.keys(chartColors) as Array<keyof Metrics>).map(key => (
+                    {(Object.keys(chartColors) as Array<keyof typeof chartColors>).map(key => (
                         <div key={key} className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: chartColors[key] }}></div>
                             <span className="text-sm text-gray-300">{metricConfig[key].label}</span>
