@@ -108,18 +108,19 @@ const verifyTurnstile = async (req, res, next) => {
     const secretKey = process.env.TURNSTILE_SECRET_KEY || '1x0000000000000000000000000000000AA';
     
     try {
-        // Construct the form data using the URLSearchParams constructor.
-        // This is a more robust method that gracefully handles cases where `ip` might be undefined,
-        // preventing a malformed request that could cause Cloudflare to return a non-JSON response.
-        const body = new URLSearchParams({
-            secret: secretKey,
-            response: token,
-            remoteip: ip,
-        });
+        const params = new URLSearchParams();
+        params.append('secret', secretKey);
+        params.append('response', token);
+
+        // The remoteip parameter is optional. Conditionally append it to avoid sending
+        // "remoteip=undefined", which would cause the request to be malformed.
+        if (ip) {
+            params.append('remoteip', ip);
+        }
 
         const response = await fetch('https://challenges.cloudflare.com/api/v0/siteverify', {
             method: 'POST',
-            body: body,
+            body: params,
         });
 
         const data = await response.json();
