@@ -8,7 +8,7 @@ import { AuthContext } from '../context/AuthContext';
 import { CollectionContext } from '../context/CollectionContext';
 import MovieCard from '../components/MovieCard';
 import Spinner from '../components/Spinner';
-import { LayersIcon, EditIcon, TrashIcon } from '../components/Icons';
+import { LayersIcon, EditIcon, TrashIcon, ShareIcon } from '../components/Icons';
 import MovieCardSkeleton from '../components/MovieCardSkeleton';
 import ConfirmationModal from '../components/ConfirmationModal';
 import EditCollectionModal from '../components/EditCollectionModal';
@@ -74,6 +74,40 @@ const CollectionDetailsPage: React.FC = () => {
         addToast(error instanceof Error ? error.message : "Failed to delete collection.", 'error');
     }
   };
+  
+  const handleShare = async () => {
+    if (!collection) return;
+
+    const path = `/collection/${collection._id}`;
+    const cleanPathname = window.location.pathname.replace(/index\.html$/, '');
+    const shareUrl = `${window.location.origin}${cleanPathname}#${path}`;
+
+    const shareTitle = collection.name;
+    const shareText = `Check out the "${collection.name}" collection on CineStream!`;
+
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: shareTitle,
+                text: shareText,
+                url: shareUrl,
+            });
+        } catch (error) {
+            if ((error as DOMException).name !== 'AbortError') {
+                 console.error('Error sharing:', error);
+                 addToast('Could not share collection.', 'error');
+            }
+        }
+    } else {
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            addToast('Collection link copied to clipboard!', 'info');
+        } catch (error) {
+            console.error('Failed to copy link:', error);
+            addToast('Could not copy link to clipboard.', 'error');
+        }
+    }
+  };
 
 
   if (loading) {
@@ -130,23 +164,33 @@ const CollectionDetailsPage: React.FC = () => {
                 </span>
             </div>
         </div>
-        {isOwner && (
-            <div className="flex-shrink-0 flex items-center gap-2">
-                <button 
-                    onClick={() => setIsEditModalOpen(true)}
-                    className="flex items-center gap-2 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-3 py-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-light-text dark:hover:text-white transition-colors">
-                    <EditIcon className="h-4 w-4" />
-                    <span>Edit</span>
-                </button>
+        <div className="flex-shrink-0 flex items-center gap-2">
+            {collection.isPublic && (
                  <button 
-                    onClick={() => setIsDeleteModalOpen(true)}
-                    className="flex items-center gap-2 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-3 py-1.5 rounded-full hover:bg-red-500/20 dark:hover:bg-red-500/20 hover:text-red-500 transition-colors"
-                >
-                    <TrashIcon className="h-4 w-4" />
-                    <span>Delete</span>
+                    onClick={handleShare}
+                    className="flex items-center gap-2 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-3 py-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-light-text dark:hover:text-white transition-colors">
+                    <ShareIcon className="h-4 w-4" />
+                    <span>Share</span>
                 </button>
-            </div>
-        )}
+            )}
+            {isOwner && (
+                <>
+                    <button 
+                        onClick={() => setIsEditModalOpen(true)}
+                        className="flex items-center gap-2 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-3 py-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-light-text dark:hover:text-white transition-colors">
+                        <EditIcon className="h-4 w-4" />
+                        <span>Edit</span>
+                    </button>
+                     <button 
+                        onClick={() => setIsDeleteModalOpen(true)}
+                        className="flex items-center gap-2 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-3 py-1.5 rounded-full hover:bg-red-500/20 dark:hover:bg-red-500/20 hover:text-red-500 transition-colors"
+                    >
+                        <TrashIcon className="h-4 w-4" />
+                        <span>Delete</span>
+                    </button>
+                </>
+            )}
+        </div>
       </div>
 
       {collection.items.length > 0 ? (
