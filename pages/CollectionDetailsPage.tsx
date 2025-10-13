@@ -11,6 +11,7 @@ import Spinner from '../components/Spinner';
 import { LayersIcon, EditIcon, TrashIcon } from '../components/Icons';
 import MovieCardSkeleton from '../components/MovieCardSkeleton';
 import ConfirmationModal from '../components/ConfirmationModal';
+import EditCollectionModal from '../components/EditCollectionModal';
 
 const CollectionDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +25,7 @@ const CollectionDetailsPage: React.FC = () => {
   const isOwner = currentUser && collection && currentUser._id === collection.userId;
   
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   usePageMetadata({
     title: collection?.name || 'Collection',
@@ -102,6 +104,15 @@ const CollectionDetailsPage: React.FC = () => {
 
   return (
     <div>
+        {isEditModalOpen && collection && (
+          <EditCollectionModal
+            collection={collection}
+            onClose={() => {
+              setIsEditModalOpen(false);
+              fetchCollectionData(); // Re-fetch on close to see updates
+            }}
+          />
+        )}
         <ConfirmationModal
             isOpen={isDeleteModalOpen}
             onClose={() => setIsDeleteModalOpen(false)}
@@ -121,7 +132,9 @@ const CollectionDetailsPage: React.FC = () => {
         </div>
         {isOwner && (
             <div className="flex-shrink-0 flex items-center gap-2">
-                <button className="flex items-center gap-2 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-3 py-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-light-text dark:hover:text-white transition-colors">
+                <button 
+                    onClick={() => setIsEditModalOpen(true)}
+                    className="flex items-center gap-2 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-3 py-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-light-text dark:hover:text-white transition-colors">
                     <EditIcon className="h-4 w-4" />
                     <span>Edit</span>
                 </button>
