@@ -108,19 +108,22 @@ const verifyTurnstile = async (req, res, next) => {
     const secretKey = process.env.TURNSTILE_SECRET_KEY || '1x0000000000000000000000000000000AA';
     
     try {
-        const params = new URLSearchParams();
-        params.append('secret', secretKey);
-        params.append('response', token);
+        // Construct the form data in an object.
+        // The `remoteip` property will be undefined if `ip` is falsy.
+        const formData = {
+            secret: secretKey,
+            response: token,
+            remoteip: ip
+        };
 
-        // The remoteip parameter is optional. Conditionally append it to avoid sending
-        // "remoteip=undefined", which would cause the request to be malformed.
-        if (ip) {
-            params.append('remoteip', ip);
-        }
+        // When URLSearchParams is constructed from an object, it automatically
+        // omits keys with `undefined` or `null` values, providing a clean and robust way
+        // to handle the optional `remoteip` parameter.
+        const body = new URLSearchParams(formData);
 
-        const response = await fetch('https://challenges.cloudflare.com/api/v0/siteverify', {
+        const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
             method: 'POST',
-            body: params,
+            body: body, // node-fetch will correctly set Content-Type header
         });
 
         const data = await response.json();
