@@ -18,7 +18,7 @@ interface TurnstileProps {
 const Turnstile: React.FC<TurnstileProps> = ({ 
     onSuccess, 
     onExpire, 
-    siteKey = '1x00000000000000000000AA', // Cloudflare's "always passes" test key for development
+    siteKey = '0x4AAAAAAB6QOuyxQZcdRNSZ', // Cloudflare's "always passes" test key for development
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const { theme } = useContext(ThemeContext);
