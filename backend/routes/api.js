@@ -108,18 +108,18 @@ const verifyTurnstile = async (req, res, next) => {
     const secretKey = process.env.TURNSTILE_SECRET_KEY || '1x0000000000000000000000000000000AA';
     
     try {
-        // FIX: Replaced manual string concatenation with URLSearchParams for a more robust
-        // `application/x-www-form-urlencoded` request. This prevents potential formatting
-        // errors that could lead to Cloudflare returning an empty or non-JSON response,
-        // which caused the 'Unexpected end of JSON input' error.
-        const formData = new URLSearchParams();
-        formData.append('secret', secretKey);
-        formData.append('response', token);
-        formData.append('remoteip', ip);
+        // Construct the form data using the URLSearchParams constructor.
+        // This is a more robust method that gracefully handles cases where `ip` might be undefined,
+        // preventing a malformed request that could cause Cloudflare to return a non-JSON response.
+        const body = new URLSearchParams({
+            secret: secretKey,
+            response: token,
+            remoteip: ip,
+        });
 
         const response = await fetch('https://challenges.cloudflare.com/api/v0/siteverify', {
             method: 'POST',
-            body: formData,
+            body: body,
         });
 
         const data = await response.json();
