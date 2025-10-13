@@ -10,9 +10,9 @@ import {
   deleteSupportTicket,
   updateStoredMovie,
   addStoredMovie,
-  searchTMDB,
   apiTestEmail,
   getDbStats,
+  getDetails,
 } from '../services/api';
 import {
   Metrics,
@@ -20,10 +20,10 @@ import {
   AdminUserView,
   SupportTicket,
   DownloadLink,
-  MovieSummary,
-  TVSummary,
   ContentType,
   DbStats,
+  MovieDetail,
+  TVDetail,
 } from '../types';
 import Spinner from '../components/Spinner';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -42,8 +42,6 @@ import {
   SpinnerIcon,
   DatabaseIcon,
 } from '../components/Icons';
-import { useDebounce } from '../hooks/useDebounce';
-import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
 import { Avatar } from '../components/Avatars';
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -741,30 +739,34 @@ interface MovieAddModalProps {
 }
 const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
   const [step, setStep] = useState(1);
-  const [query, setQuery] = useState('');
-  const debouncedQuery = useDebounce(query, 500);
-  const [searchResults, setSearchResults] = useState<(MovieSummary | TVSummary)[]>([]);
-  const [selectedItem, setSelectedItem] = useState<(MovieSummary | TVSummary) & { type: ContentType } | null>(null);
+  const [tmdbId, setTmdbId] = useState('');
+  const [type, setType] = useState<ContentType>('movie');
+  const [selectedItem, setSelectedItem] = useState<(MovieDetail | TVDetail) & { type: ContentType } | null>(null);
   const [links, setLinks] = useState<DownloadLink[]>([{ label: '', url: '' }]);
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
 
-  useEffect(() => {
-    if (debouncedQuery.trim().length > 2) {
-      setLoading(true);
-      searchTMDB(debouncedQuery)
-        .then(res => setSearchResults(res.results))
-        .catch(() => addToast('Search failed', 'error'))
-        .finally(() => setLoading(false));
-    } else {
-      setSearchResults([]);
+  const handleFetchDetails = async () => {
+    if (!tmdbId.trim()) {
+        addToast('Please enter a TMDB ID.', 'error');
+        return;
     }
-  }, [debouncedQuery, addToast]);
-
-  const handleSelect = (item: MovieSummary | TVSummary) => {
-    const type = (item as any).media_type || ('title' in item ? 'movie' : 'tv');
-    setSelectedItem({ ...item, type });
-    setStep(2);
+    setLoading(true);
+    try {
+        const id = parseInt(tmdbId, 10);
+        if (isNaN(id)) {
+            addToast('Invalid TMDB ID.', 'error');
+            setLoading(false);
+            return;
+        }
+        const details = await getDetails(type, id);
+        setSelectedItem({ ...details, type });
+        setStep(2);
+    } catch (error) {
+        addToast('Failed to fetch details. Check the ID and type.', 'error');
+    } finally {
+        setLoading(false);
+    }
   };
 
   const handleLinkChange = (index: number, field: 'label' | 'url', value: string) => {
@@ -813,23 +815,20 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
               <button type="button" onClick={onClose} className="text-muted hover:text-white"><XIcon className="h-5 w-5" /></button>
             </div>
             {step === 1 ? (
-              <div className="mt-4">
-                <div className="relative">
-                  <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search for a movie or TV show..." className={`${inputClass} pl-10`} />
-                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
+              <div className="mt-4 space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-end">
+                    <div className="flex-grow w-full">
+                        <label htmlFor="tmdbId" className="block text-sm font-medium text-muted mb-1">TMDB ID</label>
+                        <input type="number" id="tmdbId" value={tmdbId} onChange={e => setTmdbId(e.target.value)} placeholder="e.g., 550" className={inputClass} />
+                    </div>
+                    <div className="w-full sm:w-auto">
+                        <label htmlFor="contentType" className="block text-sm font-medium text-muted mb-1">Type</label>
+                        <select id="contentType" value={type} onChange={e => setType(e.target.value as ContentType)} className={inputClass}>
+                            <option value="movie">Movie</option>
+                            <option value="tv">TV Show</option>
+                        </select>
+                    </div>
                 </div>
-                {loading && <Spinner />}
-                <ul className="mt-2 max-h-80 overflow-y-auto">
-                  {searchResults.map(item => (
-                    <li key={item.id} onClick={() => handleSelect(item)} className="p-2 flex gap-4 items-center hover:bg-cyan/10 rounded cursor-pointer transition-colors">
-                      <img src={item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : ''} alt="" className="w-10 h-14 object-cover rounded bg-primary" />
-                      <div>
-                        <p className="text-white">{'title' in item ? item.title : item.name}</p>
-                        <p className="text-sm text-muted">{new Date('release_date' in item ? item.release_date : item.first_air_date).getFullYear() || 'N/A'}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
               </div>
             ) : (
               <div className="mt-4">
@@ -852,8 +851,13 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
             )}
           </div>
           <div className="bg-primary/50 px-6 py-4 flex justify-end gap-2 rounded-b-lg">
-            {step === 2 && <button type="button" onClick={() => setStep(1)} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Back</button>}
+            {step === 2 && <button type="button" onClick={() => { setStep(1); setSelectedItem(null); }} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Back</button>}
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Cancel</button>
+            {step === 1 && (
+                <button type="button" onClick={handleFetchDetails} disabled={loading} className="px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:bg-muted disabled:text-gray-800 disabled:cursor-not-allowed">
+                    {loading ? <SpinnerIcon className="animate-spin h-5 w-5"/> : 'Fetch Details'}
+                </button>
+            )}
             {step === 2 && (
               <button type="submit" disabled={loading} className="px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:bg-muted disabled:text-gray-800 disabled:cursor-not-allowed">
                 {loading ? 'Saving...' : 'Save Content'}
@@ -1157,7 +1161,7 @@ const AdminPage: React.FC = () => {
       <div className="glass-panel rounded-lg">
         <div className="flex border-b border-glass-border overflow-x-auto">
           <TabButton name="dashboard" activeTab={activeTab} setActiveTab={setActiveTab} label="Dashboard" />
-          <TabButton name="movies" activeTab={activeTab} setActiveTab={setActiveTab} label="Content Links" />
+          <TabButton name="movies" activeTab={activeTab} setActiveTab={setActiveTab} label="Stored Movies" />
           <TabButton name="users" activeTab={activeTab} setActiveTab={setActiveTab} label="Users" />
           <TabButton name="tickets" activeTab={activeTab} setActiveTab={setActiveTab} label="Support Tickets" />
           <TabButton name="database" activeTab={activeTab} setActiveTab={setActiveTab} label="Database" />
