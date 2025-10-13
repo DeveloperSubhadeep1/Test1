@@ -11,14 +11,14 @@ declare global {
 interface TurnstileProps {
   onSuccess: (token: string) => void;
   onExpire?: () => void;
-  // This is a test key. Replace with your actual key in a production environment.
+  // This is a public site key from Cloudflare Turnstile
   siteKey?: string; 
 }
 
 const Turnstile: React.FC<TurnstileProps> = ({ 
     onSuccess, 
     onExpire, 
-    siteKey = '1x00000000000000000000AA', // Cloudflare's "always passes" test key for development
+    siteKey = '0x4AAAAAAB6QOuyxQZcdRNSZ',
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null); // Use a ref to avoid re-renders on widgetId change

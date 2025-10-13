@@ -9,5 +9,5 @@ export const TMDB_API_BASE_URL = 'https://api.themoviedb.org/3';
 
 // --- Database API Configuration ---
 // TODO: Replace this placeholder with your live backend URL from Render (see DEPLOY_FULL_STACK.md)
-export const DB_BASE_URL = 'https://cinestream-backend-hh3z.onrender.com/api'; 
+export const DB_BASE_URL = 'https://precise-tobye-s2-creation-a17fcd33.koyeb.app/api'; 
 export const DB_API_KEY = ''; // No longer needed for this backend.
