@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
-import { getDetails, getStoredMovie, incrementDownloadCount, getCredits, findIdBySlug } from '../services/api';
-import { ContentType, MovieDetail, StoredMovie, TVDetail, CastMember, ContentItem, Genre } from '../types';
+import { getDetails, getStoredMovie, incrementDownloadCount, getCredits, findIdBySlug, getVideos } from '../services/api';
+import { ContentType, MovieDetail, StoredMovie, TVDetail, CastMember, ContentItem, Genre, Video } from '../types';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
 import { FavoritesContext } from '../context/FavoritesContext';
 import { WatchlistContext } from '../context/WatchlistContext';
@@ -24,6 +24,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   const { slug } = useParams<{ slug: string }>();
   const [details, setDetails] = useState<MovieDetail | TVDetail | null>(null);
   const [cast, setCast] = useState<CastMember[]>([]);
+  const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [storedMovie, setStoredMovie] = useState<StoredMovie | null>(null);
   const [loading, setLoading] = useState(true);
   const { addFavorite, removeFavorite, isFavorite } = useContext(FavoritesContext);
@@ -74,14 +75,22 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
           return;
         }
         
-        const [detailsData, storedData, creditsData] = await Promise.all([
+        const [detailsData, storedData, creditsData, videosData] = await Promise.all([
           getDetails(type, tmdbId),
           getStoredMovie(tmdbId, type),
-          getCredits(type, tmdbId)
+          getCredits(type, tmdbId),
+          getVideos(type, tmdbId),
         ]);
         setDetails(detailsData);
         setStoredMovie(storedData);
         setCast(creditsData.cast.slice(0, 18));
+
+        // Find the official YouTube trailer
+        const officialTrailer = videosData.results.find(
+          (vid: Video) => vid.site === 'YouTube' && vid.type === 'Trailer'
+        );
+        setTrailerKey(officialTrailer ? officialTrailer.key : null);
+
       } catch (error) {
         console.error('Failed to fetch details:', error);
         addToast('Failed to load details. Please try again.', 'error');
@@ -335,6 +344,22 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
           </div>
           <h2 className="text-xl font-semibold mt-6 mb-2">Overview</h2>
           <ExpandableText text={details.overview} />
+
+          {trailerKey && (
+            <div className="mt-8">
+              <h2 className="text-xl font-semibold mb-4">Trailer</h2>
+              <div className="aspect-[16/9] bg-black rounded-lg overflow-hidden shadow-lg">
+                <iframe
+                  src={`https://www.youtube.com/embed/${trailerKey}`}
+                  title="YouTube video player"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  className="w-full h-full"
+                ></iframe>
+              </div>
+            </div>
+          )}
 
           {cast.length > 0 && (
             <div className="mt-8">

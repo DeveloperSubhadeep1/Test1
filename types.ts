@@ -141,3 +141,15 @@ export interface Notification {
   type: ContentType;
   tmdb_id: number;
 }
+
+export interface Video {
+  id: string;
+  key: string;
+  name: string;
+  site: string;
+  type: string;
+}
+
+export interface VideosResponse {
+  results: Video[];
+}

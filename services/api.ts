@@ -22,6 +22,7 @@ import {
   FavoriteItem,
   WatchlistItem,
   DbStats,
+  VideosResponse,
 } from '../types';
 import { TMDB_API_KEY, TMDB_API_BASE_URL, DB_BASE_URL } from '../constants';
 
@@ -100,6 +101,7 @@ export const getDiscover = async (
 
 export const getDetails = async (type: ContentType, id: number): Promise<MovieDetail | TVDetail> => tmdbFetch(`/${type}/${id}`);
 export const getCredits = async (type: ContentType, id: number): Promise<CreditsResponse> => tmdbFetch(`/${type}/${id}/credits`);
+export const getVideos = async (type: ContentType, id: number): Promise<VideosResponse> => tmdbFetch(`/${type}/${id}/videos`, { language: 'en-US' });
 export const getPersonDetails = async (id: number): Promise<PersonDetails> => tmdbFetch(`/person/${id}`);
 export const getPersonCredits = async (id: number): Promise<{ cast: PersonCredit[] }> => {
     const data = await tmdbFetch(`/person/${id}/combined_credits`);
