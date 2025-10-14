@@ -6,6 +6,7 @@ import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import MovieCard from '../components/MovieCard';
 import MovieCardSkeleton from '../components/MovieCardSkeleton';
+import { InfoIcon } from '../components/Icons';
 
 const SearchResultsPage: React.FC = () => {
   const { query } = useParams<{ query: string }>();
@@ -67,7 +68,11 @@ const SearchResultsPage: React.FC = () => {
           })}
         </div>
       ) : (
-        <p className="text-center text-light-muted dark:text-muted text-lg mt-10">No results found for your search.</p>
+        <div className="text-center text-light-muted dark:text-muted text-lg mt-10 py-10 flex flex-col items-center">
+            <InfoIcon className="h-16 w-16 mb-4" />
+            <p className="font-bold text-xl text-light-text dark:text-white">No Results Found</p>
+            <p>We couldn't find any movies or TV shows matching "{query}".</p>
+        </div>
       )}
     </div>
   );

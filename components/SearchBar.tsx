@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useDebounce } from '../hooks/useDebounce';
-import { SearchIcon, ClockIcon, XIcon, InfoIcon, FilmIcon } from './Icons';
+import { SearchIcon, InfoIcon, FilmIcon } from './Icons';
 import { searchTMDB } from '../services/api';
 import { MovieSummary, TVSummary } from '../types';
 import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
 import { generateSlug } from '../utils';
-
-const RECENT_SEARCHES_KEY = 'cineStreamRecentSearches';
-const MAX_RECENT_SEARCHES = 5;
 
 const SearchBar: React.FC = () => {
   const navigate = useNavigate();
@@ -34,41 +31,7 @@ const SearchBar: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const searchContainerRef = useRef<HTMLDivElement>(null);
-  
-  useEffect(() => {
-    try {
-        const stored = localStorage.getItem(RECENT_SEARCHES_KEY);
-        if (stored) {
-            setRecentSearches(JSON.parse(stored));
-        }
-    } catch (e) {
-        console.error("Failed to parse recent searches from localStorage", e);
-    }
-  }, []);
-
-  const updateRecentSearches = useCallback((searches: string[]) => {
-      setRecentSearches(searches);
-      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(searches));
-  }, []);
-
-  const addRecentSearch = useCallback((term: string) => {
-    if (!term) return;
-    setRecentSearches(prevSearches => {
-        const newSearches = [
-            term,
-            ...prevSearches.filter(s => s.toLowerCase() !== term.toLowerCase())
-        ].slice(0, MAX_RECENT_SEARCHES);
-        
-        if (JSON.stringify(newSearches) === JSON.stringify(prevSearches)) {
-            return prevSearches;
-        }
-
-        localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(newSearches));
-        return newSearches;
-    });
-  }, []);
   
   useEffect(() => {
     const queryFromPath = getQueryFromPath();
@@ -80,19 +43,12 @@ const SearchBar: React.FC = () => {
   }, [getQueryFromPath]);
   
   useEffect(() => {
-    const queryFromPath = getQueryFromPath();
-    if (location.pathname.startsWith('/search/') && queryFromPath) {
-        addRecentSearch(queryFromPath);
-    }
-  }, [location.pathname, getQueryFromPath, addRecentSearch]);
-
-  useEffect(() => {
     const fetchSuggestions = async () => {
       if (debouncedQuery.trim().length > 1) {
         setIsLoading(true);
         try {
           const res = await searchTMDB(debouncedQuery);
-          setSuggestions(res.results.slice(0, 7));
+          setSuggestions(res.results.slice(0, 5));
           setShowSuggestions(true);
           setActiveIndex(-1);
         } catch (error) {
@@ -104,18 +60,14 @@ const SearchBar: React.FC = () => {
       } else {
         setIsLoading(false);
         setSuggestions([]);
-        if (query.trim().length === 0) {
-            setShowSuggestions(true);
-        } else {
-            setShowSuggestions(false);
-        }
+        setShowSuggestions(false);
       }
     };
 
     if (isUserTyping.current) {
       fetchSuggestions();
     }
-  }, [debouncedQuery, query]);
+  }, [debouncedQuery]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -148,10 +100,9 @@ const SearchBar: React.FC = () => {
     }
   };
 
-  const showDropdown = showSuggestions && (query.trim().length > 0 || recentSearches.length > 0);
-  const showRecentSearches = showSuggestions && query.trim().length === 0 && recentSearches.length > 0;
-  const showLiveSuggestions = showSuggestions && query.trim().length > 0 && suggestions.length > 0;
-  const showNoResults = showSuggestions && query.trim().length > 0 && !isLoading && suggestions.length === 0;
+  const showDropdown = showSuggestions && query.trim().length > 1;
+  const showLiveSuggestions = !isLoading && suggestions.length > 0;
+  const showNoResults = showSuggestions && query.trim().length > 1 && !isLoading && suggestions.length === 0;
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Escape') {
@@ -159,82 +110,43 @@ const SearchBar: React.FC = () => {
       return;
     }
 
-    const isShowingLive = showLiveSuggestions;
-    const isShowingRecent = showRecentSearches;
-    
-    if (isShowingLive) {
-        const listLength = suggestions.length + 1; // N suggestions + "View All" link
-        switch (e.key) {
-            case 'ArrowDown':
-                e.preventDefault();
-                setActiveIndex(prevIndex => (prevIndex + 1) % listLength);
-                break;
-            case 'ArrowUp':
-                e.preventDefault();
-                setActiveIndex(prevIndex => (prevIndex - 1 + listLength) % listLength);
-                break;
-            case 'Enter':
-                if (activeIndex >= 0) {
-                    e.preventDefault();
-                    setShowSuggestions(false);
-                    if (activeIndex < suggestions.length) {
-                        const item = suggestions[activeIndex];
-                        const type = 'title' in item ? 'movie' : 'tv';
-                        const title = 'title' in item ? item.title : item.name;
-                        const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
-                        const year = releaseDate ? new Date(releaseDate).getFullYear() : undefined;
-                        const slug = generateSlug(title, year);
-                        navigate(`/${type}/${item.id}-${slug}`);
-                    } else {
-                        navigate(`/search/${encodeURIComponent(query.trim())}`);
-                    }
-                }
-                break;
-            default:
-                break;
-        }
-    } else if (isShowingRecent) {
-      const listLength = recentSearches.length;
-      if (listLength === 0) return;
-      switch (e.key) {
+    if (!showLiveSuggestions) return;
+
+    const listLength = suggestions.length + 1; // N suggestions + "View All" link
+    switch (e.key) {
         case 'ArrowDown':
-          e.preventDefault();
-          setActiveIndex(prevIndex => (prevIndex + 1) % listLength);
-          break;
-        case 'ArrowUp':
-          e.preventDefault();
-          setActiveIndex(prevIndex => (prevIndex - 1 + listLength) % listLength);
-          break;
-        case 'Enter':
-          if (activeIndex >= 0) {
             e.preventDefault();
-            setShowSuggestions(false);
-            const term = recentSearches[activeIndex];
-            setQuery(term);
-            navigate(`/search/${encodeURIComponent(term)}`);
-          }
-          break;
+            setActiveIndex(prevIndex => (prevIndex + 1) % listLength);
+            break;
+        case 'ArrowUp':
+            e.preventDefault();
+            setActiveIndex(prevIndex => (prevIndex - 1 + listLength) % listLength);
+            break;
+        case 'Enter':
+            if (activeIndex >= 0) {
+                e.preventDefault();
+                setShowSuggestions(false);
+                if (activeIndex < suggestions.length) {
+                    const item = suggestions[activeIndex];
+                    const type = 'title' in item ? 'movie' : 'tv';
+                    const title = 'title' in item ? item.title : item.name;
+                    const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
+                    const year = releaseDate ? new Date(releaseDate).getFullYear() : undefined;
+                    const slug = generateSlug(title, year);
+                    navigate(`/${type}/${item.id}-${slug}`);
+                } else {
+                    navigate(`/search/${encodeURIComponent(query.trim())}`);
+                }
+            }
+            break;
         default:
-          break;
-      }
+            break;
     }
   };
 
   const clearSuggestions = () => {
     setShowSuggestions(false);
     setActiveIndex(-1);
-  };
-
-  const handleRemoveRecent = (e: React.MouseEvent, term: string) => {
-      e.stopPropagation();
-      e.preventDefault();
-      updateRecentSearches(recentSearches.filter(s => s !== term));
-  };
-
-  const handleClearAllRecent = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      updateRecentSearches([]);
-      setShowSuggestions(false);
   };
 
   const activeClass = 'bg-light-accent/20 dark:bg-accent/20';
@@ -247,7 +159,9 @@ const SearchBar: React.FC = () => {
           value={query}
           onChange={handleQueryChange}
           onKeyDown={handleKeyDown}
-          onFocus={() => setShowSuggestions(true)}
+          onFocus={() => {
+            if (query.trim().length > 1) setShowSuggestions(true);
+          }}
           placeholder="Search movies, TV shows..."
           className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-full py-2 lg:py-2.5 pl-10 lg:pl-12 pr-4 lg:pr-6 text-sm lg:text-base focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent transition-all"
           autoComplete="off"
@@ -258,40 +172,6 @@ const SearchBar: React.FC = () => {
       </form>
       {showDropdown && (
         <div className="absolute z-20 w-full mt-2 bg-light-primary dark:bg-secondary border border-light-border dark:border-gray-700 rounded-lg shadow-lg flex flex-col max-h-[80vh]">
-          {showRecentSearches && (
-            <div className="overflow-y-auto">
-              <div className="px-4 pt-3 pb-2 flex justify-between items-center">
-                <h4 className="text-sm font-semibold text-light-muted dark:text-muted">Recent Searches</h4>
-                <button onClick={handleClearAllRecent} className="text-xs text-light-accent dark:text-accent hover:underline">Clear All</button>
-              </div>
-              <ul>
-                {recentSearches.map((term, index) => (
-                  <li 
-                    key={term}
-                    className={`group flex items-center justify-between transition-colors ${index === activeIndex ? activeClass : 'hover:bg-light-secondary dark:hover:bg-primary'}`}
-                    onMouseEnter={() => setActiveIndex(index)}
-                  >
-                    <Link
-                      to={`/search/${encodeURIComponent(term)}`}
-                      onClick={clearSuggestions}
-                      className="flex-grow flex items-center space-x-4 p-3 min-w-0"
-                    >
-                      <ClockIcon className="h-4 w-4 text-light-muted dark:text-muted flex-shrink-0" />
-                      <span className="text-light-text dark:text-white truncate">{term}</span>
-                    </Link>
-                    <button
-                      onClick={(e) => handleRemoveRecent(e, term)}
-                      className="p-3 text-light-muted dark:text-muted hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                      title={`Remove "${term}"`}
-                    >
-                      <XIcon className="h-4 w-4" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
           {isLoading && <div className="p-4 text-center text-light-muted dark:text-muted">Loading...</div>}
           
           {showNoResults && (
