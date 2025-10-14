@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
-import { getDetails, getStoredMovie, incrementDownloadCount, getCredits, findIdBySlug, getVideos } from '../services/api';
-import { ContentType, MovieDetail, StoredMovie, TVDetail, CastMember, ContentItem, Genre, Video } from '../types';
+import { getDetails, getStoredMovie, incrementDownloadCount, getCredits, findIdBySlug, getVideos, addSupportTicket } from '../services/api';
+import { ContentType, MovieDetail, StoredMovie, TVDetail, CastMember, ContentItem, Genre, Video, SupportTicket } from '../types';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
 import { FavoritesContext } from '../context/FavoritesContext';
 import { WatchlistContext } from '../context/WatchlistContext';
@@ -15,6 +15,7 @@ import CastCard from '../components/CastCard';
 import { StarIcon, CalendarIcon, ClockIcon, DownloadIcon, HeartIcon, BookmarkIcon, ShareIcon, SpinnerIcon, PlusCircleIcon } from '../components/Icons';
 import ExpandableText from '../components/ExpandableText';
 import AddToCollectionModal from '../components/AddToCollectionModal';
+import Turnstile from '../components/Turnstile';
 
 interface DetailsPageProps {
   type: ContentType;
@@ -41,6 +42,12 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   const [showLinks, setShowLinks] = useState(false);
   const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false);
   
+  // States for link suggestion
+  const [suggestionLabel, setSuggestionLabel] = useState('');
+  const [suggestionUrl, setSuggestionUrl] = useState('');
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
+
   const title = details ? ('title' in details ? details.title : details.name) : '';
   const posterPath = details?.poster_path ? `${TMDB_IMAGE_BASE_URL}${details.poster_path}` : undefined;
 
@@ -254,6 +261,44 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
     }
   };
 
+  const handleSuggestLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!suggestionUrl.trim() || !suggestionLabel.trim()) {
+        addToast('Please provide both a label and a URL.', 'error');
+        return;
+    }
+    if (!turnstileToken) {
+        addToast('Please complete the CAPTCHA.', 'error');
+        return;
+    }
+    
+    setIsSuggesting(true);
+    try {
+        const message = `Label: ${suggestionLabel}\nURL: ${suggestionUrl}`;
+        await addSupportTicket({
+            subject: 'Link Suggestion',
+            contentTitle: title,
+            message: message,
+        }, turnstileToken);
+        addToast('Suggestion submitted for review. Thank you!', 'success');
+        setSuggestionLabel('');
+        setSuggestionUrl('');
+        if (window.turnstile) {
+            window.turnstile.reset();
+        }
+        setTurnstileToken('');
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+        addToast(`Failed to submit suggestion: ${errorMessage}`, 'error');
+        if (window.turnstile) {
+            window.turnstile.reset();
+        }
+        setTurnstileToken('');
+    } finally {
+        setIsSuggesting(false);
+    }
+  };
+
   if (loading) return <Spinner />;
   if (!details) return <p>Content not found.</p>;
   
@@ -435,6 +480,75 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
             ) : (
               <p className="text-light-muted dark:text-muted">No download links available yet. Please check back later.</p>
             )}
+          </div>
+          
+          <div className="mt-8 bg-light-secondary dark:bg-secondary p-6 rounded-lg">
+              <h2 className="text-2xl font-bold mb-4">Help the Community: Suggest a Link</h2>
+              {isAuthenticated ? (
+                  <form onSubmit={handleSuggestLink} className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <div className="sm:col-span-1">
+                              <label htmlFor="suggestionLabel" className="block text-sm font-medium text-light-muted dark:text-muted mb-1">Label</label>
+                              <input
+                                  id="suggestionLabel"
+                                  type="text"
+                                  value={suggestionLabel}
+                                  onChange={(e) => setSuggestionLabel(e.target.value)}
+                                  placeholder="e.g., 1080p WEB-DL"
+                                  className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent"
+                                  required
+                                  disabled={isSuggesting}
+                              />
+                          </div>
+                          <div className="sm:col-span-2">
+                              <label htmlFor="suggestionUrl" className="block text-sm font-medium text-light-muted dark:text-muted mb-1">URL</label>
+                              <input
+                                  id="suggestionUrl"
+                                  type="url"
+                                  value={suggestionUrl}
+                                  onChange={(e) => setSuggestionUrl(e.target.value)}
+                                  placeholder="https://example.com/download"
+                                  className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent"
+                                  required
+                                  disabled={isSuggesting}
+                              />
+                          </div>
+                      </div>
+                      <div className="flex justify-center pt-2">
+                          <Turnstile onSuccess={setTurnstileToken} />
+                      </div>
+                      <div>
+                          <button
+                              type="submit"
+                              disabled={isSuggesting || !turnstileToken}
+                              className="w-full flex items-center justify-center gap-2 bg-light-accent/80 dark:bg-accent/80 text-white font-bold py-3 px-4 rounded-lg hover:bg-light-accent dark:hover:bg-accent transition-colors duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed"
+                          >
+                              {isSuggesting ? (
+                                  <>
+                                      <SpinnerIcon className="animate-spin h-6 w-6" />
+                                      <span>Submitting...</span>
+                                  </>
+                              ) : (
+                                  <span>Submit Suggestion</span>
+                              )}
+                          </button>
+                      </div>
+                  </form>
+              ) : (
+                  <div className="text-center p-4 bg-light-primary dark:bg-primary/40 rounded-md border border-light-border dark:border-glass-border">
+                      <h3 className="font-bold text-lg text-light-text dark:text-white mb-2">Want to contribute?</h3>
+                      <p className="text-light-muted dark:text-muted mb-4">
+                          Please log in or create an account to suggest new download links for the community.
+                      </p>
+                      <Link
+                          to="/login"
+                          state={{ from: location }}
+                          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-light-accent dark:bg-accent text-white font-bold py-2 px-4 rounded-lg hover:opacity-90 transition-opacity"
+                      >
+                          Log In to Suggest
+                      </Link>
+                  </div>
+              )}
           </div>
         </div>
       </div>
