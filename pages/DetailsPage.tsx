@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { getDetails, getStoredMovie, incrementDownloadCount, getCredits, findIdBySlug, getVideos, addSupportTicket } from '../services/api';
-import { ContentType, MovieDetail, StoredMovie, TVDetail, CastMember, ContentItem, Genre, Video, SupportTicket } from '../types';
+import { ContentType, MovieDetail, StoredMovie, TVDetail, CastMember, ContentItem, Genre, Video, SupportTicket, DownloadLink } from '../types';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
 import { FavoritesContext } from '../context/FavoritesContext';
 import { WatchlistContext } from '../context/WatchlistContext';
@@ -31,7 +31,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   const { addFavorite, removeFavorite, isFavorite } = useContext(FavoritesContext);
   const { addToWatchlist, removeFromWatchlist, isOnWatchlist } = useContext(WatchlistContext);
   const { addToHistory } = useContext(HistoryContext);
-  const { isAuthenticated } = useContext(AuthContext);
+  const { isAuthenticated, isAdmin } = useContext(AuthContext);
   const { addToast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
@@ -170,7 +170,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
     setCountdown(10);
   };
 
-  const handleDownloadClick = async (url: string) => {
+  const handleDownloadClick = async (link: DownloadLink) => {
     if (storedMovie && details) {
       // Add to viewing history
       // FIX: Cast to ContentItem to resolve discriminated union issue.
@@ -181,7 +181,12 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
         console.error("Failed to increment download count", error);
         addToast('Could not track download click.', 'info');
       }
-      window.open(url, '_blank');
+
+      if (link.suggestedBy && !isAdmin) {
+        addToast(`Shout out to ${link.suggestedBy} for this link!`, 'info');
+      }
+
+      window.open(link.url, '_blank');
     }
   };
 
@@ -450,7 +455,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
                         {storedMovie.download_links.map((link, index) => (
                           <button
                             key={index}
-                            onClick={() => handleDownloadClick(link.url)}
+                            onClick={() => handleDownloadClick(link)}
                             className="w-full flex items-center justify-between bg-light-accent dark:bg-accent text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-opacity"
                           >
                             <span>{link.label}</span>

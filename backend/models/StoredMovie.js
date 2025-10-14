@@ -3,6 +3,10 @@ const mongoose = require('mongoose');
 const DownloadLinkSchema = new mongoose.Schema({
   label: String,
   url: String,
+  suggestedBy: {
+    type: String,
+    required: false
+  },
 });
 
 const StoredMovieSchema = new mongoose.Schema({

@@ -530,6 +530,7 @@ const SupportTicketsTab: React.FC = () => {
               <div className="flex justify-between items-start">
                 <div>
                   <h4 className="font-bold text-white">{ticket.subject}</h4>
+                  {ticket.username && <p className="text-sm text-cyan">From: <span className="font-semibold">{ticket.username}</span></p>}
                   {ticket.contentTitle && <p className="text-sm text-muted">Content: {ticket.contentTitle}</p>}
                   <p className="text-xs text-muted mt-1">{new Date(ticket.timestamp).toLocaleString()}</p>
                 </div>
@@ -670,9 +671,9 @@ const MovieEditModal: React.FC<MovieEditModalProps> = ({ movie, onClose, onSave 
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
 
-  const handleLinkChange = (index: number, field: 'label' | 'url', value: string) => {
+  const handleLinkChange = (index: number, field: keyof DownloadLink, value: string) => {
     const newLinks = [...links];
-    newLinks[index][field] = value;
+    (newLinks[index] as any)[field] = value;
     setLinks(newLinks);
   };
 
@@ -707,10 +708,11 @@ const MovieEditModal: React.FC<MovieEditModalProps> = ({ movie, onClose, onSave 
             <h3 className="text-lg font-bold text-white">Edit Links for: <span className="text-cyan">{movie.title}</span></h3>
             <div className="space-y-4 mt-4 max-h-96 overflow-y-auto pr-2">
               {links.map((link, index) => (
-                <div key={index} className="flex gap-2 items-center">
-                  <input type="text" placeholder="Label (e.g., 1080p)" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className={`${inputClass} w-1/3`} />
-                  <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className={`${inputClass} w-2/3`} />
-                  <button type="button" onClick={() => removeLink(index)} className="p-2 text-danger hover:bg-danger/10 rounded-full transition-colors">
+                <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                  <input type="text" placeholder="Label" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className={`${inputClass} col-span-3`} />
+                  <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className={`${inputClass} col-span-5`} />
+                  <input type="text" placeholder="Suggested By" value={link.suggestedBy || ''} onChange={e => handleLinkChange(index, 'suggestedBy', e.target.value)} className={`${inputClass} col-span-3`} />
+                  <button type="button" onClick={() => removeLink(index)} className="p-2 text-danger hover:bg-danger/10 rounded-full transition-colors col-span-1">
                     <XIcon className="h-5 w-5" />
                   </button>
                 </div>
@@ -769,9 +771,9 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
     }
   };
 
-  const handleLinkChange = (index: number, field: 'label' | 'url', value: string) => {
+  const handleLinkChange = (index: number, field: keyof DownloadLink, value: string) => {
     const newLinks = [...links];
-    newLinks[index][field] = value;
+    (newLinks[index] as any)[field] = value;
     setLinks(newLinks);
   };
 
@@ -834,10 +836,11 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
               <div className="mt-4">
                  <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
                   {links.map((link, index) => (
-                    <div key={index} className="flex gap-2 items-center">
-                      <input type="text" placeholder="Label (e.g., 1080p)" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className={`${inputClass} w-1/3`} />
-                      <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className={`${inputClass} w-2/3`} />
-                      <button type="button" onClick={() => removeLink(index)} className="p-2 text-danger hover:bg-danger/10 rounded-full transition-colors">
+                    <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                      <input type="text" placeholder="Label" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className={`${inputClass} col-span-3`} />
+                      <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className={`${inputClass} col-span-5`} />
+                      <input type="text" placeholder="Suggested By" value={link.suggestedBy || ''} onChange={e => handleLinkChange(index, 'suggestedBy', e.target.value)} className={`${inputClass} col-span-3`} />
+                      <button type="button" onClick={() => removeLink(index)} className="p-2 text-danger hover:bg-danger/10 rounded-full transition-colors col-span-1">
                         <XIcon className="h-5 w-5" />
                       </button>
                     </div>

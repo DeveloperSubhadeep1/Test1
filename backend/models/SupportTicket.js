@@ -1,6 +1,13 @@
 const mongoose = require('mongoose');
 
 const SupportTicketSchema = new mongoose.Schema({
+  userId: {
+    type: String,
+    index: true
+  },
+  username: {
+    type: String
+  },
   subject: {
     type: String,
     required: true,

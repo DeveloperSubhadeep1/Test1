@@ -66,6 +66,7 @@ export interface Collection {
 export interface DownloadLink {
   label: string;
   url: string;
+  suggestedBy?: string;
 }
 
 export interface StoredMovie {
@@ -79,6 +80,8 @@ export interface StoredMovie {
 
 export interface SupportTicket {
   _id: string;
+  userId?: string;
+  username?: string;
   subject: string;
   contentTitle?: string;
   message: string;

@@ -617,11 +617,47 @@ router.patch('/stored-movies/:id/increment', async (req, res) => {
 
 // --- Support Tickets ---
 router.get('/support-tickets', getUserId, requireAdmin, async (req, res) => res.json(await SupportTicket.find({}).sort({ timestamp: -1 })));
+
 router.post('/support-tickets', verifyTurnstile, async (req, res) => {
-    const newTicket = new SupportTicket({ ...req.body, timestamp: new Date() });
+    const userId = req.headers['x-user-id'];
+    let user = null;
+    let username = 'Anonymous';
+
+    if (userId) {
+        try {
+            if (userId === 'admin_user') {
+                username = 'admin';
+            } else {
+                user = await User.findById(userId);
+                if (user) {
+                    username = user.username;
+                } else {
+                    return res.status(404).json({ message: 'User not found. Your session may be invalid.' });
+                }
+            }
+        } catch (error) {
+            if (error.name === 'CastError') {
+                return res.status(400).json({ message: 'Invalid User ID format in session.' });
+            }
+            console.error("Error finding user for support ticket:", error);
+        }
+    }
+    
+    const ticketData = {
+        ...req.body,
+        timestamp: new Date()
+    };
+
+    if (userId) {
+        ticketData.userId = userId;
+        ticketData.username = username;
+    }
+
+    const newTicket = new SupportTicket(ticketData);
     await newTicket.save();
     res.status(201).json(newTicket);
 });
+
 router.delete('/support-tickets/:id', getUserId, requireAdmin, async (req, res) => {
     await SupportTicket.findByIdAndDelete(req.params.id);
     res.status(204).send();
