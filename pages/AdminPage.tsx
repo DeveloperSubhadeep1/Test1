@@ -16,6 +16,8 @@ import {
   getDbStats,
   getDetails,
   searchContentByType,
+  getStoredMovie,
+  searchTMDB,
 } from '../services/api';
 import {
   Metrics,
@@ -47,6 +49,7 @@ import {
   SpinnerIcon,
   DatabaseIcon,
   FilmIcon,
+  CheckCircleIcon,
 } from '../components/Icons';
 import { Avatar } from '../components/Avatars';
 
@@ -495,6 +498,7 @@ const SupportTicketsTab: React.FC = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [ticketToDelete, setTicketToDelete] = useState<SupportTicket | null>(null);
+  const [approvingTicketId, setApprovingTicketId] = useState<string | null>(null);
   const { addToast } = useToast();
 
   const fetchTickets = useCallback(async () => {
@@ -524,6 +528,64 @@ const SupportTicketsTab: React.FC = () => {
     }
     setTicketToDelete(null);
   };
+  
+  const handleApprove = async (ticket: SupportTicket) => {
+    setApprovingTicketId(ticket._id);
+    try {
+        if (!ticket.contentTitle) {
+            throw new Error("Ticket is missing a content title.");
+        }
+
+        const labelMatch = ticket.message.match(/Label: (.*)/);
+        const urlMatch = ticket.message.match(/URL: (.*)/);
+
+        if (!labelMatch || !urlMatch || !labelMatch[1] || !urlMatch[1]) {
+            throw new Error("Could not parse link details from message.");
+        }
+
+        const label = labelMatch[1].trim();
+        const url = urlMatch[1].trim();
+
+        const searchResults = await searchTMDB(ticket.contentTitle);
+        const tmdbItem = searchResults.results[0];
+
+        if (!tmdbItem) {
+            throw new Error(`Content "${ticket.contentTitle}" not found on TMDB.`);
+        }
+
+        const { id: tmdbId, media_type: type } = tmdbItem as any;
+        if (type !== 'movie' && type !== 'tv') {
+            throw new Error("Found content is not a movie or TV show.");
+        }
+        const title = 'title' in tmdbItem ? tmdbItem.title : tmdbItem.name;
+
+        const storedMovie = await getStoredMovie(tmdbId, type);
+        
+        const newLink: DownloadLink = { label, url, suggestedBy: ticket.username };
+
+        if (storedMovie) {
+            const updatedLinks = [...storedMovie.download_links, newLink];
+            await updateStoredMovie(storedMovie._id, { download_links: updatedLinks });
+            addToast(`Added new link to "${title}".`, 'success');
+        } else {
+            await addStoredMovie({
+                tmdb_id: tmdbId,
+                type,
+                title,
+                download_links: [newLink],
+                download_count: 0,
+            });
+            addToast(`Added new content "${title}" with link.`, 'success');
+        }
+        await deleteSupportTicket(ticket._id);
+        fetchTickets();
+    } catch (error) {
+        addToast(error instanceof Error ? error.message : 'Failed to approve link.', 'error');
+    } finally {
+        setApprovingTicketId(null);
+    }
+  };
+
 
   if (loading) return <Spinner />;
 
@@ -540,9 +602,26 @@ const SupportTicketsTab: React.FC = () => {
                   {ticket.contentTitle && <p className="text-sm text-muted">Content: {ticket.contentTitle}</p>}
                   <p className="text-xs text-muted mt-1">{new Date(ticket.timestamp).toLocaleString()}</p>
                 </div>
-                <button onClick={() => setTicketToDelete(ticket)} className="p-2 text-muted hover:text-danger transition-colors" title="Delete Ticket">
-                  <TrashIcon className="h-5 w-5" />
-                </button>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {ticket.subject === 'Link Suggestion' && ticket.contentTitle && (
+                    <button 
+                      onClick={() => handleApprove(ticket)} 
+                      disabled={approvingTicketId === ticket._id}
+                      className="p-2 rounded-full bg-primary/50 text-cyan hover:bg-cyan/20 disabled:text-cyan/50 disabled:cursor-wait transition-colors" title="Approve & Add Link"
+                    >
+                      {approvingTicketId === ticket._id 
+                        ? <SpinnerIcon className="animate-spin h-5 w-5" /> 
+                        : <CheckCircleIcon className="h-5 w-5" />}
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => setTicketToDelete(ticket)} 
+                    className="p-2 rounded-full bg-primary/50 text-danger hover:bg-danger/20 transition-colors" 
+                    title="Delete Ticket"
+                  >
+                    <TrashIcon className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
               <p className="mt-2 text-sm whitespace-pre-wrap text-gray-300">{ticket.message}</p>
             </div>
