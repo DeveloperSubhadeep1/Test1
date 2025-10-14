@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo, useRef } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { usePageMetadata } from '../hooks/usePageMetadata';
+import { useDebounce } from '../hooks/useDebounce';
+import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
 import {
   getMetrics,
   getStoredMovies,
@@ -13,6 +15,7 @@ import {
   apiTestEmail,
   getDbStats,
   getDetails,
+  searchContentByType,
 } from '../services/api';
 import {
   Metrics,
@@ -24,6 +27,8 @@ import {
   DbStats,
   MovieDetail,
   TVDetail,
+  MovieSummary,
+  TVSummary,
 } from '../types';
 import Spinner from '../components/Spinner';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -41,6 +46,7 @@ import {
   SettingsIcon,
   SpinnerIcon,
   DatabaseIcon,
+  FilmIcon,
 } from '../components/Icons';
 import { Avatar } from '../components/Avatars';
 
@@ -741,31 +747,50 @@ interface MovieAddModalProps {
 }
 const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
   const [step, setStep] = useState(1);
-  const [tmdbId, setTmdbId] = useState('');
   const [type, setType] = useState<ContentType>('movie');
   const [selectedItem, setSelectedItem] = useState<(MovieDetail | TVDetail) & { type: ContentType } | null>(null);
   const [links, setLinks] = useState<DownloadLink[]>([{ label: '', url: '' }]);
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
 
-  const handleFetchDetails = async () => {
-    if (!tmdbId.trim()) {
-        addToast('Please enter a TMDB ID.', 'error');
+  // Search functionality states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<(MovieSummary | TVSummary)[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const debouncedQuery = useDebounce(searchQuery, 300);
+
+  useEffect(() => {
+    if (debouncedQuery.trim().length < 2) {
+        setSearchResults([]);
         return;
     }
-    setLoading(true);
-    try {
-        const id = parseInt(tmdbId, 10);
-        if (isNaN(id)) {
-            addToast('Invalid TMDB ID.', 'error');
-            setLoading(false);
-            return;
+
+    const performSearch = async () => {
+        setIsSearching(true);
+        setSearchResults([]);
+        try {
+            const data = await searchContentByType(debouncedQuery, type);
+            setSearchResults(data.results.slice(0, 10)); // Limit results
+        } catch (err) {
+            addToast('Content search failed. Please try again.', 'error');
+        } finally {
+            setIsSearching(false);
         }
-        const details = await getDetails(type, id);
+    };
+    
+    performSearch();
+  }, [debouncedQuery, type, addToast]);
+
+  const handleSelectSearchResult = async (item: MovieSummary | TVSummary) => {
+    setLoading(true);
+    setSearchQuery('');
+    setSearchResults([]);
+    try {
+        const details = await getDetails(type, item.id);
         setSelectedItem({ ...details, type });
         setStep(2);
     } catch (error) {
-        addToast('Failed to fetch details. Check the ID and type.', 'error');
+        addToast('Failed to fetch full details for the selected item.', 'error');
     } finally {
         setLoading(false);
     }
@@ -819,9 +844,50 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
             {step === 1 ? (
               <div className="mt-4 space-y-4">
                 <div className="flex flex-col sm:flex-row gap-4 items-end">
-                    <div className="flex-grow w-full">
-                        <label htmlFor="tmdbId" className="block text-sm font-medium text-muted mb-1">TMDB ID</label>
-                        <input type="number" id="tmdbId" value={tmdbId} onChange={e => setTmdbId(e.target.value)} placeholder="e.g., 550" className={inputClass} />
+                    <div className="relative flex-grow w-full">
+                        <label htmlFor="searchQuery" className="block text-sm font-medium text-muted mb-1">Search by Title</label>
+                        <input 
+                            type="text" 
+                            id="searchQuery" 
+                            value={searchQuery} 
+                            onChange={e => setSearchQuery(e.target.value)} 
+                            placeholder="e.g., The Matrix" 
+                            className={inputClass} 
+                            autoComplete="off"
+                        />
+                         {(isSearching || searchResults.length > 0 || (searchQuery.length > 1 && !isSearching)) && (
+                            <div className="absolute z-10 w-full mt-1 bg-primary border border-glass-border rounded-md shadow-lg max-h-64 overflow-y-auto">
+                                {isSearching && <div className="p-4 text-center text-muted">Searching...</div>}
+                                {!isSearching && searchResults.length === 0 && searchQuery.length > 1 && <div className="p-4 text-center text-muted">No results found.</div>}
+                                {!isSearching && searchResults.map(item => {
+                                    const title = 'title' in item ? item.title : item.name;
+                                    const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
+                                    const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
+                                    const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : null;
+                                    
+                                    return (
+                                        <button
+                                            type="button"
+                                            key={item.id}
+                                            onClick={() => handleSelectSearchResult(item)}
+                                            className="w-full text-left flex items-center p-2 hover:bg-cyan/10 transition-colors"
+                                        >
+                                            {posterUrl ? (
+                                                <img src={posterUrl} alt={title} className="w-10 h-14 object-cover rounded-sm mr-3 flex-shrink-0" />
+                                            ) : (
+                                                <div className="w-10 h-14 bg-secondary rounded-sm mr-3 flex items-center justify-center flex-shrink-0">
+                                                    <FilmIcon className="h-5 w-5 text-muted"/>
+                                                </div>
+                                            )}
+                                            <div className="min-w-0">
+                                                <p className="font-bold text-white truncate">{title}</p>
+                                                <p className="text-sm text-muted">{year}</p>
+                                            </div>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        )}
                     </div>
                     <div className="w-full sm:w-auto">
                         <label htmlFor="contentType" className="block text-sm font-medium text-muted mb-1">Type</label>
@@ -856,11 +922,6 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
           <div className="bg-primary/50 px-6 py-4 flex justify-end gap-2 rounded-b-lg">
             {step === 2 && <button type="button" onClick={() => { setStep(1); setSelectedItem(null); }} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Back</button>}
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Cancel</button>
-            {step === 1 && (
-                <button type="button" onClick={handleFetchDetails} disabled={loading} className="px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:bg-muted disabled:text-gray-800 disabled:cursor-not-allowed">
-                    {loading ? <SpinnerIcon className="animate-spin h-5 w-5"/> : 'Fetch Details'}
-                </button>
-            )}
             {step === 2 && (
               <button type="submit" disabled={loading} className="px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:bg-muted disabled:text-gray-800 disabled:cursor-not-allowed">
                 {loading ? 'Saving...' : 'Save Content'}

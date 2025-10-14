@@ -51,6 +51,12 @@ export const searchTMDB = async (query: string): Promise<{ results: (MovieSummar
     return { results: filteredResults };
 };
 
+export const searchContentByType = async (query: string, type: ContentType): Promise<{ results: (MovieSummary | TVSummary)[] }> => {
+    const data = await tmdbFetch(`/search/${type}`, { query });
+    // Filter out items without posters for a cleaner UI
+    return { results: data.results.filter((item: any) => item.poster_path) };
+};
+
 export const findIdBySlug = async (type: ContentType, slug: string): Promise<number | null> => {
     const slugRegex = /^(.*)-(\d{4})$/;
     const match = slug.match(slugRegex);
