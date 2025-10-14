@@ -1,22 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import { useToast } from '../hooks/useToast';
 import { addSupportTicket } from '../services/api';
 import Turnstile from '../components/Turnstile';
 
 const SupportPage: React.FC = () => {
+  const location = useLocation();
+  const { addToast } = useToast();
+  
+  const [subject, setSubject] = useState('Missing Download Link');
+  const [contentTitle, setContentTitle] = useState('');
+  const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState('');
+
   usePageMetadata({
     title: 'Support & Feedback',
     description: 'Contact our support team for help or to provide feedback about CineStream.',
     path: '/support',
   });
 
-  const { addToast } = useToast();
-  const [subject, setSubject] = useState('Missing Download Link');
-  const [contentTitle, setContentTitle] = useState('');
-  const [message, setMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState('');
+  useEffect(() => {
+    const locationState = location.state as { subject?: string; contentTitle?: string } | null;
+    if (locationState) {
+      if (locationState.subject) {
+        setSubject(locationState.subject);
+      }
+      if (locationState.contentTitle) {
+        setContentTitle(locationState.contentTitle);
+      }
+    }
+  }, [location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,7 +45,7 @@ const SupportPage: React.FC = () => {
     try {
       await addSupportTicket({
         subject,
-        contentTitle: subject === 'Missing Download Link' ? contentTitle : '',
+        contentTitle: (subject === 'Missing Download Link' || subject === 'Link Suggestion') ? contentTitle : '',
         message,
       }, turnstileToken);
       addToast('Thank you for your feedback! We have received your message.', 'success');
@@ -74,6 +89,7 @@ const SupportPage: React.FC = () => {
               className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent"
               aria-label="Subject of feedback"
             >
+              <option>Link Suggestion</option>
               <option>Missing Download Link</option>
               <option>Incorrect Information</option>
               <option>Bug Report</option>
@@ -82,7 +98,7 @@ const SupportPage: React.FC = () => {
             </select>
           </div>
 
-          {subject === 'Missing Download Link' && (
+          {(subject === 'Missing Download Link' || subject === 'Link Suggestion') && (
              <div>
                 <label htmlFor="contentTitle" className="block text-sm font-medium text-light-muted dark:text-muted mb-2">
                     Movie / TV Show Title (if applicable)
@@ -108,7 +124,7 @@ const SupportPage: React.FC = () => {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent"
-              placeholder="Please provide as much detail as possible..."
+              placeholder={subject === 'Link Suggestion' ? "Please provide the link label (e.g., 1080p WEB-DL) and the URL." : "Please provide as much detail as possible..."}
               required
               aria-required="true"
             />
