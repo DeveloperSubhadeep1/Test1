@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import { useToast } from '../hooks/useToast';
 import { addSupportTicket } from '../services/api';
 import Turnstile from '../components/Turnstile';
 
 const SupportPage: React.FC = () => {
-  const location = useLocation();
   const { addToast } = useToast();
   
   const [subject, setSubject] = useState('Missing Download Link');
@@ -20,18 +18,6 @@ const SupportPage: React.FC = () => {
     description: 'Contact our support team for help or to provide feedback about CineStream.',
     path: '/support',
   });
-
-  useEffect(() => {
-    const locationState = location.state as { subject?: string; contentTitle?: string } | null;
-    if (locationState) {
-      if (locationState.subject) {
-        setSubject(locationState.subject);
-      }
-      if (locationState.contentTitle) {
-        setContentTitle(locationState.contentTitle);
-      }
-    }
-  }, [location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,7 +110,9 @@ const SupportPage: React.FC = () => {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               className="w-full bg-light-primary dark:bg-primary border border-light-border dark:border-gray-700 rounded-md p-3 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-accent"
-              placeholder={subject === 'Link Suggestion' ? "Please provide the link label (e.g., 1080p WEB-DL) and the URL." : "Please provide as much detail as possible..."}
+              placeholder={subject === 'Link Suggestion' 
+                ? "Please use the 'Suggest a Link' button on a movie/TV page to contribute links. For other suggestions, please provide details here." 
+                : "Please provide as much detail as possible..."}
               required
               aria-required="true"
             />

@@ -29,6 +29,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import CollectionsListPage from './pages/CollectionsListPage';
 import CollectionDetailsPage from './pages/CollectionDetailsPage';
+import ContributePage from './pages/ContributePage';
 
 const AppLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -71,6 +72,7 @@ const AppLayout: React.FC = () => {
             <Route path="/collection/:id" element={<CollectionDetailsPage />} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/support" element={<SupportPage />} />
+            <Route path="/contribute" element={<ProtectedRoute><ContributePage /></ProtectedRoute>} />
             <Route path="/genres" element={<GenresPage />} />
             <Route path="/search/:query" element={<SearchResultsPage />} />
             <Route path="/movie/:slug" element={<DetailsPage type="movie" />} />

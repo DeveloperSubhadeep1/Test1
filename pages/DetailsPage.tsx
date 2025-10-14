@@ -448,8 +448,8 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
                   Found a working download link? Help us keep our library up-to-date by suggesting it.
               </p>
               <Link
-                  to="/support"
-                  state={{ contentTitle: title, subject: 'Link Suggestion' }}
+                  to="/contribute"
+                  state={{ contentTitle: title, tmdbId: details.id, type }}
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-light-accent/80 dark:bg-accent/80 text-white font-bold py-3 px-4 rounded-lg hover:bg-light-accent dark:hover:bg-accent transition-colors"
               >
                   <PlusCircleIcon className="h-6 w-6" />
