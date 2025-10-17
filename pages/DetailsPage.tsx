@@ -381,23 +381,6 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
             <TelegramAd />
           </div>
 
-          {isAuthenticated && storedMovie && storedMovie.download_links.length > 0 && (
-            <div className="mt-8">
-              <Link
-                to={`/watch/${type}/${slug}`}
-                state={{
-                  title: title,
-                  posterUrl: posterUrl,
-                  downloadLinks: storedMovie.download_links,
-                }}
-                className="w-full flex items-center justify-center gap-2 bg-purple text-white font-bold py-3 px-4 rounded-lg hover:bg-purple/80 transition-colors duration-300"
-              >
-                <PlayIcon className="h-6 w-6" />
-                <span>Watch Online</span>
-              </Link>
-            </div>
-          )}
-
           <div className="mt-8 bg-light-secondary dark:bg-secondary p-6 rounded-lg">
             <h2 className="text-2xl font-bold mb-4">Download Links</h2>
             {storedMovie && storedMovie.download_links.length > 0 ? (
