@@ -56,14 +56,20 @@ const WatchOnlinePage: React.FC = () => {
         if (!url) return '';
         try {
             const urlObj = new URL(url);
-            const pathParts = urlObj.pathname.split('/').filter(p => p);
-            if (pathParts.length >= 2 && pathParts[0] !== 'watch' && !isNaN(parseInt(pathParts[0]))) {
-                 urlObj.pathname = `/watch/${pathParts.join('/')}`;
-                 return urlObj.toString();
+            const pathname = urlObj.pathname;
+    
+            // Check if the path looks like '/{id}/{filename...}' where {id} is numeric.
+            // It should NOT convert if it already starts with '/watch'.
+            // The regex /^\/\d+\// checks for a path starting with '/', then one or more digits, then a '/'.
+            if (/^\/\d+\//.test(pathname)) {
+                // Prepend '/watch' to the existing path
+                urlObj.pathname = `/watch${pathname}`;
+                return urlObj.toString();
             }
         } catch (error) {
             console.error("Invalid URL for conversion", error);
         }
+        // Return the original URL if it doesn't match the pattern or if an error occurs
         return url;
     };
     
