@@ -55,7 +55,11 @@ const AppLayout: React.FC = () => {
         aria-modal="true"
         aria-hidden={!isSidebarOpen}
       >
-        <div className="absolute inset-0 bg-black/60" onClick={() => setIsSidebarOpen(false)} aria-hidden="true"></div>
+        <div 
+            className={`absolute inset-0 bg-black/60 transition-opacity duration-300 ease-in-out ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`}
+            onClick={() => setIsSidebarOpen(false)} 
+            aria-hidden="true"
+        ></div>
         <div className="relative h-full">
           <Sidebar onLinkClick={() => setIsSidebarOpen(false)} onClose={() => setIsSidebarOpen(false)} />
         </div>

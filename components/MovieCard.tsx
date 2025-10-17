@@ -59,7 +59,7 @@ const MovieCard: React.FC<MovieCardProps> = ({ item, type, onRemove }) => {
   };
 
   return (
-    <Link to={linkTo} className="group bg-light-secondary dark:bg-secondary rounded-lg shadow-lg overflow-hidden transform hover:-translate-y-2 transition-transform duration-300 block">
+    <Link to={linkTo} className="group bg-light-secondary dark:bg-secondary rounded-lg shadow-lg dark:shadow-black/50 overflow-hidden transform hover:-translate-y-2 hover:shadow-xl dark:hover:shadow-cyan/20 transition-all duration-300 block">
       <div className="relative">
         <img src={posterUrl} alt={title} className="w-full h-auto object-cover aspect-[2/3]" loading="lazy"/>
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>

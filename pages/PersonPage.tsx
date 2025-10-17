@@ -104,7 +104,7 @@ const PersonPage: React.FC = () => {
 
   return (
     <div className="space-y-12">
-      <section className="flex flex-col md:flex-row gap-8">
+      <section className="flex flex-col md:flex-row gap-8 animate-fade-in">
         <div className="md:w-1/4 flex-shrink-0">
             <div className="aspect-[2/3] bg-light-secondary dark:bg-secondary rounded-lg overflow-hidden shadow-2xl">
                 {profileUrl ? (
@@ -133,7 +133,7 @@ const PersonPage: React.FC = () => {
       <section>
         <h2 className="text-2xl font-bold mb-4 border-l-4 border-light-accent dark:border-accent pl-4">Known For</h2>
         {credits.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-5 animate-fade-in">
             {credits.map(item => (
               <MovieCard key={`${item.media_type}-${item.id}`} item={item} type={item.media_type} />
             ))}

@@ -40,7 +40,7 @@ const GenresPage: React.FC = () => {
         <div>
             <h1 className="text-3xl font-bold mb-6 border-l-4 border-light-accent dark:border-accent pl-4">Explore by Genre</h1>
             {genres.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 animate-fade-in">
                     {genres.map(genre => (
                         <Link
                             key={genre.id}
