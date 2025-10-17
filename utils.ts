@@ -18,3 +18,16 @@ export const generateSlug = (title: string, year?: string | number): string => {
     }
     return slug;
 }
+
+export const parseQualityFromLink = (label: string): string => {
+  if (!label) return 'SD';
+  // Matches 4k, 2160p, 1080p, 720p, 480p (case-insensitive)
+  const qualityMatch = label.match(/(4k|2160p|1080p|720p|480p)/i);
+  if (qualityMatch && qualityMatch[0]) {
+    return qualityMatch[0].toLowerCase();
+  }
+  // Fallback for generic HD labels
+  if (label.toLowerCase().includes('hd')) return 'HD';
+  
+  return 'SD'; // Default fallback
+};

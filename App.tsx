@@ -30,6 +30,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import CollectionsListPage from './pages/CollectionsListPage';
 import CollectionDetailsPage from './pages/CollectionDetailsPage';
 import ContributePage from './pages/ContributePage';
+import WatchOnlinePage from './pages/WatchOnlinePage';
 
 const AppLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -77,6 +78,7 @@ const AppLayout: React.FC = () => {
             <Route path="/search/:query" element={<SearchResultsPage />} />
             <Route path="/movie/:slug" element={<DetailsPage type="movie" />} />
             <Route path="/tv/:slug" element={<DetailsPage type="tv" />} />
+            <Route path="/watch/:type/:slug" element={<WatchOnlinePage />} />
             <Route path="/person/:slug" element={<PersonPage />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/login" element={<LoginPage />} />

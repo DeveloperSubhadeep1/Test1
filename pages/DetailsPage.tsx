@@ -12,7 +12,7 @@ import { usePageMetadata } from '../hooks/usePageMetadata';
 import Spinner from '../components/Spinner';
 import TelegramAd from '../components/TelegramAd';
 import CastCard from '../components/CastCard';
-import { StarIcon, CalendarIcon, ClockIcon, DownloadIcon, HeartIcon, BookmarkIcon, ShareIcon, SpinnerIcon, PlusCircleIcon } from '../components/Icons';
+import { StarIcon, CalendarIcon, ClockIcon, DownloadIcon, HeartIcon, BookmarkIcon, ShareIcon, SpinnerIcon, PlusCircleIcon, PlayIcon } from '../components/Icons';
 import ExpandableText from '../components/ExpandableText';
 import AddToCollectionModal from '../components/AddToCollectionModal';
 
@@ -380,6 +380,23 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
           <div className="mt-8">
             <TelegramAd />
           </div>
+
+          {isAuthenticated && storedMovie && storedMovie.download_links.length > 0 && (
+            <div className="mt-8">
+              <Link
+                to={`/watch/${type}/${slug}`}
+                state={{
+                  title: title,
+                  posterUrl: posterUrl,
+                  downloadLinks: storedMovie.download_links,
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-purple text-white font-bold py-3 px-4 rounded-lg hover:bg-purple/80 transition-colors duration-300"
+              >
+                <PlayIcon className="h-6 w-6" />
+                <span>Watch Online</span>
+              </Link>
+            </div>
+          )}
 
           <div className="mt-8 bg-light-secondary dark:bg-secondary p-6 rounded-lg">
             <h2 className="text-2xl font-bold mb-4">Download Links</h2>
