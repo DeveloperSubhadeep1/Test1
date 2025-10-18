@@ -17,40 +17,41 @@ import { CalendarIcon, ClockIcon, DownloadIcon, HeartIcon, BookmarkIcon, ShareIc
 import ExpandableText from '../components/ExpandableText';
 import AddToCollectionModal from '../components/AddToCollectionModal';
 import ScoreRing from '../components/ScoreRing';
-import { parseFilenameDetails } from '../utils';
+import { parseMediaFilename } from '../utils';
 
 interface DetailsPageProps {
   type: ContentType;
 }
 
 const DownloadLinkButton: React.FC<{ link: DownloadLink; title: string; year: string; onDownload: (link: DownloadLink) => void }> = ({ link, title, year, onDownload }) => {
-    // Start with a clean base label.
     const [displayLabel, setDisplayLabel] = useState(`${title} (${year})`);
     
     useEffect(() => {
         const generateLabel = () => {
             const url = link.url;
+            // Extract filename from URL
             const filenameMatch = url.match(/([^/\\?]+)(?:[?#]|$)/);
             const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : '';
             
             // Combine filename from URL and the admin-provided label to gather all possible details.
             const infoSource = `${filename} ${link.label || ''}`;
-            
-            const details = parseFilenameDetails(infoSource);
+            const details = parseMediaFilename(infoSource);
 
-            let labelParts = [`${title} (${year})`];
+            let label = `${title} (${year})`;
             
+            if (details.quality) {
+                label += ` ${details.quality}`;
+            }
+
             if (details.languages.length > 0) {
                 // Join with a comma for better readability, e.g., (Hindi, English)
-                labelParts.push(`(${details.languages.join(', ')})`);
+                label += ` (${details.languages.join(', ')})`;
             }
             if (details.size) {
-                labelParts.push(`[${details.size}]`);
+                label += ` [${details.size}]`;
             }
 
-            // Always use the generated label. If no details are found, it gracefully
-            // defaults to just "MovieName (Year)", which is cleaner than showing a messy label.
-            setDisplayLabel(labelParts.join(' '));
+            setDisplayLabel(label);
         };
 
         generateLabel();

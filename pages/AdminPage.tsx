@@ -52,7 +52,7 @@ import {
 } from '../components/Icons';
 import { Avatar } from '../components/Avatars';
 import { DashboardSkeleton, TableSkeleton, CardListSkeleton, TicketSkeleton, DatabaseSkeleton } from '../components/AdminPageSkeletons';
-import { parseFilename } from '../utils';
+import { parseFilenameForAutomate } from '../utils';
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Tab Button Component
@@ -842,7 +842,7 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
   // NEW states for URL import
   const [importUrl, setImportUrl] = useState('');
   const [isProcessingUrl, setIsProcessingUrl] = useState(false);
-  const [parsedInfoFromUrl, setParsedInfoFromUrl] = useState<{ quality: string | null; languages: string[]; url: string } | null>(null);
+  const [parsedInfoFromUrl, setParsedInfoFromUrl] = useState<{ label: string; url: string } | null>(null);
 
   useEffect(() => {
     if (debouncedQuery.trim().length < 2) {
@@ -883,7 +883,7 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
           return;
       }
 
-      const parsed = parseFilename(filename);
+      const parsed = parseFilenameForAutomate(filename);
       
       if (!parsed.movieName) {
           addToast('Could not parse a movie name from the filename.', 'error');
@@ -891,9 +891,16 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
           return;
       }
 
-      // Set search query to trigger search, store parsed info
+      // Set search query to trigger search
       setSearchQuery(parsed.movieName);
-      setParsedInfoFromUrl({ quality: parsed.quality, languages: parsed.languages, url: importUrl });
+      
+      // Construct a clean label from parsed info
+      const labelParts = [];
+      if (parsed.quality) labelParts.push(parsed.quality);
+      labelParts.push(...parsed.languages);
+      const suggestedLabel = labelParts.join(' ');
+
+      setParsedInfoFromUrl({ label: suggestedLabel, url: importUrl });
   };
 
 
@@ -916,16 +923,9 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
   useEffect(() => {
       if (selectedItem && parsedInfoFromUrl) {
           // This is step 2 in the automated flow
-          let label = parsedInfoFromUrl.quality || '';
-          if (parsedInfoFromUrl.languages.length > 0) {
-              label += ` ${parsedInfoFromUrl.languages.join(' ')}`;
-          }
-          if (!label.trim()) {
-              label = 'HD'; // A sensible default
-          }
-          setLinks([{ label: label.trim(), url: parsedInfoFromUrl.url }]);
+          setLinks([{ label: parsedInfoFromUrl.label || 'HD', url: parsedInfoFromUrl.url }]);
       } else {
-          // This covers manual flow, and going back to step 1 in auto flow
+          // This covers manual flow
           setLinks([{ label: '', url: '' }]);
       }
   // eslint-disable-next-line react-hooks/exhaustive-deps
