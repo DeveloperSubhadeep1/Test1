@@ -82,9 +82,12 @@ function coreFilenameParser(filename: string): { moviename: string; year: string
     const languages: string[] = [];
     const languageMap: { [key: string]: string } = {
         'hindi': 'Hindi',
-        'हिन्दी': 'Hindi', // Added native script support
-        'english': 'English', 'eng': 'English', 'tamil': 'Tamil',
-        'telugu': 'Telugu', 'kannada': 'Kannada', 'malayalam': 'Malayalam',
+        'हिन्दी': 'Hindi',
+        'english': 'English', 'eng': 'English', 'esubs': 'English', 'esub': 'English',
+        'tamil': 'Tamil',
+        'telugu': 'Telugu',
+        'kannada': 'Kannada',
+        'malayalam': 'Malayalam',
         'dual': 'Dual Audio', 'audio': 'Dual Audio',
     };
     const ignoreLangRegex = /aac|hdrip|x264|amzn|web-dl|webrip/i;
