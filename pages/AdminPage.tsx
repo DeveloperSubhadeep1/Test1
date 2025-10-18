@@ -52,6 +52,7 @@ import {
 } from '../components/Icons';
 import { Avatar } from '../components/Avatars';
 import { DashboardSkeleton, TableSkeleton, CardListSkeleton, TicketSkeleton, DatabaseSkeleton } from '../components/AdminPageSkeletons';
+import { parseFilename } from '../utils';
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Tab Button Component
@@ -838,27 +839,63 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
   const [isSearching, setIsSearching] = useState(false);
   const debouncedQuery = useDebounce(searchQuery, 300);
 
+  // NEW states for URL import
+  const [importUrl, setImportUrl] = useState('');
+  const [isProcessingUrl, setIsProcessingUrl] = useState(false);
+  const [parsedInfoFromUrl, setParsedInfoFromUrl] = useState<{ quality: string | null; languages: string[]; url: string } | null>(null);
+
   useEffect(() => {
     if (debouncedQuery.trim().length < 2) {
         setSearchResults([]);
+        if (isProcessingUrl) setIsProcessingUrl(false);
         return;
     }
 
     const performSearch = async () => {
         setIsSearching(true);
-        setSearchResults([]);
+        setSearchResults([]); // Clear previous results
         try {
             const data = await searchContentByType(debouncedQuery, type);
-            setSearchResults(data.results.slice(0, 10)); // Limit results
+            setSearchResults(data.results.slice(0, 10));
         } catch (err) {
             addToast('Content search failed. Please try again.', 'error');
         } finally {
             setIsSearching(false);
+            if (isProcessingUrl) setIsProcessingUrl(false);
         }
     };
     
     performSearch();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQuery, type, addToast]);
+
+  // NEW handler for processing URL
+  const handleProcessUrl = () => {
+      if (!importUrl) return;
+      setIsProcessingUrl(true);
+      // Extract filename from URL
+      const filenameMatch = importUrl.match(/([^/\\?]+)(?:\?.*)?$/);
+      const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : '';
+
+      if (!filename) {
+          addToast('Could not extract filename from URL', 'error');
+          setIsProcessingUrl(false);
+          return;
+      }
+
+      const parsed = parseFilename(filename);
+      
+      if (!parsed.movieName) {
+          addToast('Could not parse a movie name from the filename.', 'error');
+          setIsProcessingUrl(false);
+          return;
+      }
+
+      // Set search query to trigger search, store parsed info
+      setSearchQuery(parsed.movieName);
+      setParsedInfoFromUrl({ quality: parsed.quality, languages: parsed.languages, url: importUrl });
+  };
+
 
   const handleSelectSearchResult = async (item: MovieSummary | TVSummary) => {
     setLoading(true);
@@ -874,6 +911,26 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
         setLoading(false);
     }
   };
+
+  // NEW useEffect to pre-fill links
+  useEffect(() => {
+      if (selectedItem && parsedInfoFromUrl) {
+          // This is step 2 in the automated flow
+          let label = parsedInfoFromUrl.quality || '';
+          if (parsedInfoFromUrl.languages.length > 0) {
+              label += ` ${parsedInfoFromUrl.languages.join(' ')}`;
+          }
+          if (!label.trim()) {
+              label = 'HD'; // A sensible default
+          }
+          setLinks([{ label: label.trim(), url: parsedInfoFromUrl.url }]);
+      } else {
+          // This covers manual flow, and going back to step 1 in auto flow
+          setLinks([{ label: '', url: '' }]);
+      }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedItem]);
+
 
   const handleLinkChange = (index: number, field: keyof DownloadLink, value: string) => {
     const newLinks = [...links];
@@ -922,6 +979,33 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
             </div>
             {step === 1 ? (
               <div className="mt-4 space-y-4">
+                <div className="space-y-2 p-3 bg-primary/50 rounded-lg">
+                    <label htmlFor="importUrl" className="block text-sm font-medium text-cyan mb-1">Automate from URL</label>
+                    <div className="flex gap-2">
+                        <input 
+                            type="url" 
+                            id="importUrl" 
+                            value={importUrl} 
+                            onChange={e => setImportUrl(e.target.value)} 
+                            placeholder="Paste movie/TV download URL here" 
+                            className={`${inputClass} flex-grow`}
+                        />
+                        <button 
+                            type="button" 
+                            onClick={handleProcessUrl} 
+                            disabled={!importUrl || isProcessingUrl}
+                            className="px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:opacity-50 flex-shrink-0"
+                        >
+                            {isProcessingUrl || isSearching ? <SpinnerIcon className="animate-spin h-5 w-5"/> : 'Process'}
+                        </button>
+                    </div>
+                </div>
+                
+                <div className="relative text-center">
+                    <span className="absolute left-0 top-1/2 w-full h-px bg-glass-border"></span>
+                    <span className="relative bg-secondary px-2 text-xs text-muted">OR</span>
+                </div>
+
                 <div className="flex flex-col sm:flex-row gap-4 items-end">
                     <div className="relative flex-grow w-full">
                         <label htmlFor="searchQuery" className="block text-sm font-medium text-muted mb-1">Search by Title</label>
