@@ -24,35 +24,33 @@ interface DetailsPageProps {
 }
 
 const DownloadLinkButton: React.FC<{ link: DownloadLink; title: string; year: string; onDownload: (link: DownloadLink) => void }> = ({ link, title, year, onDownload }) => {
-    const [displayLabel, setDisplayLabel] = useState(`${title} (${year}) - ${link.label}`);
+    // Start with a clean base label.
+    const [displayLabel, setDisplayLabel] = useState(`${title} (${year})`);
     
     useEffect(() => {
         const generateLabel = () => {
             const url = link.url;
-            // Extract filename from URL more robustly
             const filenameMatch = url.match(/([^/\\?]+)(?:[?#]|$)/);
             const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : '';
             
-            if (filename) {
-                const details = parseFilenameDetails(filename);
+            // Combine filename from URL and the admin-provided label to gather all possible details.
+            const infoSource = `${filename} ${link.label || ''}`;
+            
+            const details = parseFilenameDetails(infoSource);
 
-                let labelParts = [`${title} (${year})`];
-                
-                if (details.languages.length > 0) {
-                    labelParts.push(`(${details.languages.join(' ')})`);
-                }
-                if (details.size) {
-                    labelParts.push(`[${details.size}]`);
-                }
-
-                // If we found extra details, use the new format.
-                // Otherwise, stick with a simpler format that includes the admin-provided label.
-                if (details.languages.length > 0 || details.size) {
-                    setDisplayLabel(labelParts.join(' '));
-                } else {
-                    setDisplayLabel(`${title} (${year}) - ${link.label}`);
-                }
+            let labelParts = [`${title} (${year})`];
+            
+            if (details.languages.length > 0) {
+                // Join with a comma for better readability, e.g., (Hindi, English)
+                labelParts.push(`(${details.languages.join(', ')})`);
             }
+            if (details.size) {
+                labelParts.push(`[${details.size}]`);
+            }
+
+            // Always use the generated label. If no details are found, it gracefully
+            // defaults to just "MovieName (Year)", which is cleaner than showing a messy label.
+            setDisplayLabel(labelParts.join(' '));
         };
 
         generateLabel();

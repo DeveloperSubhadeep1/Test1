@@ -41,49 +41,50 @@ export function parseFilename(filename: string): { movieName: string; year: numb
   let quality: string | null = null;
   const languages: string[] = [];
   
+  // Define a set of common technical/junk terms to exclude from language detection.
+  const languageExclusionList = new Set([
+      'aac', 'dts', 'ac3', 'x264', 'x265', 'hevc', 'web-dl', 'webrip', 'bluray',
+      'hdtv', 'brrip', 'hdrip', 'divx', 'xvid', 'repack', 'proper', 'internal',
+      'extended', 'uncut', 'remastered', 'multi', 'sub', 'subs', 'dub', 'dubbed',
+      'com', 'org', 'net', 'esub', 'esubs', 'atmos'
+  ]);
+  
   const yearIndex = parts.findIndex(p => /^\d{4}$/.test(p) && parseInt(p, 10) > 1900 && parseInt(p, 10) < new Date().getFullYear() + 2);
 
-  let nameParts: string[] = [];
+  let movieName = '';
+  let remainingParts: string[] = [];
 
   if (yearIndex !== -1) {
     year = parseInt(parts[yearIndex], 10);
-    nameParts = parts.slice(0, yearIndex);
-    const remainingParts = parts.slice(yearIndex + 1);
-    
-    remainingParts.forEach(p => {
-        if (!quality) {
-             const qualityMatch = p.match(/(\d{3,4}p|4k|uhd)/i);
-             if (qualityMatch) {
-                 quality = qualityMatch[0];
-                 return;
-             }
-        }
-        // Very basic language code detection
-        if (p.length > 1 && p.length < 4 && !/\d/.test(p) && !/^(com|org|net)$/i.test(p)) {
-            languages.push(p);
-        }
-    });
-
+    movieName = parts.slice(0, yearIndex).join(" ");
+    remainingParts = parts.slice(yearIndex + 1);
   } else {
-    nameParts = parts;
-  }
-  
-  const keywords = /(480p|720p|1080p|2160p|4k|uhd|aac|dts|ac3|hdrip|x264|x265|hevc|amzn|web-dl|webrip|bluray|hdtv|divx|xvid|repack|proper|internal|extended|uncut|remastered|multi)/i;
-  
-  const finalNameParts = [];
-  for (const part of nameParts) {
-      if (keywords.test(part)) {
-          if (!quality) {
-              const qualityMatch = part.match(/(\d{3,4}p|4k|uhd)/i);
-              if (qualityMatch) quality = qualityMatch[0];
-          }
-      } else {
-          finalNameParts.push(part);
-      }
+    // If no year, we have to guess. Try to find the last part that is likely part of the name.
+    const keywordIndex = parts.findIndex(p => languageExclusionList.has(p.toLowerCase()) || /(\d{3,4}p|4k|uhd)/i.test(p));
+    if (keywordIndex !== -1 && keywordIndex > 0) { // Make sure we don't create an empty name
+        movieName = parts.slice(0, keywordIndex).join(' ');
+        remainingParts = parts.slice(keywordIndex);
+    } else {
+        movieName = parts.join(' ');
+    }
   }
 
-  let movieName = finalNameParts.join(" ").trim();
-  
+  // Process remaining parts for quality and languages
+  remainingParts.forEach(p => {
+      const pLower = p.toLowerCase();
+      if (!quality) {
+           const qualityMatch = p.match(/(\d{3,4}p|4k|uhd)/i);
+           if (qualityMatch) {
+               quality = qualityMatch[0];
+               return; // This is definitely a quality tag, not a language
+           }
+      }
+      // Updated language detection: 2-4 letters, no digits, and not in the exclusion list.
+      if (p.length >= 2 && p.length <= 4 && !/\d/.test(p) && !languageExclusionList.has(pLower)) {
+          languages.push(p);
+      }
+  });
+
   if (!quality) {
       const qualityMatch = filename.match(/(480p|720p|1080p|2160p|4k)/i);
       if (qualityMatch) {
@@ -91,10 +92,10 @@ export function parseFilename(filename: string): { movieName: string; year: numb
       }
   }
   
-   movieName = movieName.replace(/\s+/g, ' '); // collapse multiple spaces
-
-  return { movieName, year, languages, quality };
+  // Use a Set to ensure language tags are unique.
+  return { movieName, year, languages: [...new Set(languages)], quality };
 }
+
 
 export function parseFilenameDetails(filename: string): { languages: string[]; size: string | null } {
   // Normalize filename for easier parsing
