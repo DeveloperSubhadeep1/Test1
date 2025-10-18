@@ -19,82 +19,102 @@ export const generateSlug = (title: string, year?: string | number): string => {
     return slug;
 }
 
-// This function is for the Details Page to generate a clean download button label from metadata.
-export function parseMediaFilename(source: string): { languages: string[]; quality: string | null; size: string | null; } {
-    const normalized = source.replace(/[._\[\]()]/g, " ").replace(/\s+/g, ' ').toLowerCase();
-
-    let quality: string | null = null;
-    let size: string | null = null;
-    
-    const qualityMatch = normalized.match(/\b(4k|2160p|1080p|720p|480p)\b/i);
-    if (qualityMatch) quality = qualityMatch[0].toUpperCase().replace('P', 'p');
-
-    const sizeMatch = normalized.match(/\b(\d+(\.\d+)?\s?(gb|mb))\b/i);
-    if (sizeMatch) size = sizeMatch[0].toUpperCase().replace(/\s/g, '');
-    
-    const languageMap: { [key: string]: string } = {
-        'hindi': 'Hindi', 'english': 'English', 'eng': 'English', 'tamil': 'Tamil',
-        'telugu': 'Telugu', 'kannada': 'Kannada', 'malayalam': 'Malayalam',
-        'bengali': 'Bengali', 'marathi': 'Marathi', 'punjabi': 'Punjabi',
-        'gujarati': 'Gujarati', 'urdu': 'Urdu', 'dualaudio': 'Dual Audio',
-        'multiaudio': 'Multi Audio'
-    };
-    
-    const langRegex = /\b(hindi|english|eng|tamil|telugu|kannada|malayalam|bengali|marathi|punjabi|gujarati|urdu|dual-?audio|multi-?audio)\b/ig;
-    const langMatches = normalized.match(langRegex) || [];
-    const languages = langMatches.map(match => languageMap[match.toLowerCase().replace('-', '')]).filter(Boolean);
-
-    return {
-        languages: [...new Set(languages)],
-        quality,
-        size
-    };
-}
-
-
-// This function is for the Admin Panel to extract movie name, year, and metadata for automation.
-export function parseFilenameForAutomate(filename: string): { movieName: string; year: number | null; languages: string[]; quality: string | null; } {
+/**
+ * A robust, shared function to parse metadata from a filename string.
+ * It uses the year as a primary delimiter to separate title from metadata.
+ */
+function coreFilenameParser(filename: string): { moviename: string; year: string | null; languages: string[]; quality: string | null; size: string | null } {
     const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
     const normalized = nameWithoutExt.replace(/[._\[\]()]/g, " ").replace(/\s+/g, ' ').trim();
-    const parts = normalized.split(" ");
-    
-    // High-confidence keywords that usually appear after the movie title
-    const keywords = new Set([
-        '4k', '2160p', '1080p', '720p', '480p', 'web-dl', 'webdl', 'webrip', 'bluray',
-        'hdtv', 'brrip', 'hdrip', 'x264', 'x265', 'hevc', 'hindi', 'english', 'eng', 'dual', 'audio'
-    ]);
+    const parts = normalized.split(' ');
 
-    let year: number | null = null;
-    let titleEndIndex = -1;
+    let year: string | null = null;
+    let yearIndex = -1;
 
-    // Find year first, as it's a reliable delimiter
-    for (let i = parts.length - 1; i >= 0; i--) {
-        const part = parts[i];
-        if (/^\d{4}$/.test(part) && parseInt(part, 10) > 1900 && parseInt(part, 10) < new Date().getFullYear() + 2) {
-            year = parseInt(part, 10);
-            titleEndIndex = i;
-            break;
-        }
-    }
-
-    // If no year, find the first technical keyword
-    if (titleEndIndex === -1) {
-        for (let i = 1; i < parts.length; i++) { // Start from 1 to avoid matching if the first word is a keyword
-            if (keywords.has(parts[i].toLowerCase())) {
-                titleEndIndex = i;
+    // Find the year from the end; it's the most reliable delimiter.
+    for (let i = parts.length - 1; i > 0; i--) {
+        if (/^\d{4}$/.test(parts[i])) {
+            const potentialYear = parseInt(parts[i], 10);
+            if (potentialYear > 1900 && potentialYear < new Date().getFullYear() + 2) {
+                year = parts[i];
+                yearIndex = i;
                 break;
             }
         }
     }
-    
-    const movieName = (titleEndIndex !== -1 ? parts.slice(0, titleEndIndex) : parts).join(' ');
-    
-    const parsedDetails = parseMediaFilename(normalized);
 
-    return {
-        movieName: movieName,
-        year,
-        languages: parsedDetails.languages,
-        quality: parsedDetails.quality
+    // Title is everything before the year.
+    const titleParts = yearIndex !== -1 ? parts.slice(0, yearIndex) : [...parts];
+    
+    // If no year was found, we need to guess where the title ends by looking for the first metadata keyword.
+    if (yearIndex === -1) {
+        const keywords = ['4k', '2160p', '1080p', '720p', '480p', 'web-dl', 'webdl', 'webrip', 'bluray', 'hdtv', 'hdrip', 'x264', 'hindi', 'english', 'eng', 'dual', 'audio'];
+        let firstMetaIndex = -1;
+        // Start from index 1 to avoid matching if title itself is a keyword (e.g., the movie 'Dual')
+        for (let i = 1; i < titleParts.length; i++) {
+            if (keywords.includes(titleParts[i].toLowerCase())) {
+                firstMetaIndex = i;
+                break;
+            }
+        }
+        if (firstMetaIndex !== -1) {
+            titleParts.splice(firstMetaIndex);
+        }
+    }
+
+    const moviename = titleParts.join(' ').trim();
+    
+    // Now parse metadata from the entire normalized string for simplicity and accuracy.
+    const lowerNormalized = normalized.toLowerCase();
+    
+    let quality: string | null = null;
+    const qualityMatch = lowerNormalized.match(/\b(4k|2160p|1080p|720p|480p)\b/i);
+    if (qualityMatch) {
+      quality = qualityMatch[0].toUpperCase().replace('P', 'p');
+    }
+
+    let size: string | null = null;
+    const sizeMatch = lowerNormalized.match(/(\d+(\.\d+)?\s?(gb|mb))/i);
+    if (sizeMatch) {
+      size = sizeMatch[0].replace(/\s/g, '').toUpperCase();
+    }
+    
+    const languages: string[] = [];
+    const languageMap: { [key: string]: string } = {
+        'hindi': 'Hindi', 'english': 'English', 'eng': 'English', 'tamil': 'Tamil',
+        'telugu': 'Telugu', 'kannada': 'Kannada', 'malayalam': 'Malayalam',
+        'dual': 'Dual Audio', 'audio': 'Dual Audio',
     };
+    const ignoreLangRegex = /aac|hdrip|x264|amzn|web-dl|webrip/i;
+    
+    parts.forEach(p => {
+        const pLower = p.toLowerCase();
+        if (languageMap[pLower] && !languages.includes(languageMap[pLower])) {
+            languages.push(languageMap[pLower]);
+        } else if (!/p$|^\d+$|\bg[b]?\b|\bm[b]?\b/i.test(pLower) && !ignoreLangRegex.test(pLower) && p.length > 2 && isNaN(Number(p))) {
+             // Heuristic: If it's not quality, a number, size, or an ignored keyword, it might be a language.
+             // This is less reliable but can catch languages not in the map.
+             // languages.push(p.charAt(0).toUpperCase() + p.slice(1));
+        }
+    });
+
+    return { moviename, year, languages, quality, size };
+}
+
+
+/**
+ * Parses a filename to extract the movie name and other metadata for the Admin Panel automation.
+ */
+export function parseFilenameForAutomate(filename: string): { movieName: string; year: number | null; languages: string[]; quality: string | null; } {
+    const { moviename, year, languages, quality } = coreFilenameParser(filename);
+    return { movieName: moviename, year: year ? parseInt(year, 10) : null, languages, quality };
+}
+
+/**
+ * Parses a source string (filename + label) to extract displayable metadata for download buttons.
+ * It does not need to determine the title or year.
+ */
+export function parseMediaFilename(source: string): { languages: string[]; quality: string | null; size: string | null; } {
+    const { languages, quality, size } = coreFilenameParser(source);
+    return { languages, quality, size };
 }
