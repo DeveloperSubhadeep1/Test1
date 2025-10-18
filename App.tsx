@@ -30,6 +30,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import CollectionsListPage from './pages/CollectionsListPage';
 import CollectionDetailsPage from './pages/CollectionDetailsPage';
 import ContributePage from './pages/ContributePage';
+import WatchTrailerPage from './pages/WatchTrailerPage';
+import WatchOnlinePage from './pages/WatchOnlinePage';
 
 const AppLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -42,32 +44,41 @@ const AppLayout: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location]);
+  
+  // Define page types for layout variations
+  const isImmersivePage = location.pathname.startsWith('/movie/') || location.pathname.startsWith('/tv/');
+  const isOverlayPage = location.pathname.startsWith('/watch/') || location.pathname.startsWith('/trailer');
+
+  // Determine which layout components to show
+  const showHeader = !isOverlayPage; // Show header everywhere except on full-screen video/trailer overlays
+  const showFooter = !isImmersivePage && !isOverlayPage; // Show footer only on standard pages
+  const useStandardContainer = !isImmersivePage && !isOverlayPage; // Apply container and padding only to standard pages
 
   return (
-    <div className="bg-light-primary dark:bg-primary text-light-text dark:text-gray-200">
-      {/* Sidebar (Off-canvas) */}
-      <div
-        className={`fixed inset-0 z-50 transform transition-transform duration-300 ease-in-out ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-        role="dialog"
-        aria-modal="true"
-        aria-hidden={!isSidebarOpen}
-      >
-        <div 
-            className={`absolute inset-0 bg-black/60 transition-opacity duration-300 ease-in-out ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`}
-            onClick={() => setIsSidebarOpen(false)} 
-            aria-hidden="true"
-        ></div>
-        <div className="relative h-full">
-          <Sidebar onLinkClick={() => setIsSidebarOpen(false)} onClose={() => setIsSidebarOpen(false)} />
+    <div className={useStandardContainer ? 'bg-light-primary dark:bg-primary text-light-text dark:text-gray-200' : 'text-light-text dark:text-gray-200'}>
+      {/* Sidebar is available on any page with a header */}
+      {showHeader && (
+        <div
+          className={`fixed inset-0 z-50 transform transition-transform duration-300 ease-in-out ${ isSidebarOpen ? 'translate-x-0' : '-translate-x-full' }`}
+          role="dialog"
+          aria-modal="true"
+          aria-hidden={!isSidebarOpen}
+        >
+          <div 
+              className={`absolute inset-0 bg-black/60 transition-opacity duration-300 ease-in-out ${isSidebarOpen ? 'opacity-100' : 'opacity-0'}`}
+              onClick={() => setIsSidebarOpen(false)} 
+              aria-hidden="true"
+          ></div>
+          <div className="relative h-full">
+            <Sidebar onLinkClick={() => setIsSidebarOpen(false)} onClose={() => setIsSidebarOpen(false)} />
+          </div>
         </div>
-      </div>
+      )}
       
-      {/* Main Content Wrapper */}
       <div className="flex flex-col min-h-screen">
-        <Header onMenuClick={() => setIsSidebarOpen(true)} />
-        <main className="flex-grow container py-8">
+        {showHeader && <Header onMenuClick={() => setIsSidebarOpen(true)} />}
+        
+        <main className={useStandardContainer ? "flex-grow container py-8" : "flex-grow"}>
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />
@@ -87,10 +98,16 @@ const AppLayout: React.FC = () => {
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            
+            {/* NEW ROUTES */}
+            <Route path="/trailer" element={<WatchTrailerPage />} />
+            <Route path="/watch/:type/:slug" element={<WatchOnlinePage />} />
+            
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </main>
-        <Footer />
+        
+        {showFooter && <Footer />}
       </div>
     </div>
   );

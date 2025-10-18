@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { getDetails, getStoredMovie, incrementDownloadCount, getCredits, findIdBySlug, getVideos } from '../services/api';
-import { ContentType, MovieDetail, StoredMovie, TVDetail, CastMember, ContentItem, Genre, Video, SupportTicket, DownloadLink } from '../types';
+// FIX: Imported the 'Video' type to resolve a type error when processing video data from the API.
+import { ContentType, MovieDetail, StoredMovie, TVDetail, CastMember, ContentItem, CrewMember, DownloadLink, Video } from '../types';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
 import { FavoritesContext } from '../context/FavoritesContext';
 import { WatchlistContext } from '../context/WatchlistContext';
@@ -9,12 +10,13 @@ import { HistoryContext } from '../context/HistoryContext';
 import { AuthContext } from '../context/AuthContext';
 import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
-import Spinner from '../components/Spinner';
+import DetailsPageSkeleton from '../components/DetailsPageSkeleton';
 import TelegramAd from '../components/TelegramAd';
 import CastCard from '../components/CastCard';
-import { StarIcon, CalendarIcon, ClockIcon, DownloadIcon, HeartIcon, BookmarkIcon, ShareIcon, SpinnerIcon, PlusCircleIcon, PlayIcon } from '../components/Icons';
+import { CalendarIcon, ClockIcon, DownloadIcon, HeartIcon, BookmarkIcon, ShareIcon, SpinnerIcon, PlusCircleIcon, PlayIcon, ArrowLeftIcon } from '../components/Icons';
 import ExpandableText from '../components/ExpandableText';
 import AddToCollectionModal from '../components/AddToCollectionModal';
+import ScoreRing from '../components/ScoreRing';
 
 interface DetailsPageProps {
   type: ContentType;
@@ -24,6 +26,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   const { slug } = useParams<{ slug: string }>();
   const [details, setDetails] = useState<MovieDetail | TVDetail | null>(null);
   const [cast, setCast] = useState<CastMember[]>([]);
+  const [crew, setCrew] = useState<{ director?: CrewMember, writers: CrewMember[] }>({ writers: [] });
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [storedMovie, setStoredMovie] = useState<StoredMovie | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,6 +46,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
 
   const title = details ? ('title' in details ? details.title : details.name) : '';
   const posterPath = details?.poster_path ? `${TMDB_IMAGE_BASE_URL}${details.poster_path}` : undefined;
+  const originalBackdropUrl = details?.poster_path ? `https://image.tmdb.org/t/p/original${details.poster_path}` : '';
 
   usePageMetadata({
     title: title || 'Loading...',
@@ -57,6 +61,8 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
       
       try {
         setLoading(true);
+        setDetails(null);
+        setTrailerKey(null);
         
         let tmdbId: number | null = null;
         const idMatch = slug.match(/^(\d+)/);
@@ -64,13 +70,11 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
         if (idMatch) {
           tmdbId = parseInt(idMatch[1], 10);
         } else {
-          // Fallback for old URLs that don't have an ID
           tmdbId = await findIdBySlug(type, slug);
         }
 
         if (!tmdbId) {
           addToast('Content not found.', 'error');
-          setDetails(null);
           setLoading(false);
           return;
         }
@@ -83,9 +87,12 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
         ]);
         setDetails(detailsData);
         setStoredMovie(storedData);
-        setCast(creditsData.cast.slice(0, 18));
+        setCast(creditsData.cast.slice(0, 10));
+        
+        const director = creditsData.crew.find(c => c.job === 'Director');
+        const writers = creditsData.crew.filter(c => c.department === 'Writing').slice(0, 3);
+        setCrew({ director, writers });
 
-        // Find the official YouTube trailer
         const officialTrailer = videosData.results.find(
           (vid: Video) => vid.site === 'YouTube' && vid.type === 'Trailer'
         );
@@ -101,7 +108,8 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
     fetchDetails();
   }, [slug, type, addToast]);
   
-  // Effect for JSON-LD structured data
+  // ... (other effects and handlers are the same)
+   // Effect for JSON-LD structured data
   useEffect(() => {
     if (details) {
       const title = 'title' in details ? details.title : details.name;
@@ -123,7 +131,6 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
         }
       };
 
-      // FIX: Correctly type the script element to avoid type errors when setting `type`.
       let script = document.getElementById('json-ld-schema') as HTMLScriptElement | null;
       if (!script) {
         script = document.createElement('script');
@@ -142,7 +149,6 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
     }
   }, [details, type]);
   
-  // Effect for countdown timer
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     if (isPreparing && countdown !== null && countdown > 0) {
@@ -165,8 +171,6 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
 
   const handleDownloadClick = async (link: DownloadLink) => {
     if (storedMovie && details) {
-      // Add to viewing history
-      // FIX: Cast to ContentItem to resolve discriminated union issue.
       addToHistory({ ...details, type } as ContentItem);
       try {
         await incrementDownloadCount(storedMovie._id);
@@ -174,11 +178,9 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
         console.error("Failed to increment download count", error);
         addToast('Could not track download click.', 'info');
       }
-
       if (link.suggestedBy && !isAdmin) {
         addToast(`Shout out to ${link.suggestedBy} for this link!`, 'info');
       }
-
       window.open(link.url, '_blank');
     }
   };
@@ -189,7 +191,6 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
       return;
     }
     if (!details) return;
-    // FIX: Cast to ContentItem to resolve discriminated union issue.
     const favoriteItem = { ...details, type } as ContentItem;
     if (isFavorite(details.id)) {
       removeFavorite(details.id);
@@ -204,7 +205,6 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
       return;
     }
     if (!details) return;
-    // FIX: Cast to ContentItem to resolve discriminated union issue.
     const watchlistItem = { ...details, type } as ContentItem;
     if (isOnWatchlist(details.id)) {
       removeFromWatchlist(details.id);
@@ -223,32 +223,22 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   
   const handleShare = async () => {
     if (!details) return;
-
-    // Manually construct the URL to ensure it's absolute and well-formed for the Web Share API.
-    // This avoids issues where window.location.href might be ambiguous or invalid.
     const path = `/${type}/${slug}?id=${details.id}`;
     const cleanPathname = window.location.pathname.replace(/index\.html$/, '');
     const shareUrl = `${window.location.origin}${cleanPathname}#${path}`;
-
     const shareTitle = title;
     const shareText = `Check out ${title} on CineStream! Find download links and more.`;
 
     if (navigator.share) {
         try {
-            await navigator.share({
-                title: shareTitle,
-                text: shareText,
-                url: shareUrl,
-            });
+            await navigator.share({ title: shareTitle, text: shareText, url: shareUrl });
         } catch (error) {
-            // Don't show an error if the user cancels the share action
             if ((error as DOMException).name !== 'AbortError') {
                  console.error('Error sharing:', error);
                  addToast('Could not share content.', 'error');
             }
         }
     } else {
-        // Fallback for browsers that don't support the Web Share API
         try {
             await navigator.clipboard.writeText(shareUrl);
             addToast('Link copied to clipboard!', 'info');
@@ -259,204 +249,197 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
     }
   };
 
-  if (loading) return <Spinner />;
-  if (!details) return <p>Content not found.</p>;
-  
-  const isFav = isFavorite(details.id);
-  const onWl = isOnWatchlist(details.id);
-  const releaseDate = 'release_date' in details ? details.release_date : details.first_air_date;
-  const runtime = 'runtime' in details ? details.runtime : (details.episode_run_time?.[0] || 0);
+  if (loading) {
+    return <DetailsPageSkeleton />;
+  }
 
-  const posterUrl = details.poster_path
-    ? `${TMDB_IMAGE_BASE_URL}${details.poster_path}`
-    : 'https://picsum.photos/500/750';
-    
-  // FIX: Cast to ContentItem to resolve discriminated union issue.
+  const posterUrl = details?.poster_path ? `${TMDB_IMAGE_BASE_URL}${details.poster_path}` : 'https://picsum.photos/500/750';
   const contentItemForCollection: ContentItem | null = details ? { ...details, type } as ContentItem : null;
+  const isFav = details ? isFavorite(details.id) : false;
+  const onWl = details ? isOnWatchlist(details.id) : false;
+  const releaseDate = details ? ('release_date' in details ? details.release_date : details.first_air_date) : '';
+  const runtime = details ? ('runtime' in details ? details.runtime : (details.episode_run_time?.[0] || 0)) : 0;
 
   return (
     <>
       {isCollectionModalOpen && contentItemForCollection && (
-        <AddToCollectionModal 
-          item={contentItemForCollection}
-          onClose={() => setIsCollectionModalOpen(false)}
-        />
+        <AddToCollectionModal item={contentItemForCollection} onClose={() => setIsCollectionModalOpen(false)} />
       )}
-      <div className="flex flex-col md:flex-row gap-8">
-        <div className="md:w-1/3 flex-shrink-0">
-          <img src={posterUrl} alt={title} className="rounded-lg shadow-2xl w-full object-cover aspect-[2/3]" />
+      <div className="min-h-screen w-full bg-primary relative text-white animate-fade-in">
+        <div 
+          className="absolute inset-0 z-0 bg-cover bg-center opacity-20" 
+          style={{ backgroundImage: `url(${originalBackdropUrl})` }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/80 to-primary/50 backdrop-blur-md"></div>
         </div>
-        <div className="md:w-2/3">
-          <div className="flex items-start justify-between gap-4">
-              <h1 className="text-4xl font-bold text-light-text dark:text-white">{title}</h1>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <button
-                  onClick={handleOpenCollectionModal}
-                  title="Add to collection"
-                  className="p-2 bg-light-secondary dark:bg-secondary rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                  aria-label="Add to collection"
-                >
-                  <PlusCircleIcon className="h-6 w-6 text-light-muted dark:text-muted" />
-                </button>
-                <button
-                  onClick={handleWatchlistToggle}
-                  title={onWl ? 'Remove from watchlist' : 'Add to watchlist'}
-                  className="p-2 bg-light-secondary dark:bg-secondary rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                  aria-label="Toggle Watchlist"
-                >
-                  <BookmarkIcon className={`h-6 w-6 transition-all ${onWl ? 'fill-accent stroke-accent' : 'text-light-muted dark:text-muted'}`} />
-                </button>
-                <button
-                  onClick={handleFavoriteToggle}
-                  title={isFav ? 'Remove from favorites' : 'Add to favorites'}
-                  className="p-2 bg-light-secondary dark:bg-secondary rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                  aria-label="Toggle Favorite"
-                >
-                  <HeartIcon className={`h-6 w-6 transition-all ${isFav ? 'fill-red-500 stroke-red-500' : 'text-light-muted dark:text-muted'}`} />
-                </button>
-                <button
-                  onClick={handleShare}
-                  title="Share"
-                  className="p-2 bg-light-secondary dark:bg-secondary rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                  aria-label="Share this content"
-                >
-                  <ShareIcon className="h-6 w-6 text-light-muted dark:text-muted" />
-                </button>
-              </div>
-          </div>
-
-          {details.tagline && <p className="text-light-muted dark:text-muted italic mt-1">"{details.tagline}"</p>}
-          <div className="flex items-center space-x-4 my-4 text-light-muted dark:text-muted">
-            <div className="flex items-center">
-              <StarIcon className="h-5 w-5 mr-1 text-yellow-400" />
-              <span className="font-bold text-light-text dark:text-white">{details.vote_average.toFixed(1)}</span> / 10
+        
+        {!details ? (
+            <div className="relative z-10 container flex items-center justify-center min-h-[70vh]">
+                <p>Content not found.</p>
             </div>
-            <div className="flex items-center">
-              <CalendarIcon className="h-5 w-5 mr-1" />
-              <span>{new Date(releaseDate).getFullYear()}</span>
-            </div>
-            {runtime > 0 && (
-              <div className="flex items-center">
-                <ClockIcon className="h-5 w-5 mr-1" />
-                <span>{runtime} min{type === 'tv' && ' / episode'}</span>
-              </div>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2 my-4">
-            {details.genres.map(genre => (
-              <span key={genre.id} className="bg-light-secondary dark:bg-secondary text-light-text dark:text-gray-200 px-3 py-1 text-xs font-semibold rounded-full">{genre.name}</span>
-            ))}
-          </div>
-          <h2 className="text-xl font-semibold mt-6 mb-2">Overview</h2>
-          <ExpandableText text={details.overview} />
-
-          {trailerKey && (
-            <div className="mt-8">
-              <h2 className="text-xl font-semibold mb-4">Trailer</h2>
-              <div className="aspect-[16/9] bg-black rounded-lg overflow-hidden shadow-lg">
-                <iframe
-                  src={`https://www.youtube.com/embed/${trailerKey}`}
-                  title="YouTube video player"
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                  className="w-full h-full"
-                ></iframe>
-              </div>
-            </div>
-          )}
-
-          {cast.length > 0 && (
-            <div className="mt-8">
-              <h2 className="text-xl font-semibold mb-4">Cast</h2>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
-                {cast.map(person => (
-                  <CastCard key={person.id} person={person} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="mt-8">
-            <TelegramAd />
-          </div>
-
-          <div className="mt-8 bg-light-secondary dark:bg-secondary p-6 rounded-lg">
-            <h2 className="text-2xl font-bold mb-4">Download Links</h2>
-            {storedMovie && storedMovie.download_links.length > 0 ? (
-              <>
-                {isAuthenticated ? (
-                  <>
-                    {!showLinks ? (
-                      <button
-                        onClick={handlePrepareDownloads}
-                        disabled={isPreparing}
-                        className="w-full flex items-center justify-center gap-2 bg-light-highlight dark:bg-highlight text-white font-bold py-3 px-4 rounded-lg hover:bg-green-600 transition-colors duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed"
-                      >
-                        {isPreparing ? (
-                          <>
-                            <SpinnerIcon className="animate-spin h-6 w-6" />
-                            <span>Generating links in {countdown}s...</span>
-                          </>
-                        ) : (
-                          <>
-                            <DownloadIcon className="h-6 w-6" />
-                            <span>Prepare Download Links</span>
-                          </>
+        ) : (
+            <>
+                <div className="relative z-10 container mx-auto px-4 pt-24 pb-12 md:pt-32 md:pb-16">
+                    <div className="flex flex-col md:flex-row gap-8 lg:gap-12">
+                    <div className="md:w-1/3 flex-shrink-0">
+                        <img src={posterUrl} alt={title} className="rounded-lg shadow-2xl shadow-black/50 w-full object-cover aspect-[2/3]" />
+                    </div>
+                    
+                    <div className="md:w-2/3">
+                        <div className="flex items-start justify-between gap-4">
+                            <h1 className="text-4xl lg:text-5xl font-bold text-white">{title}</h1>
+                        </div>
+                        {details.tagline && <p className="text-muted italic mt-2 text-lg">"{details.tagline}"</p>}
+                        
+                        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 my-4 text-muted">
+                        <div className="flex items-center">
+                            <CalendarIcon className="h-5 w-5 mr-1.5" />
+                            <span>{new Date(releaseDate).getFullYear()}</span>
+                        </div>
+                        {runtime > 0 && (
+                            <div className="flex items-center">
+                            <ClockIcon className="h-5 w-5 mr-1.5" />
+                            <span>{runtime} min{type === 'tv' && ' / ep'}</span>
+                            </div>
                         )}
-                      </button>
-                    ) : (
-                      <div className="space-y-3 animate-fade-in">
-                        {storedMovie.download_links.map((link, index) => (
-                          <button
-                            key={index}
-                            onClick={() => handleDownloadClick(link)}
-                            className="w-full flex items-center justify-between bg-light-accent dark:bg-accent text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-opacity"
-                          >
-                            <span>{link.label}</span>
-                            <DownloadIcon className="h-6 w-6" />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-center p-4 bg-light-primary dark:bg-primary/40 rounded-md border border-light-border dark:border-glass-border">
-                      <h3 className="font-bold text-lg text-light-text dark:text-white mb-2">Login to Download</h3>
-                      <p className="text-light-muted dark:text-muted mb-4">
-                          Please log in or create a free account to prepare and view the download links for this content.
-                      </p>
-                      <Link
-                          to="/login"
-                          state={{ from: location }}
-                          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-light-accent dark:bg-accent text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-opacity"
-                      >
-                          <DownloadIcon className="h-6 w-6" />
-                          <span>Log In or Sign Up to Download</span>
-                      </Link>
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="text-light-muted dark:text-muted">No download links available yet. Please check back later.</p>
-            )}
-          </div>
-          
-          <div className="mt-8 bg-light-secondary dark:bg-secondary p-6 rounded-lg">
-              <h2 className="text-2xl font-bold mb-2">Help the Community</h2>
-              <p className="text-light-muted dark:text-muted mb-4">
-                  Found a working download link? Help us keep our library up-to-date by suggesting it.
-              </p>
-              <Link
-                  to="/contribute"
-                  state={{ contentTitle: title, tmdbId: details.id, type }}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-light-accent/80 dark:bg-accent/80 text-white font-bold py-3 px-4 rounded-lg hover:bg-light-accent dark:hover:bg-accent transition-colors"
-              >
-                  <PlusCircleIcon className="h-6 w-6" />
-                  <span>Suggest a Link</span>
-              </Link>
-          </div>
-        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {details.genres.slice(0,3).map(genre => (
+                            <span key={genre.id} className="border border-gray-700 text-gray-300 px-3 py-1 text-xs font-semibold rounded-full">{genre.name}</span>
+                            ))}
+                        </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 my-6">
+                        <ScoreRing score={details.vote_average} />
+                        <span className="font-bold">User<br/>Score</span>
+                        <div className="h-10 w-px bg-gray-700"></div>
+                        <div className="flex items-center gap-2">
+                            <button onClick={handleOpenCollectionModal} title="Add to collection" className="h-11 w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Add to collection">
+                                <PlusCircleIcon className="h-6 w-6 text-white" />
+                            </button>
+                            <button onClick={handleWatchlistToggle} title={onWl ? 'Remove from watchlist' : 'Add to watchlist'} className="h-11 w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Toggle Watchlist">
+                                <BookmarkIcon className={`h-6 w-6 transition-all ${onWl ? 'fill-accent stroke-accent' : 'text-white'}`} />
+                            </button>
+                            <button onClick={handleFavoriteToggle} title={isFav ? 'Remove from favorites' : 'Add to favorites'} className="h-11 w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Toggle Favorite">
+                                <HeartIcon className={`h-6 w-6 transition-all ${isFav ? 'fill-red-500 stroke-red-500' : 'text-white'}`} />
+                            </button>
+                            <button onClick={handleShare} title="Share" className="h-11 w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Share this content">
+                                <ShareIcon className="h-6 w-6 text-white" />
+                            </button>
+                        </div>
+                        </div>
+                        
+                        <h2 className="text-xl font-semibold mt-6 mb-2">Overview</h2>
+                        <ExpandableText text={details.overview} />
+                        
+                        <div className="grid grid-cols-2 gap-4 mt-6">
+                        {crew.director && (
+                            <div>
+                                <p className="font-bold">{crew.director.name}</p>
+                                <p className="text-sm text-muted">Director</p>
+                            </div>
+                        )}
+                        {crew.writers.length > 0 && (
+                            <div>
+                                <p className="font-bold">{crew.writers.map(w => w.name).join(', ')}</p>
+                                <p className="text-sm text-muted">Writer(s)</p>
+                            </div>
+                        )}
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-4 mt-8">
+                            {trailerKey && (
+                            <Link
+                                to={`/trailer?key=${trailerKey}&title=${encodeURIComponent(title)}`}
+                                className="flex items-center gap-2 bg-white/90 text-black font-bold py-3 px-6 rounded-lg hover:bg-white transition-colors duration-300"
+                                >
+                                <PlayIcon className="h-6 w-6" />
+                                <span>Play Trailer</span>
+                                </Link>
+                            )}
+                        </div>
+                    </div>
+                    </div>
+                </div>
+
+                <div className="relative z-10 container mx-auto px-4 pb-16 md:pb-24">
+                    <div className="space-y-12">
+                        {cast.length > 0 && (
+                        <div>
+                            <h2 className="text-2xl font-semibold mb-4">Top Cast</h2>
+                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+                            {cast.map(person => ( <CastCard key={person.id} person={person} /> ))}
+                            </div>
+                        </div>
+                        )}
+                        <TelegramAd />
+                        <div className="glass-panel p-6 rounded-lg">
+                        <h2 className="text-2xl font-bold mb-4">Download Links</h2>
+                        {storedMovie && storedMovie.download_links.length > 0 ? (
+                            <>
+                                {isAuthenticated ? (
+                                <>
+                                    {!showLinks ? (
+                                    <button
+                                        onClick={handlePrepareDownloads}
+                                        disabled={isPreparing}
+                                        className="w-full flex items-center justify-center gap-2 bg-highlight text-white font-bold py-3 px-4 rounded-lg hover:bg-green-600 transition-colors duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed"
+                                    >
+                                        {isPreparing ? (
+                                        <>
+                                            <SpinnerIcon className="animate-spin h-6 w-6" />
+                                            <span>Generating links in {countdown}s...</span>
+                                        </>
+                                        ) : (
+                                        <>
+                                            <DownloadIcon className="h-6 w-6" />
+                                            <span>Prepare Download Links</span>
+                                        </>
+                                        )}
+                                    </button>
+                                    ) : (
+                                    <div className="space-y-3 animate-fade-in">
+                                        {storedMovie.download_links.map((link, index) => (
+                                        <button
+                                            key={index}
+                                            onClick={() => handleDownloadClick(link)}
+                                            className="w-full flex items-center justify-between bg-accent text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-opacity"
+                                        >
+                                            <span>{link.label}</span>
+                                            <DownloadIcon className="h-6 w-6" />
+                                        </button>
+                                        ))}
+                                    </div>
+                                    )}
+                                </>
+                                ) : (
+                                <div className="text-center p-4 bg-primary/40 rounded-md border border-glass-border">
+                                    <h3 className="font-bold text-lg text-white mb-2">Login to Download</h3>
+                                    <p className="text-muted mb-4">Please log in or create an account to view download links.</p>
+                                    <Link to="/login" state={{ from: location }} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-accent text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-opacity">
+                                        <DownloadIcon className="h-6 w-6" />
+                                        <span>Log In or Sign Up</span>
+                                    </Link>
+                                </div>
+                                )}
+                            </>
+                            ) : (
+                            <p className="text-muted">No download links available yet. Please check back later.</p>
+                            )}
+                        </div>
+                        
+                        <div className="glass-panel p-6 rounded-lg">
+                            <h2 className="text-2xl font-bold mb-2">Help the Community</h2>
+                            <p className="text-muted mb-4">Found a working link? Help us keep our library up-to-date by suggesting it.</p>
+                            <Link to="/contribute" state={{ contentTitle: title, tmdbId: details.id, type }} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-accent/80 text-white font-bold py-3 px-4 rounded-lg hover:bg-accent transition-colors">
+                                <PlusCircleIcon className="h-6 w-6" />
+                                <span>Suggest a Link</span>
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </>
+        )}
       </div>
     </>
   );

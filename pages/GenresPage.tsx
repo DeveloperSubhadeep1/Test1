@@ -4,7 +4,6 @@ import { getAllGenres } from '../services/api';
 import { Genre } from '../types';
 import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
-import Spinner from '../components/Spinner';
 
 const GenresPage: React.FC = () => {
     const [genres, setGenres] = useState<Genre[]>([]);
@@ -33,7 +32,16 @@ const GenresPage: React.FC = () => {
     }, [addToast]);
 
     if (loading) {
-        return <Spinner />;
+        return (
+            <div>
+                <h1 className="text-3xl font-bold mb-6 border-l-4 border-light-accent dark:border-accent pl-4">Explore by Genre</h1>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 animate-pulse">
+                    {Array.from({ length: 15 }).map((_, index) => (
+                        <div key={index} className="bg-light-secondary dark:bg-secondary h-20 rounded-lg"></div>
+                    ))}
+                </div>
+            </div>
+        );
     }
 
     return (

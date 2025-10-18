@@ -108,8 +108,16 @@ export interface CastMember {
   profile_path: string | null;
 }
 
+export interface CrewMember {
+  id: number;
+  name: string;
+  job: string;
+  department: string;
+}
+
 export interface CreditsResponse {
   cast: CastMember[];
+  crew: CrewMember[];
 }
 
 export interface PersonDetails {

@@ -32,7 +32,6 @@ import {
   MovieSummary,
   TVSummary,
 } from '../types';
-import Spinner from '../components/Spinner';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useToast } from '../hooks/useToast';
 import {
@@ -52,6 +51,7 @@ import {
   CheckCircleIcon,
 } from '../components/Icons';
 import { Avatar } from '../components/Avatars';
+import { DashboardSkeleton, TableSkeleton, CardListSkeleton, TicketSkeleton, DatabaseSkeleton } from '../components/AdminPageSkeletons';
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Tab Button Component
@@ -359,7 +359,7 @@ const DashboardTab: React.FC = () => {
       // Note: totalCollections is available in `metrics` but not displayed here as a card or in the chart legend.
   };
 
-  if (loading) return <Spinner />;
+  if (loading) return <DashboardSkeleton />;
   
   const chartColors = {
       totalLinks: metricConfig.totalLinks.color,
@@ -426,7 +426,7 @@ const UsersTab: React.FC = () => {
     getUsers().then(setUsers).catch(() => addToast('Failed to load users.', 'error')).finally(() => setLoading(false));
   }, [addToast]);
 
-  if (loading) return <Spinner />;
+  if (loading) return <><CardListSkeleton /><TableSkeleton /></>;
 
   return (
     <>
@@ -587,7 +587,7 @@ const SupportTicketsTab: React.FC = () => {
   };
 
 
-  if (loading) return <Spinner />;
+  if (loading) return <TicketSkeleton />;
 
   return (
     <>
@@ -727,7 +727,7 @@ const DatabaseTab: React.FC = () => {
     fetchData();
   }, [addToast]);
 
-  if (loading) return <Spinner />;
+  if (loading) return <DatabaseSkeleton />;
 
   return (
     <div className="glass-panel p-6 rounded-lg flex flex-col items-center justify-center min-h-[50vh]">
@@ -1056,7 +1056,7 @@ const MoviesTab: React.FC = () => {
     setMovieToDelete(null);
   };
 
-  if (loading) return <Spinner />;
+  if (loading) return <><CardListSkeleton /><TableSkeleton /></>;
 
   return (
     <>
