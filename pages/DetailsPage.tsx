@@ -279,7 +279,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
             </div>
         ) : (
             <>
-                <div className="relative z-10 container mx-auto px-4 pt-24 pb-12 md:pt-32 md:pb-16">
+                <div className="relative z-10 container mx-auto px-4 pt-16 pb-12 md:pt-20 md:pb-16">
                     <div className="flex flex-col md:flex-row gap-8 lg:gap-12">
                     <div className="md:w-1/3 flex-shrink-0">
                         <img src={posterUrl} alt={title} className="rounded-lg shadow-2xl shadow-black/50 w-full object-cover aspect-[2/3]" />

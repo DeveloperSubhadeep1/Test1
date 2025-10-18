@@ -7,7 +7,7 @@ const DetailsPageSkeleton: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/80 to-primary/50 backdrop-blur-md"></div>
       </div>
       
-      <div className="relative z-10 container mx-auto px-4 pt-24 pb-12 md:pt-32 md:pb-16 animate-pulse">
+      <div className="relative z-10 container mx-auto px-4 pt-16 pb-12 md:pt-20 md:pb-16 animate-pulse">
         <div className="flex flex-col md:flex-row gap-8 lg:gap-12">
           {/* Poster Skeleton */}
           <div className="md:w-1/3 flex-shrink-0">
