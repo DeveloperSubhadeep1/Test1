@@ -17,10 +17,57 @@ import { CalendarIcon, ClockIcon, DownloadIcon, HeartIcon, BookmarkIcon, ShareIc
 import ExpandableText from '../components/ExpandableText';
 import AddToCollectionModal from '../components/AddToCollectionModal';
 import ScoreRing from '../components/ScoreRing';
+import { parseFilenameDetails } from '../utils';
 
 interface DetailsPageProps {
   type: ContentType;
 }
+
+const DownloadLinkButton: React.FC<{ link: DownloadLink; title: string; year: string; onDownload: (link: DownloadLink) => void }> = ({ link, title, year, onDownload }) => {
+    const [displayLabel, setDisplayLabel] = useState(`${title} (${year}) - ${link.label}`);
+    
+    useEffect(() => {
+        const generateLabel = () => {
+            const url = link.url;
+            // Extract filename from URL more robustly
+            const filenameMatch = url.match(/([^/\\?]+)(?:[?#]|$)/);
+            const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : '';
+            
+            if (filename) {
+                const details = parseFilenameDetails(filename);
+
+                let labelParts = [`${title} (${year})`];
+                
+                if (details.languages.length > 0) {
+                    labelParts.push(`(${details.languages.join(' ')})`);
+                }
+                if (details.size) {
+                    labelParts.push(`[${details.size}]`);
+                }
+
+                // If we found extra details, use the new format.
+                // Otherwise, stick with a simpler format that includes the admin-provided label.
+                if (details.languages.length > 0 || details.size) {
+                    setDisplayLabel(labelParts.join(' '));
+                } else {
+                    setDisplayLabel(`${title} (${year}) - ${link.label}`);
+                }
+            }
+        };
+
+        generateLabel();
+    }, [link, title, year]);
+
+    return (
+        <button
+            onClick={() => onDownload(link)}
+            className="w-full flex items-center justify-between bg-accent text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-opacity text-left"
+        >
+            <span className="truncate">{displayLabel}</span>
+            <DownloadIcon className="h-6 w-6 flex-shrink-0 ml-4" />
+        </button>
+    );
+};
 
 const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   const { slug } = useParams<{ slug: string }>();
@@ -258,6 +305,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
   const isFav = details ? isFavorite(details.id) : false;
   const onWl = details ? isOnWatchlist(details.id) : false;
   const releaseDate = details ? ('release_date' in details ? details.release_date : details.first_air_date) : '';
+  const year = releaseDate ? new Date(releaseDate).getFullYear().toString() : 'N/A';
   const runtime = details ? ('runtime' in details ? details.runtime : (details.episode_run_time?.[0] || 0)) : 0;
 
   return (
@@ -294,7 +342,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
                         <div className="flex flex-wrap items-center gap-x-6 gap-y-3 my-4 text-muted">
                         <div className="flex items-center">
                             <CalendarIcon className="h-5 w-5 mr-1.5" />
-                            <span>{new Date(releaseDate).getFullYear()}</span>
+                            <span>{year}</span>
                         </div>
                         {runtime > 0 && (
                             <div className="flex items-center">
@@ -400,14 +448,13 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
                                     ) : (
                                     <div className="space-y-3 animate-fade-in">
                                         {storedMovie.download_links.map((link, index) => (
-                                        <button
-                                            key={index}
-                                            onClick={() => handleDownloadClick(link)}
-                                            className="w-full flex items-center justify-between bg-accent text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-opacity"
-                                        >
-                                            <span>{link.label}</span>
-                                            <DownloadIcon className="h-6 w-6" />
-                                        </button>
+                                            <DownloadLinkButton 
+                                                key={index}
+                                                link={link}
+                                                onDownload={handleDownloadClick}
+                                                title={title}
+                                                year={year}
+                                            />
                                         ))}
                                     </div>
                                     )}

@@ -68,7 +68,6 @@ export function parseFilename(filename: string): { movieName: string; year: numb
     nameParts = parts;
   }
   
-  // Filter out all keywords from the name parts to get a clean name
   const keywords = /(480p|720p|1080p|2160p|4k|uhd|aac|dts|ac3|hdrip|x264|x265|hevc|amzn|web-dl|webrip|bluray|hdtv|divx|xvid|repack|proper|internal|extended|uncut|remastered|multi)/i;
   
   const finalNameParts = [];
@@ -95,4 +94,28 @@ export function parseFilename(filename: string): { movieName: string; year: numb
    movieName = movieName.replace(/\s+/g, ' '); // collapse multiple spaces
 
   return { movieName, year, languages, quality };
+}
+
+export function parseFilenameDetails(filename: string): { languages: string[]; size: string | null } {
+  // Normalize filename for easier parsing
+  const normalized = filename.replace(/[._\[\]()-]/g, ' ').toLowerCase();
+
+  // Using \b to match whole words.
+  const languagesRegex = /\b(hindi|english|eng|tamil|telugu|kannada|malayalam|bengali|marathi|punjabi|gujarati|urdu|dual[- .]?audio|multi[- .]?audio)\b/ig;
+  const sizeRegex = /\b(\d+(\.\d+)?\s?(gb|mb))\b/ig;
+
+  const languages = [...normalized.matchAll(languagesRegex)].map(m => {
+      let lang = m[1].toLowerCase().replace(/[-.]/g, '');
+      if (lang === 'eng') return 'English';
+      if (lang === 'dualaudio') return 'Dual Audio';
+      if (lang === 'multiaudio') return 'Multi Audio';
+      return lang.charAt(0).toUpperCase() + lang.slice(1);
+  });
+
+  const sizeMatch = normalized.match(sizeRegex);
+  
+  return {
+    languages: [...new Set(languages)], // Remove duplicates
+    size: sizeMatch ? sizeMatch[0].toUpperCase().replace(/\s/g, '') : null,
+  };
 }
