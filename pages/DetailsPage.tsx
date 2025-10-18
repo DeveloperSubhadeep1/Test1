@@ -38,10 +38,6 @@ const DownloadLinkButton: React.FC<{ link: DownloadLink; title: string; year: st
             const details = parseMediaFilename(infoSource);
 
             let label = `${title} (${year})`;
-            
-            if (details.quality) {
-                label += ` ${details.quality}`;
-            }
 
             if (details.languages.length > 0) {
                 // Join with a comma for better readability, e.g., (Hindi, English)

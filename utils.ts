@@ -105,9 +105,9 @@ function coreFilenameParser(filename: string): { moviename: string; year: string
 /**
  * Parses a filename to extract the movie name and other metadata for the Admin Panel automation.
  */
-export function parseFilenameForAutomate(filename: string): { movieName: string; year: number | null; languages: string[]; quality: string | null; } {
-    const { moviename, year, languages, quality } = coreFilenameParser(filename);
-    return { movieName: moviename, year: year ? parseInt(year, 10) : null, languages, quality };
+export function parseFilenameForAutomate(filename: string): { movieName: string; year: number | null; languages: string[]; quality: string | null; size: string | null; } {
+    const { moviename, year, languages, quality, size } = coreFilenameParser(filename);
+    return { movieName: moviename, year: year ? parseInt(year, 10) : null, languages, quality, size };
 }
 
 /**

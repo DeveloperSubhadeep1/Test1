@@ -842,7 +842,7 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
   // NEW states for URL import
   const [importUrl, setImportUrl] = useState('');
   const [isProcessingUrl, setIsProcessingUrl] = useState(false);
-  const [parsedInfoFromUrl, setParsedInfoFromUrl] = useState<{ label: string; url: string } | null>(null);
+  const [parsedInfoFromUrl, setParsedInfoFromUrl] = useState<{ url: string; languages: string[]; size: string | null; } | null>(null);
 
   useEffect(() => {
     if (debouncedQuery.trim().length < 2) {
@@ -894,13 +894,8 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
       // Set search query to trigger search
       setSearchQuery(parsed.movieName);
       
-      // Construct a clean label from parsed info
-      const labelParts = [];
-      if (parsed.quality) labelParts.push(parsed.quality);
-      labelParts.push(...parsed.languages);
-      const suggestedLabel = labelParts.join(' ');
-
-      setParsedInfoFromUrl({ label: suggestedLabel, url: importUrl });
+      // Store the parsed metadata to construct the full label in Step 2
+      setParsedInfoFromUrl({ url: importUrl, languages: parsed.languages, size: parsed.size });
   };
 
 
@@ -921,14 +916,27 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
 
   // NEW useEffect to pre-fill links
   useEffect(() => {
-      if (selectedItem && parsedInfoFromUrl) {
-          // This is step 2 in the automated flow
-          setLinks([{ label: parsedInfoFromUrl.label || 'HD', url: parsedInfoFromUrl.url }]);
-      } else {
-          // This covers manual flow
-          setLinks([{ label: '', url: '' }]);
+    if (selectedItem && parsedInfoFromUrl) {
+      // This is step 2 in the automated flow. Construct the full label here.
+      const title = 'title' in selectedItem ? selectedItem.title : selectedItem.name;
+      const releaseDate = 'release_date' in selectedItem ? selectedItem.release_date : selectedItem.first_air_date;
+      const year = releaseDate ? new Date(releaseDate).getFullYear().toString() : '';
+      
+      let fullLabel = `${title} (${year})`;
+
+      if (parsedInfoFromUrl.languages.length > 0) {
+          fullLabel += ` (${parsedInfoFromUrl.languages.join(', ')})`;
       }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+      if (parsedInfoFromUrl.size) {
+          fullLabel += ` [${parsedInfoFromUrl.size}]`;
+      }
+      
+      setLinks([{ label: fullLabel, url: parsedInfoFromUrl.url }]);
+    } else {
+        // This covers manual flow
+        setLinks([{ label: '', url: '' }]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedItem]);
 
 
