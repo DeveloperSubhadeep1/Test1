@@ -81,17 +81,20 @@ function coreFilenameParser(filename: string): { moviename: string; year: string
     
     const languages: string[] = [];
     const languageMap: { [key: string]: string } = {
-        'hindi': 'Hindi', 'english': 'English', 'eng': 'English', 'tamil': 'Tamil',
+        'hindi': 'Hindi',
+        'हिन्दी': 'Hindi', // Added native script support
+        'english': 'English', 'eng': 'English', 'tamil': 'Tamil',
         'telugu': 'Telugu', 'kannada': 'Kannada', 'malayalam': 'Malayalam',
         'dual': 'Dual Audio', 'audio': 'Dual Audio',
     };
     const ignoreLangRegex = /aac|hdrip|x264|amzn|web-dl|webrip/i;
     
     parts.forEach(p => {
-        const pLower = p.toLowerCase();
-        if (languageMap[pLower] && !languages.includes(languageMap[pLower])) {
-            languages.push(languageMap[pLower]);
-        } else if (!/p$|^\d+$|\bg[b]?\b|\bm[b]?\b/i.test(pLower) && !ignoreLangRegex.test(pLower) && p.length > 2 && isNaN(Number(p))) {
+        // Use original casing for native scripts, but lowercase for map lookup
+        const pKey = p.toLowerCase();
+        if (languageMap[pKey] && !languages.includes(languageMap[pKey])) {
+            languages.push(languageMap[pKey]);
+        } else if (!/p$|^\d+$|\bg[b]?\b|\bm[b]?\b/i.test(pKey) && !ignoreLangRegex.test(pKey) && p.length > 2 && isNaN(Number(p))) {
              // Heuristic: If it's not quality, a number, size, or an ignored keyword, it might be a language.
              // This is less reliable but can catch languages not in the map.
              // languages.push(p.charAt(0).toUpperCase() + p.slice(1));
