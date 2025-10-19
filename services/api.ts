@@ -10,6 +10,7 @@ import {
   CreditsResponse,
   PersonDetails,
   PersonCredit,
+  TMDBSearchResult,
   Genre,
   UserProfile,
   HistoryItem,
@@ -42,7 +43,7 @@ const tmdbFetch = async (endpoint: string, params: Record<string, string> = {}) 
     return response.json();
 }
 
-export const searchTMDB = async (query: string): Promise<{ results: (MovieSummary | TVSummary)[] }> => {
+export const searchTMDB = async (query: string): Promise<{ results: TMDBSearchResult[] }> => {
     const data = await tmdbFetch('/search/multi', { query });
     // Filter out people and items without posters for a cleaner UI
     const filteredResults = data.results.filter(

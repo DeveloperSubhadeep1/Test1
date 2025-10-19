@@ -21,8 +21,8 @@ import {
   AdminUserView,
   SupportTicket,
   DownloadLink,
-  MovieSummary,
-  TVSummary,
+  TMDBSearchResult,
+  ContentItem,
   ContentType,
   DbStats,
 } from '../types';
@@ -750,7 +750,7 @@ interface ParsedUrlData {
 interface ProcessedItem {
     url: string;
     parsedInfo: ParsedUrlData | null;
-    tmdbMatch: ((MovieSummary | TVSummary) & { type: ContentType }) | null;
+    tmdbMatch: ContentItem | null;
     status: 'pending' | 'success' | 'parsing_failed' | 'tmdb_failed';
     errorMessage?: string;
 }
@@ -767,8 +767,8 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave, allMovie
   const [step, setStep] = useState(1);
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounce(query, 500);
-  const [searchResults, setSearchResults] = useState<(MovieSummary | TVSummary)[]>([]);
-  const [selectedItem, setSelectedItem] = useState<(MovieSummary | TVSummary) & { type: ContentType } | null>(null);
+  const [searchResults, setSearchResults] = useState<TMDBSearchResult[]>([]);
+  const [selectedItem, setSelectedItem] = useState<ContentItem | null>(null);
   const [links, setLinks] = useState<DownloadLink[]>([{ label: '', url: '' }]);
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
@@ -815,10 +815,9 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave, allMovie
     }
   };
 
-  const handleSelect = (item: MovieSummary | TVSummary) => {
-    // FIX: Use a more specific type assertion instead of 'any' to access the 'media_type' property, which exists on multi-search results but not in the base types.
-    const type = (item as { media_type?: ContentType }).media_type || ('title' in item ? 'movie' : 'tv');
-    setSelectedItem({ ...item, type });
+  const handleSelect = (item: TMDBSearchResult) => {
+    const { media_type, ...rest } = item;
+    setSelectedItem({ ...rest, type: media_type } as ContentItem);
     setStep(2);
   };
 
@@ -879,19 +878,14 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave, allMovie
         const searchQuery = parsedInfo.year ? `${parsedInfo.movieName} ${parsedInfo.year}` : parsedInfo.movieName;
         const tmdbResults = await searchTMDB(searchQuery);
         
-        const bestMatch = tmdbResults.results.find(
-            // FIX: Use a type assertion to safely access the 'media_type' property.
-            r => {
-                const mediaType = (r as { media_type?: ContentType }).media_type;
-                return mediaType === 'movie' || mediaType === 'tv';
-            }
-        ) as (MovieSummary | TVSummary) & { media_type: ContentType } | undefined;
+        const bestMatch = tmdbResults.results[0];
         
         if (!bestMatch) {
             throw new Error(`No movie/TV match found for "${parsedInfo.movieName}".`);
         }
         
-        const tmdbMatch = { ...bestMatch, type: bestMatch.media_type };
+        const { media_type, ...restOfBestMatch } = bestMatch;
+        const tmdbMatch = { ...restOfBestMatch, type: media_type } as ContentItem;
         
         return { url, parsedInfo, tmdbMatch, status: 'success' };
 
@@ -1010,15 +1004,19 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave, allMovie
                             </div>
                             {loading && <Spinner />}
                             <ul className="mt-2 max-h-80 overflow-y-auto">
-                            {searchResults.map(item => (
-                                <li key={item.id} onClick={() => handleSelect(item)} className="p-2 flex gap-4 items-center hover:bg-cyan/10 rounded cursor-pointer transition-colors">
-                                <img src={item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : ''} alt="" className="w-10 h-14 object-cover rounded bg-primary" />
-                                <div>
-                                    <p className="text-white">{'title' in item ? item.title : item.name}</p>
-                                    <p className="text-sm text-muted">{new Date('release_date' in item ? item.release_date : item.first_air_date).getFullYear() || 'N/A'}</p>
-                                </div>
-                                </li>
-                            ))}
+                            {searchResults.map(item => {
+                                const title = item.media_type === 'movie' ? item.title : item.name;
+                                const releaseDate = item.media_type === 'movie' ? item.release_date : item.first_air_date;
+                                return (
+                                    <li key={item.id} onClick={() => handleSelect(item)} className="p-2 flex gap-4 items-center hover:bg-cyan/10 rounded cursor-pointer transition-colors">
+                                        <img src={item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : ''} alt="" className="w-10 h-14 object-cover rounded bg-primary" />
+                                        <div>
+                                            <p className="text-white">{title}</p>
+                                            <p className="text-sm text-muted">{new Date(releaseDate).getFullYear() || 'N/A'}</p>
+                                        </div>
+                                    </li>
+                                );
+                            })}
                             </ul>
                         </div>
                     ) : (

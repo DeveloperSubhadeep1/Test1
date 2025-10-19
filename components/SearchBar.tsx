@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useDebounce } from '../hooks/useDebounce';
 import { SearchIcon, InfoIcon, FilmIcon } from './Icons';
 import { searchTMDB } from '../services/api';
-import { MovieSummary, TVSummary } from '../types';
+import { TMDBSearchResult } from '../types';
 import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
 import { generateSlug } from '../utils';
 
@@ -27,7 +27,7 @@ const SearchBar: React.FC = () => {
   const [query, setQuery] = useState(getQueryFromPath());
   const debouncedQuery = useDebounce(query, 300);
 
-  const [suggestions, setSuggestions] = useState<(MovieSummary | TVSummary)[]>([]);
+  const [suggestions, setSuggestions] = useState<TMDBSearchResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -128,9 +128,9 @@ const SearchBar: React.FC = () => {
                 setShowSuggestions(false);
                 if (activeIndex < suggestions.length) {
                     const item = suggestions[activeIndex];
-                    const type = 'title' in item ? 'movie' : 'tv';
-                    const title = 'title' in item ? item.title : item.name;
-                    const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
+                    const type = item.media_type;
+                    const title = type === 'movie' ? item.title : item.name;
+                    const releaseDate = type === 'movie' ? item.release_date : item.first_air_date;
                     const year = releaseDate ? new Date(releaseDate).getFullYear() : undefined;
                     const slug = generateSlug(title, year);
                     navigate(`/${type}/${item.id}-${slug}`);
@@ -190,9 +190,9 @@ const SearchBar: React.FC = () => {
                 </div>
                 <ul>
                     {suggestions.map((item, index) => {
-                        const type = 'title' in item ? 'movie' : 'tv';
-                        const title = type === 'movie' ? (item as MovieSummary).title : (item as TVSummary).name;
-                        const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
+                        const type = item.media_type;
+                        const title = type === 'movie' ? item.title : item.name;
+                        const releaseDate = type === 'movie' ? item.release_date : item.first_air_date;
                         const year = releaseDate ? new Date(releaseDate).getFullYear() : undefined;
                         const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : null;
                         const slug = generateSlug(title, year);

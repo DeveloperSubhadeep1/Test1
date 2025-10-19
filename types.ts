@@ -130,6 +130,8 @@ export interface PersonDetails {
 
 export type PersonCredit = (MovieSummary | TVSummary) & { media_type: 'movie' | 'tv' };
 
+export type TMDBSearchResult = (MovieSummary & { media_type: 'movie' }) | (TVSummary & { media_type: 'tv' });
+
 export interface UserProfile {
   _id: string;
   username: string;

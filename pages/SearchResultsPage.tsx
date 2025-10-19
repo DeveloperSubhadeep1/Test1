@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { searchTMDB } from '../services/api';
-import { MovieSummary, TVSummary } from '../types';
+import { TMDBSearchResult } from '../types';
 import { useToast } from '../hooks/useToast';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import MovieCard from '../components/MovieCard';
@@ -10,7 +10,7 @@ import { InfoIcon } from '../components/Icons';
 
 const SearchResultsPage: React.FC = () => {
   const { query } = useParams<{ query: string }>();
-  const [results, setResults] = useState<(MovieSummary | TVSummary)[]>([]);
+  const [results, setResults] = useState<TMDBSearchResult[]>([]);
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
 
@@ -58,12 +58,7 @@ const SearchResultsPage: React.FC = () => {
       {results.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-5 animate-fade-in">
           {results.map(item => {
-            const type = (item as any).media_type;
-
-            if (type !== 'movie' && type !== 'tv') {
-              return null;
-            }
-
+            const type = item.media_type;
             return <MovieCard key={`${type}-${item.id}`} item={item} type={type} />;
           })}
         </div>
