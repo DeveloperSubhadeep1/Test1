@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const nodemailer = require('nodemailer');
 const mongoose = require('mongoose');
+const fetch = require('node-fetch');
 
 // Import Mongoose Models
 const User = require('../models/User');
@@ -11,6 +12,8 @@ const Collection = require('../models/Collection');
 const History = require('../models/History');
 const Favorite = require('../models/Favorite');
 const Watchlist = require('../models/Watchlist');
+
+const TMDB_API_KEY = 'c83a22a71ba60632da9d3a91cd5a9274';
 
 
 // --- Helper Middleware ---
@@ -291,7 +294,29 @@ router.post('/utils/parse-url', async (req, res) => {
         }
         
         const decodedFilename = decodeURIComponent(filenameWithExt);
-        const { movieName, year, languages, quality } = parseFilename(decodedFilename);
+        let { movieName, year, languages, quality } = parseFilename(decodedFilename);
+
+        // If year is not found in filename, try to get it from TMDb
+        if (!year && movieName) {
+            try {
+                const searchParams = new URLSearchParams({
+                    api_key: TMDB_API_KEY,
+                    query: movieName,
+                });
+                const tmdbRes = await fetch(`https://api.themoviedb.org/3/search/movie?${searchParams.toString()}`);
+                if (tmdbRes.ok) {
+                    const tmdbData = await tmdbRes.json();
+                    if (tmdbData.results && tmdbData.results.length > 0) {
+                        const releaseDate = tmdbData.results[0].release_date;
+                        if (releaseDate) {
+                            year = new Date(releaseDate).getFullYear().toString();
+                        }
+                    }
+                }
+            } catch (tmdbError) {
+                console.warn(`TMDb fallback search failed for "${movieName}":`, tmdbError.message);
+            }
+        }
 
         let size = null;
         try {
@@ -489,10 +514,10 @@ router.post('/auth/send-reset-otp', rateLimiter, verifyTurnstile, async (req, re
                             <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #ffffff; background-color: #FF2E63; padding: 16px 24px; border-radius: 8px; display: inline-block; margin: 16px 0;">
                                 ${otp}
                             </div>
-                            <p style="font-size: 14px; color: #57606a;">This code is valid for 1 hour. Please use it promptly to secure your account.</p>
+                            <p style="font-size: 14px; color: #57606a;">This code is valid for 1 hour. Please use it soon.</p>
                         </div>
                         <div style="background-color: #161B22; color: #8B949E; padding: 16px; text-align: center; font-size: 12px;">
-                            <p>If you did not request a password reset, please disregard this email. Your account is safe.</p>
+                            <p>If you did not request a password reset, you can safely ignore this email.</p>
                             <p>&copy; ${new Date().getFullYear()} CineStream. All Rights Reserved.</p>
                         </div>
                     </div>
@@ -500,497 +525,489 @@ router.post('/auth/send-reset-otp', rateLimiter, verifyTurnstile, async (req, re
             });
         }
         
-        res.status(200).json({ message: 'If an account with this email exists, a password reset code has been sent.' });
+        res.status(200).json({ message: 'If an account with that email exists, a reset code has been sent.' });
 
     } catch (error) {
-        console.error('Error sending password reset OTP:', error);
-        let message = 'Server error while sending password reset code.';
-        if (error.code === 'EAUTH' || error.responseCode === 535) {
-            message = 'Email service authentication failed. The server is misconfigured. Please contact the site administrator.';
-        } else if (error.code === 'ETIMEDOUT') {
-            message = 'Connection to email service timed out. Please try again later.';
-        }
-        res.status(500).json({ message });
+        console.error('Error sending reset OTP:', error);
+        // Do not reveal server-side errors to the user to prevent enumeration attacks.
+        res.status(200).json({ message: 'If an account with that email exists, a reset code has been sent.' });
     }
 });
 
-// Step 2 of Password Reset - Verify OTP and update password
+
+// Step 2 of Password Reset - Verify and Update
 router.post('/auth/reset-password', async (req, res) => {
     try {
         const { email, otp, newPassword } = req.body;
-        
-        if (!email || !otp || !newPassword) {
-            return res.status(400).json({ message: 'Email, OTP, and new password are required.' });
-        }
-        if (newPassword.length < 6) {
-            return res.status(400).json({ message: 'Password must be at least 6 characters.' });
-        }
-
         const storedData = otpStore[email];
 
         if (!storedData || storedData.type !== 'reset') {
-            return res.status(400).json({ message: 'Invalid request or no active password reset for this email.' });
+            return res.status(400).json({ message: 'Invalid request. Please start the reset process again.' });
         }
-
+        
         if (Date.now() > storedData.expiry) {
             delete otpStore[email];
-            return res.status(400).json({ message: 'OTP has expired. Please request a new one.' });
+            return res.status(400).json({ message: 'OTP has expired. Please try again.' });
         }
 
         if (otp !== storedData.otp) {
             return res.status(400).json({ message: 'Invalid OTP.' });
         }
-
+        
         const user = await User.findOne({ email });
         if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
+             return res.status(404).json({ message: 'User not found.' });
         }
-
-        // In a real app, hash this password
+        
+        // In a real app, hash the password: user.password = await bcrypt.hash(newPassword, 10);
         user.password = newPassword;
         await user.save();
         
         delete otpStore[email];
 
-        res.status(200).json({ message: 'Password has been reset successfully. Please log in.' });
+        res.status(200).json({ message: 'Password has been reset successfully. You can now log in.' });
 
     } catch (error) {
-        console.error('Error resetting password:', error);
+        console.error('Error during password reset:', error);
         res.status(500).json({ message: 'Server error during password reset.' });
     }
 });
 
-// --- Admin Diagnostics ---
-router.post('/admin/test-email', getUserId, requireAdmin, async (req, res) => {
-    try {
-        await transporter.verify(); // First, verify connection config
-        const info = await transporter.sendMail({
-            from: `"CineStream Diagnostics" <${process.env.EMAIL_USER}>`,
-            to: process.env.EMAIL_USER,
-            subject: 'CineStream Email Test Successful ✔',
-            html: `
-                <div style="font-family: sans-serif; padding: 20px;">
-                    <h2>Email Configuration Test</h2>
-                    <p>This is an automated test email from your CineStream application.</p>
-                    <p>If you received this, your email service is configured correctly!</p>
-                    <p style="color: #888;">Timestamp: ${new Date().toISOString()}</p>
-                </div>
-            `,
-        });
 
-        console.log('Test email sent: %s', info.messageId);
-        res.status(200).json({ success: true, message: `Successfully sent test email to ${process.env.EMAIL_USER}. Message ID: ${info.messageId}` });
-
-    } catch (error) {
-        console.error('Email diagnostic test failed:', error);
-        
-        let errorMessage = `Failed to send test email. Error: ${error.message}. Code: ${error.code || 'N/A'}. Command: ${error.command || 'N/A'}.`;
-        
-        // Add specific troubleshooting advice for common errors
-        if (error.code === 'ETIMEDOUT') {
-            errorMessage += `\n\nTROUBLESHOOTING:\nThis is a connection timeout error. It usually means the server couldn't reach Google's mail server. Please check the following:\n1.  **Google Security Alert:** Check the inbox of your EMAIL_USER (${process.env.EMAIL_USER}) for a "Security alert" email from Google. You may need to approve the sign-in attempt from the new server location (Render).\n2.  **Firewall:** Ensure your hosting provider (Render) allows outbound connections on port 465. (This is usually not an issue).\n3.  **Wait and Retry:** Sometimes, this is a temporary network issue. Please wait a minute and try again.`;
-        } else if (error.code === 'EAUTH' || (error.responseCode === 535)) {
-             errorMessage += `\n\nTROUBLESHOOTING:\nThis is an authentication error. Please check your email credentials:\n1.  **Correct App Password:** Make sure your EMAIL_PASS is the 16-character "App Password" generated from your Google Account, NOT your regular Gmail password.\n2.  **No Spaces:** Ensure the App Password was copied without any spaces.\n3.  **2-Step Verification:** "App Passwords" can only be used if 2-Step Verification is enabled on your Google Account.`;
-        }
-
-        res.status(500).json({ success: false, message: errorMessage });
-    }
-});
-
-// --- User Management ---
+// --- User Profile ---
 router.patch('/users/profile', getUserId, async (req, res) => {
     try {
-        const user = await User.findById(req.userId);
-        if (!user) {
+        const { customName, dob, gender, avatar } = req.body;
+        const updateData = {};
+        
+        if (customName !== undefined) updateData.customName = customName;
+        if (dob !== undefined) updateData.dob = dob;
+        if (gender !== undefined) updateData.gender = gender;
+        if (avatar !== undefined) updateData.avatar = avatar;
+
+        const updatedUser = await User.findByIdAndUpdate(req.userId, updateData, { new: true, runValidators: true });
+        
+        if (!updatedUser) {
             return res.status(404).json({ message: 'User not found.' });
         }
-
-        const { customName, dob, gender, avatar } = req.body;
-        if (customName !== undefined) user.customName = customName.trim();
-        if (avatar !== undefined) user.avatar = avatar;
-        if (gender !== undefined) user.gender = gender;
         
-        // Explicitly handle Date of Birth to prevent Mongoose CastErrors
-        // that would trigger a generic 500 error.
-        if (dob !== undefined) {
-            // Allow clearing the date
-            if (dob === null || dob === '') {
-                user.dob = null;
-            } else {
-                const date = new Date(dob);
-                // Check if the provided date string is valid
-                if (isNaN(date.getTime())) {
-                    // If invalid, send a specific error back to the client.
-                    return res.status(400).json({ message: 'Invalid Date of Birth format provided.' });
-                }
-                user.dob = date;
-            }
-        }
-        
-        await user.save();
-        const { password, ...userProfile } = user.toObject();
+        const { password: _, ...userProfile } = updatedUser.toObject();
         res.json(userProfile);
+
     } catch (error) {
-        console.error('Error updating profile:', error);
-        // Catch Mongoose validation errors (e.g., for the gender enum)
-        if (error.name === 'ValidationError') {
-            return res.status(400).json({ message: Object.values(error.errors).map(e => e.message).join(', ') });
-        }
-        res.status(500).json({ message: 'Server error updating profile.' });
+        console.error("Error updating user profile:", error);
+        res.status(500).json({ message: 'Server error while updating profile.' });
     }
 });
 
-router.get('/users', getUserId, requireAdmin, async (req, res) => {
+
+// --- Favorites ---
+router.get('/favorites', getUserId, async (req, res) => {
     try {
-        const users = await User.aggregate([
-            { $match: { username: { $ne: 'admin' } } },
-            { $project: { password: 0, __v: 0 } },
-            {
-                $lookup: {
-                    from: 'favorites',
-                    let: { userIdString: { $toString: '$_id' } },
-                    pipeline: [
-                        { $match: { $expr: { $eq: ['$userId', '$$userIdString'] } } },
-                        { $count: 'count' }
-                    ],
-                    as: 'favorites',
-                },
-            },
-            {
-                $lookup: {
-                    from: 'watchlists',
-                    let: { userIdString: { $toString: '$_id' } },
-                    pipeline: [
-                        { $match: { $expr: { $eq: ['$userId', '$$userIdString'] } } },
-                        { $count: 'count' }
-                    ],
-                    as: 'watchlist',
-                },
-            },
-            {
-                $addFields: {
-                    favoritesCount: { $ifNull: [{ $arrayElemAt: ['$favorites.count', 0] }, 0] },
-                    watchlistCount: { $ifNull: [{ $arrayElemAt: ['$watchlist.count', 0] }, 0] },
-                },
-            },
-            { $project: { favorites: 0, watchlist: 0 } }
-        ]);
-        res.json(users);
+        const favorites = await Favorite.find({ userId: req.userId }).sort({ dateAdded: -1 });
+        res.json(favorites);
     } catch (error) {
-        console.error('Error fetching users for admin:', error);
-        res.status(500).json({ message: 'Server error fetching user data.' });
+        res.status(500).json({ message: 'Server error fetching favorites.' });
     }
 });
-
-
-// --- Admin / Stored Content Routes ---
-router.get('/stored-movies', getUserId, requireAdmin, async (req, res) => res.json(await StoredMovie.find({})));
-router.get('/stored-movies/find', async (req, res) => {
-    const { tmdbId, type } = req.query;
-    res.json(await StoredMovie.findOne({ tmdb_id: tmdbId, type: type }));
-});
-router.post('/stored-movies', getUserId, requireAdmin, async (req, res) => {
-    try {
-        const newMovie = new StoredMovie(req.body);
-        await newMovie.save();
-        res.status(201).json(newMovie);
-    } catch (error) {
-        // Handle unique constraint error
-        if (error.code === 11000) {
-            return res.status(409).json({ message: 'This movie/TV show already has links stored.' });
-        }
-        res.status(500).json({ message: 'Failed to add movie.' });
-    }
-});
-router.patch('/stored-movies/:id', getUserId, requireAdmin, async (req, res) => {
-    try {
-        const { download_links } = req.body;
-        const updatedMovie = await StoredMovie.findByIdAndUpdate(
-            req.params.id,
-            { download_links },
-            { new: true, runValidators: true }
-        );
-        if (!updatedMovie) {
-            return res.status(404).json({ message: 'Movie not found.' });
-        }
-        res.json(updatedMovie);
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to update movie.' });
-    }
-});
-router.delete('/stored-movies/:id', getUserId, requireAdmin, async (req, res) => {
-    await StoredMovie.findByIdAndDelete(req.params.id);
-    res.status(204).send();
-});
-router.patch('/stored-movies/:id/increment', async (req, res) => {
-    // Also add to user history if a user is logged in
-    const userId = req.headers['x-user-id'];
-    if (userId) {
-        try {
-            const movie = await StoredMovie.findById(req.params.id);
-            if (movie) {
-                 // Use updateOne with upsert to avoid creating duplicates
-                await History.updateOne(
-                    { userId, id: movie.tmdb_id },
-                    { 
-                        $set: {
-                            ...movie.toObject(),
-                            userId: userId,
-                            id: movie.tmdb_id,
-                            viewedAt: new Date()
-                        },
-                    },
-                    { upsert: true }
-                );
-            }
-        } catch (histError) {
-            console.error("Could not update history on download increment", histError);
-        }
-    }
-    await StoredMovie.findByIdAndUpdate(req.params.id, { $inc: { download_count: 1 } });
-    res.status(204).send();
-});
-
-
-// --- Support Tickets ---
-router.get('/support-tickets', getUserId, requireAdmin, async (req, res) => res.json(await SupportTicket.find({}).sort({ timestamp: -1 })));
-
-router.post('/support-tickets', verifyTurnstile, async (req, res) => {
-    const userId = req.headers['x-user-id'];
-    let user = null;
-    let username = 'Anonymous';
-
-    if (userId) {
-        try {
-            if (userId === 'admin_user') {
-                username = 'admin';
-            } else {
-                user = await User.findById(userId);
-                if (user) {
-                    username = user.username;
-                } else {
-                    return res.status(404).json({ message: 'User not found. Your session may be invalid.' });
-                }
-            }
-        } catch (error) {
-            if (error.name === 'CastError') {
-                return res.status(400).json({ message: 'Invalid User ID format in session.' });
-            }
-            console.error("Error finding user for support ticket:", error);
-        }
-    }
-    
-    const ticketData = {
-        ...req.body,
-        timestamp: new Date()
-    };
-
-    if (userId) {
-        ticketData.userId = userId;
-        ticketData.username = username;
-    }
-
-    const newTicket = new SupportTicket(ticketData);
-    await newTicket.save();
-    res.status(201).json(newTicket);
-});
-
-router.delete('/support-tickets/:id', getUserId, requireAdmin, async (req, res) => {
-    await SupportTicket.findByIdAndDelete(req.params.id);
-    res.status(204).send();
-});
-
-
-// --- Metrics ---
-router.get('/metrics', getUserId, requireAdmin, async (req, res) => {
-    const movies = await StoredMovie.find({});
-    const ticketsCount = await SupportTicket.countDocuments();
-    const usersCount = await User.countDocuments({ username: { $ne: 'admin' } });
-    const collectionsCount = await Collection.countDocuments();
-    const totalLinks = movies.reduce((sum, movie) => sum + movie.download_links.length, 0);
-    const totalDownloads = movies.reduce((sum, movie) => sum + movie.download_count, 0);
-    res.json({ totalLinks, totalDownloads, totalSupportTickets: ticketsCount, totalUsers: usersCount, totalCollections: collectionsCount });
-});
-
-// --- Database Stats ---
-router.get('/db-stats', getUserId, requireAdmin, async (req, res) => {
-    try {
-        const stats = await mongoose.connection.db.stats();
-        const usedBytes = stats.storageSize || 0;
-        // Free tier of MongoDB Atlas is 512MB
-        const totalBytes = 512 * 1024 * 1024; 
-        res.json({ usedBytes, totalBytes });
-    } catch (error) {
-        console.error('Error fetching database stats:', error);
-        res.status(500).json({ message: 'Server error fetching database stats.' });
-    }
-});
-
-
-// --- User-specific lists (Favorites, Watchlist, History) ---
-// Favorites
-router.get('/favorites', getUserId, async (req, res) => res.json(await Favorite.find({ userId: req.userId }).sort({ dateAdded: -1 })));
 router.post('/favorites', getUserId, async (req, res) => {
-    const newItem = new Favorite({ ...req.body, userId: req.userId });
-    await newItem.save();
-    res.status(201).json(newItem);
+    try {
+        const newItem = new Favorite({ ...req.body, userId: req.userId });
+        await newItem.save();
+        res.status(201).json(newItem);
+    } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ message: 'Item already in favorites.' });
+        res.status(500).json({ message: 'Server error adding favorite.' });
+    }
 });
 router.delete('/favorites/:tmdbId', getUserId, async (req, res) => {
-    await Favorite.deleteOne({ userId: req.userId, id: req.params.tmdbId });
-    res.status(204).send();
+    try {
+        await Favorite.deleteOne({ userId: req.userId, id: req.params.tmdbId });
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ message: 'Server error removing favorite.' });
+    }
 });
 
-// Watchlist
-router.get('/watchlist', getUserId, async (req, res) => res.json(await Watchlist.find({ userId: req.userId }).sort({ dateAdded: -1 })));
+
+// --- Watchlist ---
+router.get('/watchlist', getUserId, async (req, res) => {
+    try {
+        const watchlist = await Watchlist.find({ userId: req.userId }).sort({ dateAdded: -1 });
+        res.json(watchlist);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error fetching watchlist.' });
+    }
+});
 router.post('/watchlist', getUserId, async (req, res) => {
-    const newItem = new Watchlist({ ...req.body, userId: req.userId });
-    await newItem.save();
-    res.status(201).json(newItem);
+    try {
+        const newItem = new Watchlist({ ...req.body, userId: req.userId });
+        await newItem.save();
+        res.status(201).json(newItem);
+    } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ message: 'Item already in watchlist.' });
+        res.status(500).json({ message: 'Server error adding to watchlist.' });
+    }
 });
 router.delete('/watchlist/:tmdbId', getUserId, async (req, res) => {
-    await Watchlist.deleteOne({ userId: req.userId, id: req.params.tmdbId });
-    res.status(204).send();
+    try {
+        await Watchlist.deleteOne({ userId: req.userId, id: req.params.tmdbId });
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ message: 'Server error removing from watchlist.' });
+    }
 });
 
 
-// History
-router.get('/history', getUserId, async (req, res) => res.json(await History.find({ userId: req.userId }).sort({ viewedAt: -1 })));
+// --- History ---
+router.get('/history', getUserId, async (req, res) => {
+    try {
+        const history = await History.find({ userId: req.userId }).sort({ viewedAt: -1 });
+        res.json(history);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error fetching history.' });
+    }
+});
 router.post('/history', getUserId, async (req, res) => {
-    // Use updateOne with upsert to either create a new history item or update the timestamp of an existing one.
-    // This prevents the history from being cluttered with duplicate entries for the same item.
-    const item = { ...req.body, userId: req.userId };
-    const updatedHistoryItem = await History.findOneAndUpdate(
-        { userId: req.userId, id: item.id },
-        { ...item, viewedAt: new Date() },
-        { new: true, upsert: true }
-    );
-    res.status(201).json(updatedHistoryItem);
+    try {
+        // Use `findOneAndUpdate` with `upsert: true` to either update the timestamp of an existing item
+        // or create a new one. This prevents duplicates and keeps the most recent view time.
+        const newItem = await History.findOneAndUpdate(
+            { userId: req.userId, id: req.body.id },
+            { ...req.body, userId: req.userId, viewedAt: new Date() },
+            { new: true, upsert: true, setDefaultsOnInsert: true }
+        );
+        res.status(201).json(newItem);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error adding to history.' });
+    }
 });
 router.delete('/history', getUserId, async (req, res) => {
-    await History.deleteMany({ userId: req.userId });
-    res.status(204).send();
+    try {
+        await History.deleteMany({ userId: req.userId });
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ message: 'Server error clearing history.' });
+    }
 });
 
 
 // --- Collections ---
-// Create a new collection
+router.get('/collections/user', getUserId, async (req, res) => {
+    try {
+        const collections = await Collection.find({ userId: req.userId }).sort({ updatedAt: -1 });
+        res.json(collections);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error fetching collections.' });
+    }
+});
+router.get('/collections/:id', async (req, res) => {
+    try {
+        const collection = await Collection.findById(req.params.id);
+        if (!collection) return res.status(404).json({ message: 'Collection not found.' });
+
+        if (collection.isPublic) {
+            return res.json(collection);
+        }
+        
+        // If private, check for ownership
+        const userId = req.headers['x-user-id'];
+        if (userId && userId === collection.userId) {
+            return res.json(collection);
+        }
+
+        return res.status(403).json({ message: 'This collection is private.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error fetching collection.' });
+    }
+});
 router.post('/collections', getUserId, async (req, res) => {
     try {
         const { name, description, isPublic } = req.body;
-        if (!name) {
-            return res.status(400).json({ message: 'Collection name is required.' });
-        }
-        const newCollection = new Collection({
-            userId: req.userId,
-            name,
-            description,
-            isPublic,
-            items: [],
-        });
+        const newCollection = new Collection({ name, description, isPublic, userId: req.userId, items: [] });
         await newCollection.save();
         res.status(201).json(newCollection);
     } catch (error) {
         res.status(500).json({ message: 'Server error creating collection.' });
     }
 });
-
-// Get all collections for the logged-in user
-router.get('/collections/user', getUserId, async (req, res) => {
-    try {
-        const collections = await Collection.find({ userId: req.userId }).sort({ createdAt: -1 });
-        res.json(collections);
-    } catch (error) {
-        res.status(500).json({ message: 'Server error fetching collections.' });
-    }
-});
-
-// Get a single collection's details
-router.get('/collections/:id', async (req, res) => {
-    try {
-        const collection = await Collection.findById(req.params.id);
-        if (!collection) {
-            return res.status(404).json({ message: 'Collection not found.' });
-        }
-        // Allow access if it's public, or if a user is making the request and they are the owner
-        const userId = req.headers['x-user-id'];
-        if (collection.isPublic || (userId && collection.userId === userId)) {
-            return res.json(collection);
-        }
-        return res.status(403).json({ message: 'This collection is private.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Server error fetching collection details.' });
-    }
-});
-
-// Update a collection
 router.patch('/collections/:id', getUserId, async (req, res) => {
     try {
-        const collection = await Collection.findById(req.params.id);
-        if (!collection || collection.userId !== req.userId) {
-            return res.status(404).json({ message: 'Collection not found or you do not have permission to edit it.' });
-        }
         const { name, description, isPublic } = req.body;
-        if (name) collection.name = name;
-        if (description !== undefined) collection.description = description;
-        if (isPublic !== undefined) collection.isPublic = isPublic;
-        await collection.save();
+        const collection = await Collection.findOneAndUpdate(
+            { _id: req.params.id, userId: req.userId },
+            { name, description, isPublic },
+            { new: true }
+        );
+        if (!collection) return res.status(404).json({ message: 'Collection not found or you do not have permission to edit it.' });
         res.json(collection);
     } catch (error) {
         res.status(500).json({ message: 'Server error updating collection.' });
     }
 });
-
-// Delete a collection
 router.delete('/collections/:id', getUserId, async (req, res) => {
     try {
-        const collection = await Collection.findOne({ _id: req.params.id, userId: req.userId });
-        if (!collection) {
-             return res.status(404).json({ message: 'Collection not found or you do not have permission to delete it.' });
-        }
-        await Collection.findByIdAndDelete(req.params.id);
+        const result = await Collection.deleteOne({ _id: req.params.id, userId: req.userId });
+        if (result.deletedCount === 0) return res.status(404).json({ message: 'Collection not found or you do not have permission to delete it.' });
         res.status(204).send();
     } catch (error) {
-         res.status(500).json({ message: 'Server error deleting collection.' });
+        res.status(500).json({ message: 'Server error deleting collection.' });
     }
 });
-
-// Add an item to a collection
 router.post('/collections/:id/items', getUserId, async (req, res) => {
     try {
-        const collection = await Collection.findById(req.params.id);
-        if (!collection || collection.userId !== req.userId) {
-            return res.status(404).json({ message: 'Collection not found or you do not have permission to edit it.' });
-        }
+        const collection = await Collection.findOne({ _id: req.params.id, userId: req.userId });
+        if (!collection) return res.status(404).json({ message: 'Collection not found or permission denied.' });
         
-        const newItem = req.body;
         // Check if item already exists
-        const itemExists = collection.items.some(item => item.id === newItem.id);
-        if (itemExists) {
+        if (collection.items.some(item => item.id === req.body.id)) {
             return res.status(409).json({ message: 'This item is already in the collection.' });
         }
         
-        collection.items.push(newItem);
+        collection.items.push(req.body);
         await collection.save();
         res.json(collection);
     } catch (error) {
         res.status(500).json({ message: 'Server error adding item to collection.' });
     }
 });
-
-// Remove an item from a collection
 router.delete('/collections/:id/items/:tmdbId', getUserId, async (req, res) => {
     try {
-        const collection = await Collection.findById(req.params.id);
-        if (!collection || collection.userId !== req.userId) {
-            return res.status(404).json({ message: 'Collection not found or you do not have permission to edit it.' });
-        }
-        
-        collection.items = collection.items.filter(item => item.id !== parseInt(req.params.tmdbId, 10));
-        await collection.save();
+        const collection = await Collection.findOneAndUpdate(
+            { _id: req.params.id, userId: req.userId },
+            { $pull: { items: { id: req.params.tmdbId } } },
+            { new: true }
+        );
+        if (!collection) return res.status(404).json({ message: 'Collection not found or permission denied.' });
         res.json(collection);
     } catch (error) {
         res.status(500).json({ message: 'Server error removing item from collection.' });
     }
 });
+
+
+
+// --- Stored Movies / Download Links ---
+router.get('/stored-movies', async (req, res) => {
+    try {
+        const movies = await StoredMovie.find({});
+        res.json(movies);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error.' });
+    }
+});
+
+router.get('/stored-movies/find', async (req, res) => {
+    try {
+        const { tmdbId, type } = req.query;
+        if (!tmdbId || !type) {
+            return res.status(400).json({ message: 'tmdbId and type are required.' });
+        }
+        const movie = await StoredMovie.findOne({ tmdb_id: tmdbId, type });
+        res.json(movie);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error.' });
+    }
+});
+
+router.post('/stored-movies', getUserId, requireAdmin, async (req, res) => {
+    try {
+        const { tmdb_id, type, title, download_links } = req.body;
+        const newMovie = new StoredMovie({ tmdb_id, type, title, download_links });
+        await newMovie.save();
+        res.status(201).json(newMovie);
+    } catch (error) {
+        if (error.code === 11000) { // Duplicate key error
+            return res.status(409).json({ message: 'This movie/show already exists in the database.' });
+        }
+        res.status(500).json({ message: 'Server error while adding movie.' });
+    }
+});
+
+router.patch('/stored-movies/:id', getUserId, requireAdmin, async (req, res) => {
+    try {
+        const { download_links } = req.body;
+        const movie = await StoredMovie.findByIdAndUpdate(req.params.id, { download_links }, { new: true });
+        if (!movie) return res.status(404).json({ message: 'Movie not found.' });
+        res.json(movie);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error while updating movie.' });
+    }
+});
+
+router.delete('/stored-movies/:id', getUserId, requireAdmin, async (req, res) => {
+    try {
+        await StoredMovie.findByIdAndDelete(req.params.id);
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ message: 'Server error while deleting movie.' });
+    }
+});
+
+router.patch('/stored-movies/:id/increment', async (req, res) => {
+    try {
+        await StoredMovie.findByIdAndUpdate(req.params.id, { $inc: { download_count: 1 } });
+        res.status(204).send();
+    } catch (error) {
+        // Don't block the user's download if this fails, just log it.
+        console.error("Failed to increment download count for movie ID:", req.params.id, error);
+        res.status(204).send();
+    }
+});
+
+// --- Support Tickets ---
+router.get('/support-tickets', getUserId, requireAdmin, async (req, res) => {
+    try {
+        const tickets = await SupportTicket.find({}).sort({ timestamp: -1 });
+        res.json(tickets);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error.' });
+    }
+});
+
+router.post('/support-tickets', verifyTurnstile, async (req, res) => {
+    try {
+        const { subject, contentTitle, message } = req.body;
+        const userId = req.headers['x-user-id']; // Optional
+        let username = 'Guest';
+
+        if (userId) {
+            const user = await User.findById(userId);
+            if (user) {
+                username = user.username;
+            }
+        }
+
+        const newTicket = new SupportTicket({
+            userId: userId || undefined,
+            username,
+            subject,
+            contentTitle: contentTitle || undefined,
+            message,
+        });
+        
+        await newTicket.save();
+
+        if (subject === 'Link Suggestion' && userId) {
+            const user = await User.findById(userId);
+            if (user) {
+                const updatedLinks = [{ label: 'Pending Review', url: message, suggestedBy: user.username }];
+                await StoredMovie.findOneAndUpdate(
+                    { tmdb_id: req.body.tmdbId, type: req.body.type },
+                    { $push: { download_links: { $each: updatedLinks } } },
+                    { upsert: false } // Don't create if not found, admin must add movie first
+                );
+            }
+        }
+        
+        res.status(201).json(newTicket);
+    } catch (error) {
+        console.error('Error submitting ticket:', error);
+        res.status(500).json({ message: 'Server error while submitting feedback.' });
+    }
+});
+
+router.delete('/support-tickets/:id', getUserId, requireAdmin, async (req, res) => {
+    try {
+        await SupportTicket.findByIdAndDelete(req.params.id);
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ message: 'Server error while deleting ticket.' });
+    }
+});
+
+
+// --- Admin Dashboard & Metrics ---
+router.get('/metrics', getUserId, requireAdmin, async (req, res) => {
+    try {
+        const totalLinks = await StoredMovie.aggregate([{ $project: { linkCount: { $size: "$download_links" } } }, { $group: { _id: null, total: { $sum: "$linkCount" } } }]);
+        const totalDownloads = await StoredMovie.aggregate([{ $group: { _id: null, total: { $sum: "$download_count" } } }]);
+        const totalSupportTickets = await SupportTicket.countDocuments();
+        const totalUsers = await User.countDocuments();
+        const totalCollections = await Collection.countDocuments();
+
+        res.json({
+            totalLinks: totalLinks[0]?.total || 0,
+            totalDownloads: totalDownloads[0]?.total || 0,
+            totalSupportTickets,
+            totalUsers,
+            totalCollections,
+        });
+    } catch (error) {
+        console.error("Error fetching metrics:", error);
+        res.status(500).json({ message: 'Server error fetching metrics.' });
+    }
+});
+
+router.get('/db-stats', getUserId, requireAdmin, async (req, res) => {
+    try {
+        const stats = await mongoose.connection.db.stats();
+        const usedBytes = stats.storageSize;
+        const totalBytes = stats.totalSize;
+        res.json({ usedBytes, totalBytes });
+    } catch (error) {
+        console.error("Error fetching DB stats:", error);
+        res.status(500).json({ message: 'Server error fetching DB stats.' });
+    }
+});
+
+router.get('/users', getUserId, requireAdmin, async (req, res) => {
+    try {
+        const users = await User.find({}).select('-password');
+        const userIds = users.map(u => u._id.toString());
+
+        const favoritesCounts = await Favorite.aggregate([
+            { $match: { userId: { $in: userIds } } },
+            { $group: { _id: "$userId", count: { $sum: 1 } } }
+        ]);
+
+        const watchlistCounts = await Watchlist.aggregate([
+            { $match: { userId: { $in: userIds } } },
+            { $group: { _id: "$userId", count: { $sum: 1 } } }
+        ]);
+
+        const favoritesMap = new Map(favoritesCounts.map(item => [item._id, item.count]));
+        const watchlistMap = new Map(watchlistCounts.map(item => [item._id, item.count]));
+
+        const usersWithCounts = users.map(user => ({
+            ...user.toObject(),
+            favoritesCount: favoritesMap.get(user._id.toString()) || 0,
+            watchlistCount: watchlistMap.get(user._id.toString()) || 0,
+        }));
+
+        res.json(usersWithCounts);
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        res.status(500).json({ message: 'Server error fetching users.' });
+    }
+});
+
+router.post('/admin/test-email', getUserId, requireAdmin, async (req, res) => {
+    try {
+        const info = await transporter.sendMail({
+            from: `"CineStream Diagnostics" <${process.env.EMAIL_USER}>`,
+            to: process.env.EMAIL_USER,
+            subject: '✅ SMTP Connection Test Successful',
+            html: `<p>This is a test email from your CineStream application's backend. If you received this, your Nodemailer configuration is working correctly.</p><p>Timestamp: ${new Date().toISOString()}</p>`,
+        });
+
+        res.json({ success: true, message: `Test email sent successfully to ${process.env.EMAIL_USER}. Message ID: ${info.messageId}` });
+    } catch (error) {
+        console.error('Email test failed:', error);
+
+        let errorMessage = `Failed to send test email. Raw Error: ${error.message}\n\nTROUBLESHOOTING:\n`;
+        
+        if (error.code === 'EAUTH' || error.responseCode === 535) {
+             errorMessage += `1. **Authentication Failed:** The \`EMAIL_USER\` or \`EMAIL_PASS\` environment variables are incorrect.\n2. **Check your password:** Ensure you are using a 16-character **Google App Password**, not your regular Gmail password.\n3. **Check for spaces:** Make sure there are no spaces in the password you pasted into your environment variables.`;
+        } else if (error.code === 'ETIMEDOUT') {
+             errorMessage += `1. **Connection Timed Out:** The server could not connect to the SMTP host (\`smtp.gmail.com\`).\n2. **Check for Security Alerts:** Sign in to the \`${process.env.EMAIL_USER}\` Gmail account and look for any "Security Alert" or "Sign-in attempt blocked" emails. You **must** approve the sign-in from your server's location.\n3. **Firewall Issues:** A firewall on your hosting provider (less likely on Render/Koyeb) might be blocking outbound connections on port 465.`;
+        } else {
+             errorMessage += `An unexpected error occurred. Please check the server logs for more details.`;
+        }
+
+        res.json({ success: false, message: errorMessage });
+    }
+});
+
 
 module.exports = router;

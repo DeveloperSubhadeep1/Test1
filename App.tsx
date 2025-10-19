@@ -32,6 +32,7 @@ import CollectionDetailsPage from './pages/CollectionDetailsPage';
 import ContributePage from './pages/ContributePage';
 import WatchTrailerPage from './pages/WatchTrailerPage';
 import WatchOnlinePage from './pages/WatchOnlinePage';
+import UrlParserPage from './pages/UrlParserPage';
 
 const AppLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -102,6 +103,7 @@ const AppLayout: React.FC = () => {
             {/* NEW ROUTES */}
             <Route path="/trailer" element={<WatchTrailerPage />} />
             <Route path="/watch/:type/:slug" element={<WatchOnlinePage />} />
+            <Route path="/url-parser" element={<UrlParserPage />} />
             
             <Route path="*" element={<NotFoundPage />} />
           </Routes>

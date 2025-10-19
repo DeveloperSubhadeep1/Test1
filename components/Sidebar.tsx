@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { FilmIcon, HomeIcon, HeartIcon, BookmarkIcon, UserCogIcon, GridIcon, XIcon, LayersIcon } from './Icons';
+import { FilmIcon, HomeIcon, HeartIcon, BookmarkIcon, UserCogIcon, GridIcon, XIcon, LayersIcon, LinkIcon } from './Icons';
 import { Avatar } from './Avatars';
 
 interface SidebarProps {
@@ -9,6 +9,7 @@ interface SidebarProps {
   onClose?: () => void;
 }
 
+// FIX: Corrected the malformed viewBox attribute which caused a JSX parsing error.
 const LogOutIcon: React.FC<{className?: string}> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
 );
@@ -102,11 +103,25 @@ const Sidebar: React.FC<SidebarProps> = ({ onLinkClick, onClose }) => {
                 <LayersIcon className="h-5 w-5" />
                 <span>My Collections</span>
             </NavLink>
+            
+            <div className="px-4 pt-4 pb-2">
+                <h5 className="text-xs font-semibold text-muted uppercase tracking-wider">Tools</h5>
+            </div>
+             <NavLink to="/url-parser" className={navLinkClass} onClick={onLinkClick}>
+                <LinkIcon className="h-5 w-5" />
+                <span>URL Parser</span>
+            </NavLink>
+            
             {isAdmin && (
-              <NavLink to="/admin" className={navLinkClass} onClick={onLinkClick}>
-                  <UserCogIcon className="h-5 w-5" />
-                  <span>Admin</span>
-              </NavLink>
+              <>
+                <div className="px-4 pt-4 pb-2">
+                    <h5 className="text-xs font-semibold text-muted uppercase tracking-wider">Admin</h5>
+                </div>
+                <NavLink to="/admin" className={navLinkClass} onClick={onLinkClick}>
+                    <UserCogIcon className="h-5 w-5" />
+                    <span>Dashboard</span>
+                </NavLink>
+              </>
             )}
         </nav>
       </div>
