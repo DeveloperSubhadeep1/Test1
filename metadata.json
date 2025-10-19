@@ -1,0 +1,5 @@
+{
+  "name": "Copy of CineStream - Movie & TV Hub",
+  "description": "A sleek, modern movie and TV series download website. Users can search for content, view details fetched live from TheMovieDB (TMDB), and find download links. Features a comprehensive admin panel for content management and site metrics.",
+  "requestFramePermissions": []
+}

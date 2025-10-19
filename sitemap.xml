@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- 
+    NOTE: Replace "https://your-domain.com" with your actual website's domain.
+    For SPAs with dynamic content (like /movie/123-movie-title), a server-generated sitemap is ideal.
+    This static file covers the main navigable pages.
+  -->
+  <url>
+    <loc>https://your-domain.com/#/</loc>
+    <priority>1.00</priority>
+    <changefreq>daily</changefreq>
+  </url>
+  <url>
+    <loc>https://your-domain.com/#/favorites</loc>
+    <priority>0.50</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+</urlset>

@@ -1,0 +1,56 @@
+# This file describes how to deploy the CineStream application on Koyeb.
+# You can deploy this application in two ways:
+# 1. Manually via the Koyeb control panel (recommended for beginners).
+# 2. Automatically by pushing this file to your GitHub repository (recommended for automation).
+#
+# The DEPLOY_FULL_STACK.md file provides a step-by-step guide for manual deployment.
+# To deploy with this file, create a new App on Koyeb, select this file's repository,
+# and Koyeb will automatically configure the services below. You will still need
+# to create the secrets (MONGODB_URI, EMAIL_PASS, etc.) in the Koyeb control panel.
+
+name: cinestream-backend
+
+services:
+  - name: cinestream-backend
+    # Service configuration for the backend Node.js application.
+    # It uses Koyeb's native buildpacks to build and run the application.
+    #
+    # Learn more about deploying Node.js applications on Koyeb:
+    # https://www.koyeb.com/docs/languages/node-js
+    git:
+      branch: main
+      repository: github.com/your-username/your-repo.git # <-- IMPORTANT: Replace with your GitHub repository URL
+      # The root directory of the backend service.
+      # All commands will be executed from this directory.
+      root: /backend
+    
+    # Environment variables are used to configure the application.
+    # Secrets should be created in the Koyeb control panel.
+    env:
+      - key: MONGODB_URI
+        from: secret
+        key: MONGODB_URI
+      - key: EMAIL_USER
+        from: secret
+        key: EMAIL_USER
+      - key: EMAIL_PASS
+        from: secret
+        key: EMAIL_PASS
+      - key: ADMIN_PASS
+        from: secret
+        key: ADMIN_PASS
+      # The PORT environment variable is automatically set by Koyeb.
+      # The application is configured to listen on this port in server.js.
+
+    # Instance configuration. We use the "free" tier.
+    instance_type: free
+
+    # Health checks to ensure the application is running correctly.
+    health_checks:
+      - path: "/"
+        port: 8080 # Koyeb maps the internal port to 8080 for health checks.
+        protocol: http
+
+    # Regions where the service will be deployed.
+    regions:
+      - fra

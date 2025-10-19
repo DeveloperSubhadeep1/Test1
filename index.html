@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CineStream | Discover & Download Movies and TV Shows</title>
+    <meta name="description" content="Discover, stream, and download the latest movies and TV shows. Search our vast library, view details, get download links, and manage your favorites all in one place." />
+
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0D1117" />
+    
+    <!-- SEO & Social Meta Tags -->
+    <link rel="canonical" href="" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="CineStream | Discover & Download Movies and TV Shows" />
+    <meta property="og:description" content="Discover, stream, and download the latest movies and TV shows. Search our vast library, view details, get download links, and manage your favorites all in one place." />
+    <meta property="og:image" content="/og-default-image.png" />
+    <meta property="og:url" content="" />
+    <meta property="og:site_name" content="CineStream" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="CineStream | Discover & Download Movies and TV Shows" />
+    <meta name="twitter:description" content="Discover, stream, and download the latest movies and TV shows. Search our vast library, view details, get download links, and manage your favorites all in one place." />
+    <meta name="twitter:image" content="/og-default-image.png" />
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      // TODO: Replace with your Google Analytics ID
+      gtag('config', 'G-XXXXXXXXXX');
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          container: {
+            center: true,
+            padding: {
+              DEFAULT: '1rem',
+              sm: '1.5rem',
+              lg: '2rem',
+            },
+          },
+          extend: {
+            fontFamily: {
+                sans: ['Rajdhani', 'sans-serif'],
+            },
+            colors: {
+              // Dark Theme
+              'primary': '#0D1117',
+              'secondary': '#161B22',
+              'accent': '#58A6FF',
+              'highlight': '#238636',
+              'muted': '#8B949E',
+
+              // Neon & Glass
+              'cyan': '#08D9D6',
+              'purple': '#9A16DD',
+              'danger': '#FF2E63',
+              'glass-dark': 'rgba(12, 12, 20, 0.5)',
+              'glass-border': 'rgba(255, 255, 255, 0.1)',
+              
+              // Light Theme
+              'light-primary': '#FFFFFF',
+              'light-secondary': '#F6F8FA',
+              'light-accent': '#0969DA',
+              'light-highlight': '#1F883D',
+              'light-muted': '#57606A',
+              'light-text': '#1F2328',
+              'light-border': '#D0D7DE',
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-out forwards',
+              'glow': 'glow 2s ease-in-out infinite alternate',
+              'bar-in': 'barIn 0.8s ease-out forwards',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0', transform: 'translateY(20px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              glow: {
+                'from': { 'box-shadow': '0 0 5px currentColor, 0 0 10px currentColor' },
+                'to': { 'box-shadow': '0 0 20px currentColor, 0 0 30px currentColor' },
+              },
+              barIn: {
+                '0%': { width: '0%', opacity: '0' },
+                '100%': { opacity: '1' },
+              }
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+      /* Hide scrollbars globally for all elements */
+      /* For Chrome, Safari and Opera */
+      *::-webkit-scrollbar {
+        display: none;
+      }
+      /* For IE, Edge and Firefox */
+      * {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+      }
+      body.dark {
+        background-color: #050508;
+        background-image: radial-gradient(ellipse at top, rgba(154, 22, 221, 0.2) 0%, transparent 50%), 
+                          radial-gradient(ellipse at bottom, rgba(8, 217, 214, 0.2) 0%, transparent 50%);
+        background-size: 100% 100%;
+        background-repeat: no-repeat;
+        animation: aurora 20s ease-in-out infinite alternate;
+      }
+      @keyframes aurora {
+        from { background-position: 0% 0%; }
+        to { background-position: 0% 100%; }
+      }
+      /* Custom class for glass panels */
+      .glass-panel {
+        background-color: rgba(22, 27, 34, 0.5);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+    </style>
+    <!-- Cloudflare Turnstile Script -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.3",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.24.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-light-primary text-light-text dark:bg-primary dark:text-gray-200 transition-colors duration-300">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
