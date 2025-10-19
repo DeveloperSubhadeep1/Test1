@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import {
@@ -44,6 +45,7 @@ import {
   DatabaseIcon,
   CheckCircleIcon,
   AlertTriangleIcon,
+  CopyIcon,
 } from '../components/Icons';
 import { useDebounce } from '../hooks/useDebounce';
 import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
@@ -1391,13 +1393,136 @@ const DiagnosticsTab: React.FC = () => {
     );
 };
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// URL Parser Tab
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+const UrlParserTab: React.FC = () => {
+    const [url, setUrl] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [result, setResult] = useState<ParsedUrlData | null>(null);
+    const { addToast } = useToast();
+
+    const ResultCard: React.FC<{ data: ParsedUrlData }> = ({ data }) => {
+        const handleCopy = () => {
+            const infoString = [
+                data.movieName,
+                data.year,
+                data.languages.join(' '),
+                data.quality,
+                data.size
+            ].filter(Boolean).join(' ');
+
+            navigator.clipboard.writeText(infoString).then(() => {
+                addToast('Info copied to clipboard!', 'success');
+            }).catch(err => {
+                addToast('Failed to copy info.', 'error');
+                console.error('Copy failed:', err);
+            });
+        };
+
+        return (
+            <div className="glass-panel p-6 rounded-lg animate-fade-in mt-8">
+                <div className="flex justify-between items-start mb-4">
+                    <h3 className="text-2xl font-bold text-white">{data.movieName || 'Unknown Title'}</h3>
+                    <button 
+                        onClick={handleCopy}
+                        className="flex items-center gap-2 text-sm bg-secondary text-muted px-3 py-1.5 rounded-full hover:bg-gray-700 hover:text-white transition-colors flex-shrink-0"
+                        title="Copy info to clipboard"
+                    >
+                        <CopyIcon className="h-4 w-4" />
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p className="text-muted">Year</p>
+                        <p className="font-semibold text-lg">{data.year || 'N/A'}</p>
+                    </div>
+                    <div>
+                        <p className="text-muted">Quality</p>
+                        <p className="font-semibold text-lg">{data.quality || 'N/A'}</p>
+                    </div>
+                    <div>
+                        <p className="text-muted">Languages</p>
+                        <p className="font-semibold text-lg">{data.languages.length > 0 ? data.languages.join(', ') : 'N/A'}</p>
+                    </div>
+                    <div>
+                        <p className="text-muted">File Size</p>
+                        <p className="font-semibold text-lg">{data.size || 'N/A'}</p>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!url.trim()) {
+            addToast('Please enter a URL.', 'error');
+            return;
+        }
+
+        setLoading(true);
+        setResult(null);
+        try {
+            const data = await apiParseUrl(url);
+            setResult(data);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Failed to parse URL.";
+            addToast(message, 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="max-w-3xl mx-auto">
+            <h2 className="text-2xl font-bold text-white">Movie Info Extractor</h2>
+            <p className="text-light-muted dark:text-muted mb-6">Paste a video download link below to automatically extract details like title, year, quality, and file size.</p>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+                 <div className="relative">
+                    <input
+                        type="url"
+                        value={url}
+                        onChange={e => setUrl(e.target.value)}
+                        placeholder="https://example.com/movie.name.2023.1080p.mkv"
+                        className="w-full bg-primary border border-glass-border rounded-lg py-3 pl-12 pr-4 text-base focus:outline-none focus:ring-2 focus:ring-cyan transition-all"
+                        disabled={loading}
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <LinkIcon className="h-5 w-5 text-muted" />
+                    </div>
+                </div>
+                 <button
+                    type="submit"
+                    className="w-full flex items-center justify-center gap-2 bg-cyan text-primary font-bold py-3 px-4 rounded-lg hover:brightness-125 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={loading}
+                >
+                    {loading ? (
+                        <>
+                            <SpinnerIcon className="animate-spin h-5 w-5" />
+                            <span>Extracting...</span>
+                        </>
+                    ) : (
+                       'Extract Info'
+                    )}
+                </button>
+            </form>
+
+            {result && <ResultCard data={result} />}
+        </div>
+    );
+};
+
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Main AdminPage Component
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 const AdminPage: React.FC = () => {
   const { isAdmin, isAuthenticated } = useContext(AuthContext);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'dashboard');
 
   usePageMetadata({
     title: 'Admin Dashboard',
@@ -1426,6 +1551,7 @@ const AdminPage: React.FC = () => {
       case 'tickets': return <SupportTicketsTab />;
       case 'database': return <DatabaseTab />;
       case 'diagnostics': return <DiagnosticsTab />;
+      case 'url-parser': return <UrlParserTab />;
       default: return null;
     }
   };
@@ -1441,6 +1567,7 @@ const AdminPage: React.FC = () => {
           <TabButton name="tickets" activeTab={activeTab} setActiveTab={setActiveTab} label="Support Tickets" />
           <TabButton name="database" activeTab={activeTab} setActiveTab={setActiveTab} label="Database" />
           <TabButton name="diagnostics" activeTab={activeTab} setActiveTab={setActiveTab} label="Diagnostics" />
+          <TabButton name="url-parser" activeTab={activeTab} setActiveTab={setActiveTab} label="URL Parser" />
         </div>
       </div>
       <div key={activeTab} className="animate-fade-in">{renderTabContent()}</div>

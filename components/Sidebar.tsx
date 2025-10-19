@@ -104,22 +104,18 @@ const Sidebar: React.FC<SidebarProps> = ({ onLinkClick, onClose }) => {
                 <span>My Collections</span>
             </NavLink>
             
-            <div className="px-4 pt-4 pb-2">
-                <h5 className="text-xs font-semibold text-muted uppercase tracking-wider">Tools</h5>
-            </div>
-             <NavLink to="/url-parser" className={navLinkClass} onClick={onLinkClick}>
-                <LinkIcon className="h-5 w-5" />
-                <span>URL Parser</span>
-            </NavLink>
-            
             {isAdmin && (
               <>
                 <div className="px-4 pt-4 pb-2">
                     <h5 className="text-xs font-semibold text-muted uppercase tracking-wider">Admin</h5>
                 </div>
-                <NavLink to="/admin" className={navLinkClass} onClick={onLinkClick}>
+                <NavLink to="/admin" className={navLinkClass} onClick={onLinkClick} end>
                     <UserCogIcon className="h-5 w-5" />
                     <span>Dashboard</span>
+                </NavLink>
+                <NavLink to="/admin?tab=url-parser" className={navLinkClass} onClick={onLinkClick}>
+                    <LinkIcon className="h-5 w-5" />
+                    <span>URL Parser</span>
                 </NavLink>
               </>
             )}
