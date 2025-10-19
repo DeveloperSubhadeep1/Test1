@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo, useRef } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { usePageMetadata } from '../hooks/usePageMetadata';
-import { useDebounce } from '../hooks/useDebounce';
 import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
 import {
   getMetrics,
@@ -14,11 +13,8 @@ import {
   addStoredMovie,
   apiTestEmail,
   getDbStats,
-  getDetails,
-  searchContentByType,
   getStoredMovie,
   searchTMDB,
-  apiParseUrl,
 } from '../services/api';
 import {
   Metrics,
@@ -53,6 +49,7 @@ import {
 } from '../components/Icons';
 import { Avatar } from '../components/Avatars';
 import { DashboardSkeleton, TableSkeleton, CardListSkeleton, TicketSkeleton, DatabaseSkeleton } from '../components/AdminPageSkeletons';
+import { parseFilenameForAutomate } from '../utils';
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Tab Button Component
@@ -753,7 +750,7 @@ interface MovieEditModalProps {
   onSave: () => void;
 }
 const MovieEditModal: React.FC<MovieEditModalProps> = ({ movie, onClose, onSave }) => {
-  const [links, setLinks] = useState<DownloadLink[]>(() => (movie.download_links.length > 0 ? movie.download_links : [{ label: '', url: '' }]));
+  const [links, setLinks] = useState<DownloadLink[]>(() => (movie.download_links.length > 0 ? JSON.parse(JSON.stringify(movie.download_links)) : [{ label: '', url: '' }]));
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
 
@@ -792,7 +789,8 @@ const MovieEditModal: React.FC<MovieEditModalProps> = ({ movie, onClose, onSave 
         <form onSubmit={handleSubmit}>
           <div className="p-6">
             <h3 className="text-lg font-bold text-white">Edit Links for: <span className="text-cyan">{movie.title}</span></h3>
-            <div className="space-y-4 mt-4 max-h-96 overflow-y-auto pr-2">
+            
+            <div className="space-y-4 mt-4 max-h-80 overflow-y-auto pr-2">
               {links.map((link, index) => (
                 <div key={index} className="grid grid-cols-12 gap-2 items-center">
                   <input type="text" placeholder="Label" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className={`${inputClass} col-span-3`} />
@@ -826,135 +824,78 @@ interface MovieAddModalProps {
   onSave: () => void;
 }
 const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
-  const [step, setStep] = useState(1);
-  const [type, setType] = useState<ContentType>('movie');
-  const [selectedItem, setSelectedItem] = useState<(MovieDetail | TVDetail) & { type: ContentType } | null>(null);
+  // State for the new flow
+  const [urlInput, setUrlInput] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationResults, setVerificationResults] = useState<(MovieSummary | TVSummary)[]>([]);
+  const [selectedItem, setSelectedItem] = useState<(MovieSummary | TVSummary) & { media_type: 'movie' | 'tv' } | null>(null);
+  
+  // State for the second step (link entry)
   const [links, setLinks] = useState<DownloadLink[]>([{ label: '', url: '' }]);
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
 
-  // Search functionality states
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<(MovieSummary | TVSummary)[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const debouncedQuery = useDebounce(searchQuery, 300);
-
-  // NEW states for URL import
-  const [importUrl, setImportUrl] = useState('');
-  const [isProcessingUrl, setIsProcessingUrl] = useState(false);
-  const [parsedInfoFromUrl, setParsedInfoFromUrl] = useState<{
-    url: string;
-    movieName: string;
-    year: number | null;
-    languages: string[];
-    quality: string | null;
-    size: string | null;
-  } | null>(null);
-
-  useEffect(() => {
-    if (debouncedQuery.trim().length < 2) {
-        setSearchResults([]);
-        if (isProcessingUrl) setIsProcessingUrl(false);
-        return;
+  const handleFetchDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!urlInput.trim()) {
+      addToast('Please enter a URL.', 'error');
+      return;
     }
 
-    const performSearch = async () => {
-        setIsSearching(true);
-        setSearchResults([]); // Clear previous results
-        try {
-            const data = await searchContentByType(debouncedQuery, type);
-            setSearchResults(data.results.slice(0, 10));
-        } catch (err) {
-            addToast('Content search failed. Please try again.', 'error');
-        } finally {
-            setIsSearching(false);
-            if (isProcessingUrl) setIsProcessingUrl(false);
-        }
-    };
-    
-    performSearch();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedQuery, type, addToast]);
-
-  // NEW handler for processing URL
-  const handleProcessUrl = async () => {
-      if (!importUrl) return;
-      setIsProcessingUrl(true);
-      try {
-          const parsed = await apiParseUrl(importUrl);
-          if (!parsed.movieName) {
-              throw new Error("Could not parse a movie name from the URL.");
-          }
-          setSearchQuery(parsed.movieName);
-          setParsedInfoFromUrl({ url: importUrl, ...parsed });
-      } catch (error) {
-          addToast(error instanceof Error ? error.message : "Failed to process URL.", 'error');
-          setIsProcessingUrl(false);
-      }
-  };
-
-  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-    setParsedInfoFromUrl(null);
-  };
-
-  const handleSelectSearchResult = async (item: MovieSummary | TVSummary) => {
-    setLoading(true);
-    setSearchQuery('');
-    setSearchResults([]);
+    setIsVerifying(true);
+    setVerificationResults([]);
     try {
-        const details = await getDetails(type, item.id);
-        setSelectedItem({ ...details, type });
-        setStep(2);
-    } catch (error) {
-        addToast('Failed to fetch full details for the selected item.', 'error');
+      const filenameWithQuery = urlInput.substring(urlInput.lastIndexOf('/') + 1);
+      const filename = decodeURIComponent(filenameWithQuery.split('?')[0]);
+      
+      const parsedInfo = parseFilenameForAutomate(filename);
+      
+      if (!parsedInfo.movieName) {
+        throw new Error('Could not automatically determine the title from the URL.');
+      }
+
+      const query = parsedInfo.year ? `${parsedInfo.movieName} ${parsedInfo.year}` : parsedInfo.movieName;
+      const data = await searchTMDB(query);
+      
+      setVerificationResults(data.results.slice(0, 10));
+
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to parse URL or search for content.', 'error');
     } finally {
-        setLoading(false);
+      setIsVerifying(false);
     }
   };
 
-  // NEW useEffect to pre-fill links
-  useEffect(() => {
-    if (selectedItem && parsedInfoFromUrl) {
-      const title = 'title' in selectedItem ? selectedItem.title : selectedItem.name;
-      const releaseDate = 'release_date' in selectedItem ? selectedItem.release_date : selectedItem.first_air_date;
-      const year = releaseDate ? new Date(releaseDate).getFullYear().toString() : parsedInfoFromUrl.year?.toString() || '';
-      
-      let labelParts = [`${title} (${year})`];
-      
-      if (parsedInfoFromUrl.quality) {
-        labelParts.push(parsedInfoFromUrl.quality.toUpperCase());
-      }
-      
-      if (parsedInfoFromUrl.languages.length > 0) {
-          labelParts.push(`(${parsedInfoFromUrl.languages.join(', ')})`);
-      }
+  const handleSelectVerificationResult = (item: (MovieSummary | TVSummary) & { media_type: 'movie' | 'tv' }) => {
+    setSelectedItem(item);
+    
+    // Auto-fill the first link
+    const filenameWithQuery = urlInput.substring(urlInput.lastIndexOf('/') + 1);
+    const filename = decodeURIComponent(filenameWithQuery.split('?')[0]);
+    const parsedInfo = parseFilenameForAutomate(filename);
 
-      if (parsedInfoFromUrl.size) {
-          labelParts.push(`[${parsedInfoFromUrl.size}]`);
-      }
-      
-      const fullLabel = labelParts.join(' ');
-      
-      setLinks([{ label: fullLabel, url: parsedInfoFromUrl.url }]);
-    } else {
-        setLinks([{ label: '', url: '' }]);
-    }
-  }, [selectedItem, parsedInfoFromUrl]);
-
+    const labelParts = [];
+    if (parsedInfo.quality) labelParts.push(parsedInfo.quality);
+    if (parsedInfo.languages.length > 0) labelParts.push(parsedInfo.languages.join('/'));
+    if (parsedInfo.size) labelParts.push(parsedInfo.size);
+    
+    const generatedLabel = labelParts.length > 0 ? labelParts.join(' ') : 'Default';
+    
+    setLinks([{ label: generatedLabel, url: urlInput }]);
+  };
 
   const handleLinkChange = (index: number, field: keyof DownloadLink, value: string) => {
     const newLinks = [...links];
     (newLinks[index] as any)[field] = value;
     setLinks(newLinks);
   };
-
   const addLink = () => setLinks([...links, { label: '', url: '' }]);
   const removeLink = (index: number) => setLinks(links.filter((_, i) => i !== index));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedItem) return;
+
     const validLinks = links.filter(link => link.label.trim() && link.url.trim());
     if (validLinks.length === 0) {
       addToast('Please add at least one valid link.', 'error');
@@ -964,7 +905,7 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
     try {
       await addStoredMovie({
         tmdb_id: selectedItem.id,
-        type: selectedItem.type,
+        type: selectedItem.media_type,
         title: 'title' in selectedItem ? selectedItem.title : selectedItem.name,
         download_links: validLinks,
         download_count: 0,
@@ -978,125 +919,115 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
       setLoading(false);
     }
   };
+  
+  const handleGoBack = () => {
+    setSelectedItem(null);
+    setLinks([{ label: '', url: '' }]);
+  };
+  
+  const renderStep1 = () => (
+    <div className="mt-4">
+      <form onSubmit={handleFetchDetails} className="flex gap-4 items-end">
+          <div className="flex-grow">
+              <label htmlFor="urlInput" className="block text-sm font-medium text-muted mb-1">Download URL</label>
+              <input
+                  type="url"
+                  id="urlInput"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  placeholder="Paste a link to automatically fetch details..."
+                  className={inputClass}
+                  autoComplete="off"
+              />
+          </div>
+          <button type="submit" disabled={isVerifying} className="flex-shrink-0 px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:bg-muted">
+              {isVerifying ? <SpinnerIcon className="animate-spin h-5 w-5 mx-auto" /> : 'Fetch Details'}
+          </button>
+      </form>
 
+      {verificationResults.length > 0 && (
+        <div className="mt-4 border-t border-glass-border pt-4">
+          <h4 className="font-semibold text-white mb-2">Please verify the content:</h4>
+          <ul className="space-y-2 max-h-64 overflow-y-auto pr-2">
+            {verificationResults.map(item => {
+              const { media_type } = item as any;
+              if (media_type !== 'movie' && media_type !== 'tv') return null;
+
+              const title = 'title' in item ? item.title : item.name;
+              const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
+              const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
+              const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : null;
+              
+              return (
+                <button
+                  type="button"
+                  key={item.id}
+                  onClick={() => handleSelectVerificationResult(item as any)}
+                  className="w-full text-left flex items-center p-2 rounded-md hover:bg-cyan/10 transition-colors"
+                >
+                  {posterUrl ? (
+                    <img src={posterUrl} alt={title} className="w-10 h-14 object-cover rounded-sm mr-3" />
+                  ) : (
+                    <div className="w-10 h-14 bg-secondary rounded-sm mr-3 flex items-center justify-center">
+                      <FilmIcon className="h-5 w-5 text-muted"/>
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-bold text-white">{title}</p>
+                    <p className="text-sm text-muted">{year}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderStep2 = () => {
+    if (!selectedItem) return null;
+    return (
+      <div className="mt-4">
+        <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+          {links.map((link, index) => (
+            <div key={index} className="grid grid-cols-12 gap-2 items-center">
+              <input type="text" placeholder="Label" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className={`${inputClass} col-span-3`} />
+              <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className={`${inputClass} col-span-5`} />
+              <input type="text" placeholder="Suggested By" value={link.suggestedBy || ''} onChange={e => handleLinkChange(index, 'suggestedBy', e.target.value)} className={`${inputClass} col-span-3`} />
+              <button type="button" onClick={() => removeLink(index)} className="p-2 text-danger hover:bg-danger/10 rounded-full transition-colors col-span-1">
+                <XIcon className="h-5 w-5" />
+              </button>
+            </div>
+          ))}
+        </div>
+        <button type="button" onClick={addLink} className="mt-4 flex items-center gap-2 text-sm text-cyan font-semibold hover:brightness-125 transition-all">
+          <PlusCircleIcon className="h-5 w-5" />
+          Add another link
+        </button>
+      </div>
+    );
+  };
+  
   return (
-     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-      <div className="glass-panel rounded-lg shadow-xl w-full max-w-2xl border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+      <div className="glass-panel rounded-lg shadow-xl w-full max-w-3xl border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
         <form onSubmit={handleSubmit}>
           <div className="p-6">
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold text-white">{step === 1 ? 'Step 1: Find Content' : `Step 2: Add links for ${selectedItem && ('title' in selectedItem ? selectedItem.title : selectedItem.name)}`}</h3>
+              <h3 className="text-lg font-bold text-white">
+                {selectedItem ? `Add links for: ${'title' in selectedItem ? selectedItem.title : selectedItem.name}` : 'Add New Content via Link'}
+              </h3>
               <button type="button" onClick={onClose} className="text-muted hover:text-white"><XIcon className="h-5 w-5" /></button>
             </div>
-            {step === 1 ? (
-              <div className="mt-4 space-y-4">
-                <div className="space-y-2 p-3 bg-primary/50 rounded-lg">
-                    <label htmlFor="importUrl" className="block text-sm font-medium text-cyan mb-1">Automate from URL</label>
-                    <div className="flex gap-2">
-                        <input 
-                            type="url" 
-                            id="importUrl" 
-                            value={importUrl} 
-                            onChange={e => setImportUrl(e.target.value)} 
-                            placeholder="Paste movie/TV download URL here" 
-                            className={`${inputClass} flex-grow`}
-                        />
-                        <button 
-                            type="button" 
-                            onClick={handleProcessUrl} 
-                            disabled={!importUrl || isProcessingUrl || isSearching}
-                            className="px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:opacity-50 flex-shrink-0"
-                        >
-                            {isProcessingUrl || isSearching ? <SpinnerIcon className="animate-spin h-5 w-5"/> : 'Process'}
-                        </button>
-                    </div>
-                </div>
-                
-                <div className="relative text-center">
-                    <span className="absolute left-0 top-1/2 w-full h-px bg-glass-border"></span>
-                    <span className="relative bg-secondary px-2 text-xs text-muted">OR</span>
-                </div>
 
-                <div className="flex flex-col sm:flex-row gap-4 items-end">
-                    <div className="relative flex-grow w-full">
-                        <label htmlFor="searchQuery" className="block text-sm font-medium text-muted mb-1">Search by Title</label>
-                        <input 
-                            type="text" 
-                            id="searchQuery" 
-                            value={searchQuery} 
-                            onChange={handleSearchInputChange} 
-                            placeholder="e.g., The Matrix" 
-                            className={inputClass} 
-                            autoComplete="off"
-                        />
-                         {(isSearching || searchResults.length > 0 || (searchQuery.length > 1 && !isSearching)) && (
-                            <div className="absolute z-10 w-full mt-1 bg-primary border border-glass-border rounded-md shadow-lg max-h-64 overflow-y-auto">
-                                {isSearching && <div className="p-4 text-center text-muted">Searching...</div>}
-                                {!isSearching && searchResults.length === 0 && searchQuery.length > 1 && <div className="p-4 text-center text-muted">No results found.</div>}
-                                {!isSearching && searchResults.map(item => {
-                                    const title = 'title' in item ? item.title : item.name;
-                                    const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
-                                    const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
-                                    const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : null;
-                                    
-                                    return (
-                                        <button
-                                            type="button"
-                                            key={item.id}
-                                            onClick={() => handleSelectSearchResult(item)}
-                                            className="w-full text-left flex items-center p-2 hover:bg-cyan/10 transition-colors"
-                                        >
-                                            {posterUrl ? (
-                                                <img src={posterUrl} alt={title} className="w-10 h-14 object-cover rounded-sm mr-3 flex-shrink-0" />
-                                            ) : (
-                                                <div className="w-10 h-14 bg-secondary rounded-sm mr-3 flex items-center justify-center flex-shrink-0">
-                                                    <FilmIcon className="h-5 w-5 text-muted"/>
-                                                </div>
-                                            )}
-                                            <div className="min-w-0">
-                                                <p className="font-bold text-white truncate">{title}</p>
-                                                <p className="text-sm text-muted">{year}</p>
-                                            </div>
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                        )}
-                    </div>
-                    <div className="w-full sm:w-auto">
-                        <label htmlFor="contentType" className="block text-sm font-medium text-muted mb-1">Type</label>
-                        <select id="contentType" value={type} onChange={e => setType(e.target.value as ContentType)} className={inputClass}>
-                            <option value="movie">Movie</option>
-                            <option value="tv">TV Show</option>
-                        </select>
-                    </div>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-4">
-                 <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                  {links.map((link, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-2 items-center">
-                      <input type="text" placeholder="Label" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className={`${inputClass} col-span-3`} />
-                      <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className={`${inputClass} col-span-5`} />
-                      <input type="text" placeholder="Suggested By" value={link.suggestedBy || ''} onChange={e => handleLinkChange(index, 'suggestedBy', e.target.value)} className={`${inputClass} col-span-3`} />
-                      <button type="button" onClick={() => removeLink(index)} className="p-2 text-danger hover:bg-danger/10 rounded-full transition-colors col-span-1">
-                        <XIcon className="h-5 w-5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <button type="button" onClick={addLink} className="mt-4 flex items-center gap-2 text-sm text-cyan font-semibold hover:brightness-125 transition-all">
-                  <PlusCircleIcon className="h-5 w-5" />
-                  Add another link
-                </button>
-              </div>
-            )}
+            {selectedItem ? renderStep2() : renderStep1()}
+            
           </div>
           <div className="bg-primary/50 px-6 py-4 flex justify-end gap-2 rounded-b-lg">
-            {step === 2 && <button type="button" onClick={() => { setStep(1); setSelectedItem(null); }} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Back</button>}
+            {selectedItem && <button type="button" onClick={handleGoBack} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Back</button>}
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Cancel</button>
-            {step === 2 && (
+            {selectedItem && (
               <button type="submit" disabled={loading} className="px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:bg-muted disabled:text-gray-800 disabled:cursor-not-allowed">
                 {loading ? 'Saving...' : 'Save Content'}
               </button>

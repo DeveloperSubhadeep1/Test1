@@ -24,6 +24,14 @@ export const generateSlug = (title: string, year?: string | number): string => {
  * It uses the year as a primary delimiter to separate title from metadata.
  */
 function coreFilenameParser(filename: string): { moviename: string; year: string | null; languages: string[]; quality: string | null; size: string | null } {
+    // --- Step 1: Extract size BEFORE normalization, as normalization can break the format (e.g., "1.23 GB").
+    let size: string | null = null;
+    const sizeMatch = filename.match(/(\d+(\.\d+)?\s?(gb|mb))/i);
+    if (sizeMatch) {
+      size = sizeMatch[0].replace(/\s/g, '').toUpperCase();
+    }
+
+    // --- Step 2: Normalize the string for further parsing.
     const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
     const normalized = nameWithoutExt.replace(/[._\[\]()]/g, " ").replace(/\s+/g, ' ').trim();
     const parts = normalized.split(' ');
@@ -64,7 +72,7 @@ function coreFilenameParser(filename: string): { moviename: string; year: string
 
     const moviename = titleParts.join(' ').trim();
     
-    // Now parse metadata from the entire normalized string for simplicity and accuracy.
+    // --- Step 3: Parse remaining metadata from the normalized string.
     const lowerNormalized = normalized.toLowerCase();
     
     let quality: string | null = null;
@@ -72,37 +80,43 @@ function coreFilenameParser(filename: string): { moviename: string; year: string
     if (qualityMatch) {
       quality = qualityMatch[0].toUpperCase().replace('P', 'p');
     }
-
-    let size: string | null = null;
-    const sizeMatch = lowerNormalized.match(/(\d+(\.\d+)?\s?(gb|mb))/i);
-    if (sizeMatch) {
-      size = sizeMatch[0].replace(/\s/g, '').toUpperCase();
-    }
     
     const languages: string[] = [];
     const languageMap: { [key: string]: string } = {
         'hindi': 'Hindi',
         'हिन्दी': 'Hindi',
-        'english': 'English', 'eng': 'English', 'esubs': 'English', 'esub': 'English',
+        'english': 'English', 'eng': 'English',
         'tamil': 'Tamil',
         'telugu': 'Telugu',
         'kannada': 'Kannada',
         'malayalam': 'Malayalam',
         'dual': 'Dual Audio', 'audio': 'Dual Audio',
     };
-    const ignoreLangRegex = /aac|hdrip|x264|amzn|web-dl|webrip/i;
     
-    parts.forEach(p => {
-        // Use original casing for native scripts, but lowercase for map lookup
-        const pKey = p.toLowerCase();
-        if (languageMap[pKey] && !languages.includes(languageMap[pKey])) {
-            languages.push(languageMap[pKey]);
-        } else if (!/p$|^\d+$|\bg[b]?\b|\bm[b]?\b/i.test(pKey) && !ignoreLangRegex.test(pKey) && p.length > 2 && isNaN(Number(p))) {
-             // Heuristic: If it's not quality, a number, size, or an ignored keyword, it might be a language.
-             // This is less reliable but can catch languages not in the map.
-             // languages.push(p.charAt(0).toUpperCase() + p.slice(1));
+    const lowerParts = parts.map(p => p.toLowerCase());
+
+    for (let i = 0; i < lowerParts.length; i++) {
+        const pKey = lowerParts[i];
+
+        // Handle 'eng' to differentiate audio from subtitles
+        if (pKey === 'eng') {
+            const nextPart = (i + 1 < lowerParts.length) ? lowerParts[i + 1] : null;
+            if (nextPart === 'sub' || nextPart === 'subs') {
+                i++; // Skip 'eng' and also skip 'sub(s)' on the next iteration
+                continue;
+            }
         }
-    });
+        
+        // Handle 'esub(s)' which are clearly subtitles
+        if (pKey === 'esub' || pKey === 'esubs') {
+            continue;
+        }
+
+        const lang = languageMap[pKey];
+        if (lang && !languages.includes(lang)) {
+            languages.push(lang);
+        }
+    }
 
     return { moviename, year, languages, quality, size };
 }

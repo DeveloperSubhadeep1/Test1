@@ -239,7 +239,7 @@ function parseFilename(filename) {
     const languages = [];
     const languageMap = {
         'hindi': 'Hindi', 'हिंदी': 'Hindi',
-        'english': 'English', 'eng': 'English', 'esubs': 'English', 'esub': 'English',
+        'english': 'English', 'eng': 'English',
         'tamil': 'Tamil',
         'telugu': 'Telugu',
         'kannada': 'Kannada',
@@ -248,14 +248,31 @@ function parseFilename(filename) {
         'bengali': 'Bengali',
         'punjabi': 'Punjabi',
     };
-    
-    Object.keys(languageMap).forEach(key => {
-      if (new RegExp(`\\b${key}\\b`, 'i').test(lowerNormalized)) {
-        if (!languages.includes(languageMap[key])) {
-          languages.push(languageMap[key]);
+
+    const lowerParts = parts.map(p => p.toLowerCase());
+
+    for (let i = 0; i < lowerParts.length; i++) {
+        const part = lowerParts[i];
+        
+        // Handle 'eng' to differentiate audio from subtitles
+        if (part === 'eng') {
+            const nextPart = (i + 1 < lowerParts.length) ? lowerParts[i+1] : null;
+            if (nextPart === 'sub' || nextPart === 'subs') {
+                i++; // Skip 'eng' and also skip 'sub(s)' on the next iteration
+                continue;
+            }
         }
-      }
-    });
+
+        // Handle 'esub' and 'esubs' which are clearly subtitles
+        if (part === 'esub' || part === 'esubs') {
+            continue;
+        }
+        
+        const lang = languageMap[part];
+        if (lang && !languages.includes(lang)) {
+            languages.push(lang);
+        }
+    }
 
     return { movieName, year, languages, quality };
 }
