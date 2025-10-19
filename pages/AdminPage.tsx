@@ -1338,6 +1338,7 @@ const AdminPage: React.FC = () => {
           <TabButton name="diagnostics" activeTab={activeTab} setActiveTab={setActiveTab} label="Diagnostics" />
         </div>
       </div>
+      
       <div key={activeTab} className="animate-fade-in">{renderTabContent()}</div>
     </div>
   );
