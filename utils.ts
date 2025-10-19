@@ -138,3 +138,20 @@ export function parseMediaFilename(source: string): { languages: string[]; quali
     const { languages, quality, size } = coreFilenameParser(source);
     return { languages, quality, size };
 }
+
+/**
+ * Generates a clean, readable label for a download link from parsed media details.
+ */
+export function generateLinkLabel(details: { quality?: string | null; languages?: string[]; size?: string | null }): string {
+    const parts: string[] = [];
+    if (details.quality) {
+        parts.push(details.quality);
+    }
+    if (details.languages && details.languages.length > 0) {
+        parts.push(details.languages.join(' + '));
+    }
+    if (details.size) {
+        parts.push(`[${details.size}]`);
+    }
+    return parts.join(' ') || 'Download'; // Fallback to "Download" if no details are parsed
+}

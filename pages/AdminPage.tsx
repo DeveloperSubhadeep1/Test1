@@ -13,6 +13,7 @@ import {
   searchTMDB,
   apiTestEmail,
   getDbStats,
+  apiParseUrl,
 } from '../services/api';
 import {
   Metrics,
@@ -41,10 +42,13 @@ import {
   SettingsIcon,
   SpinnerIcon,
   DatabaseIcon,
+  CheckCircleIcon,
+  AlertTriangleIcon,
 } from '../components/Icons';
 import { useDebounce } from '../hooks/useDebounce';
 import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
 import { Avatar } from '../components/Avatars';
+import { generateLinkLabel } from '../utils';
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Tab Button Component
@@ -735,11 +739,31 @@ const MovieEditModal: React.FC<MovieEditModalProps> = ({ movie, onClose, onSave 
   );
 };
 
+interface ParsedUrlData {
+    movieName: string;
+    year: number | null;
+    languages: string[];
+    quality: string | null;
+    size: string | null;
+}
+
+interface ProcessedItem {
+    url: string;
+    parsedInfo: ParsedUrlData | null;
+    tmdbMatch: ((MovieSummary | TVSummary) & { type: ContentType }) | null;
+    status: 'pending' | 'success' | 'parsing_failed' | 'tmdb_failed';
+    errorMessage?: string;
+}
+
 interface MovieAddModalProps {
   onClose: () => void;
   onSave: () => void;
+  allMovies: StoredMovie[];
 }
-const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
+const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave, allMovies }) => {
+  const [mode, setMode] = useState<'manual' | 'automate'>('manual');
+  
+  // --- Manual mode states ---
   const [step, setStep] = useState(1);
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounce(query, 500);
@@ -749,8 +773,13 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
 
+  // --- Automate mode states ---
+  const [urlsToParse, setUrlsToParse] = useState('');
+  const [processedItems, setProcessedItems] = useState<ProcessedItem[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+
   useEffect(() => {
-    if (debouncedQuery.trim().length > 2) {
+    if (mode === 'manual' && debouncedQuery.trim().length > 2) {
       setLoading(true);
       searchTMDB(debouncedQuery)
         .then(res => setSearchResults(res.results))
@@ -759,7 +788,32 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
     } else {
       setSearchResults([]);
     }
-  }, [debouncedQuery, addToast]);
+  }, [debouncedQuery, addToast, mode]);
+
+  const resetManualState = () => {
+    setStep(1);
+    setQuery('');
+    setSearchResults([]);
+    setSelectedItem(null);
+    setLinks([{ label: '', url: ''}]);
+  };
+  
+  const resetAutomateState = () => {
+    setStep(1);
+    setUrlsToParse('');
+    setProcessedItems([]);
+  };
+
+  const handleModeChange = (newMode: 'manual' | 'automate') => {
+    if (newMode === mode) return;
+    setMode(newMode);
+    // Reset states when switching modes
+    if (newMode === 'manual') {
+        resetAutomateState();
+    } else {
+        resetManualState();
+    }
+  };
 
   const handleSelect = (item: MovieSummary | TVSummary) => {
     const type = (item as any).media_type || ('title' in item ? 'movie' : 'tv');
@@ -776,7 +830,7 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
   const addLink = () => setLinks([...links, { label: '', url: '' }]);
   const removeLink = (index: number) => setLinks(links.filter((_, i) => i !== index));
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSaveManual = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedItem) return;
     const validLinks = links.filter(link => link.label.trim() && link.url.trim());
@@ -803,61 +857,267 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
     }
   };
 
+  // --- Automate Mode Logic ---
+  const handleProcessUrls = async () => {
+    const urls = urlsToParse.split('\n').map(u => u.trim()).filter(Boolean);
+    if (urls.length === 0) {
+      addToast('Please paste at least one URL.', 'error');
+      return;
+    }
+
+    setIsProcessing(true);
+    setProcessedItems(urls.map(url => ({ url, status: 'pending', parsedInfo: null, tmdbMatch: null })));
+
+    const results = await Promise.all(urls.map(async (url): Promise<ProcessedItem> => {
+      try {
+        const parsedInfo = await apiParseUrl(url);
+        if (!parsedInfo || !parsedInfo.movieName) {
+          throw new Error('Could not parse filename.');
+        }
+
+        const searchQuery = parsedInfo.year ? `${parsedInfo.movieName} ${parsedInfo.year}` : parsedInfo.movieName;
+        const tmdbResults = await searchTMDB(searchQuery);
+        
+        const bestMatch = tmdbResults.results.find(
+            r => r.media_type === 'movie' || r.media_type === 'tv'
+        ) as (MovieSummary | TVSummary) & { media_type: ContentType } | undefined;
+        
+        if (!bestMatch) {
+            throw new Error(`No movie/TV match found for "${parsedInfo.movieName}".`);
+        }
+        
+        const tmdbMatch = { ...bestMatch, type: bestMatch.media_type };
+        
+        return { url, parsedInfo, tmdbMatch, status: 'success' };
+
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown processing error.";
+        return { url, parsedInfo: null, tmdbMatch: null, status: 'parsing_failed', errorMessage: message };
+      }
+    }));
+
+    setProcessedItems(results);
+    setIsProcessing(false);
+    if (results.some(r => r.status === 'success')) {
+        setStep(2);
+    } else {
+        addToast("Failed to process any of the provided URLs.", "error");
+    }
+  };
+  
+  const groupedItems = useMemo(() => {
+    if (mode !== 'automate' || step !== 2) return new Map();
+    
+    const groups: Map<number, { tmdbMatch: NonNullable<ProcessedItem['tmdbMatch']>, items: ProcessedItem[] }> = new Map();
+
+    processedItems.filter(p => p.status === 'success' && p.tmdbMatch).forEach(item => {
+        const id = item.tmdbMatch!.id;
+        if (!groups.has(id)) {
+            groups.set(id, { tmdbMatch: item.tmdbMatch!, items: [] });
+        }
+        groups.get(id)!.items.push(item);
+    });
+
+    return groups;
+  }, [processedItems, mode, step]);
+
+
+  const handleSaveAutomated = async () => {
+    setLoading(true);
+
+    const promises = Array.from(groupedItems.values()).map(group => {
+        const existingMovie = allMovies.find(m => m.tmdb_id === group.tmdbMatch.id && m.type === group.tmdbMatch.type);
+        
+        const newLinks: DownloadLink[] = group.items.map(item => ({
+            url: item.url,
+            label: generateLinkLabel(item.parsedInfo!),
+        }));
+
+        if (existingMovie) {
+            const combinedLinks = [...existingMovie.download_links];
+            newLinks.forEach(newLink => {
+                if (!combinedLinks.some(existing => existing.url === newLink.url)) {
+                    combinedLinks.push(newLink);
+                }
+            });
+            return updateStoredMovie(existingMovie._id, { download_links: combinedLinks });
+        } else {
+            const { id, type } = group.tmdbMatch;
+            const title = 'title' in group.tmdbMatch ? group.tmdbMatch.title : group.tmdbMatch.name;
+            return addStoredMovie({
+                tmdb_id: id,
+                type,
+                title,
+                download_links: newLinks,
+                download_count: 0,
+            });
+        }
+    });
+
+    const results = await Promise.allSettled(promises);
+    
+    const successCount = results.filter(r => r.status === 'fulfilled').length;
+    const failedCount = results.length - successCount;
+
+    if (successCount > 0) {
+        addToast(`${successCount} item(s) saved successfully.`, 'success');
+    }
+    if (failedCount > 0) {
+        addToast(`${failedCount} item(s) failed to save. Some may be duplicates.`, 'error');
+        console.error("Failed automated saves:", results.filter(r => r.status === 'rejected'));
+    }
+
+    setLoading(false);
+    onSave();
+    onClose();
+  };
+  
+  const ModeButton: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode }> = ({ active, onClick, children }) => (
+    <button type="button" onClick={onClick} className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${active ? 'bg-cyan text-primary' : 'bg-primary/50 text-gray-300 hover:bg-secondary'}`}>
+        {children}
+    </button>
+  );
+
   return (
      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
       <div className="glass-panel rounded-lg shadow-xl w-full max-w-2xl border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={mode === 'manual' ? handleSaveManual : undefined}>
           <div className="p-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold text-white">{step === 1 ? 'Step 1: Find Content' : `Step 2: Add links for ${selectedItem && ('title' in selectedItem ? selectedItem.title : selectedItem.name)}`}</h3>
-              <button type="button" onClick={onClose} className="text-muted hover:text-white"><XIcon className="h-5 w-5" /></button>
-            </div>
-            {step === 1 ? (
-              <div className="mt-4">
-                <div className="relative">
-                  <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search for a movie or TV show..." className={`${inputClass} pl-10`} />
-                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
-                </div>
-                {loading && <Spinner />}
-                <ul className="mt-2 max-h-80 overflow-y-auto">
-                  {searchResults.map(item => (
-                    <li key={item.id} onClick={() => handleSelect(item)} className="p-2 flex gap-4 items-center hover:bg-cyan/10 rounded cursor-pointer transition-colors">
-                      <img src={item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : ''} alt="" className="w-10 h-14 object-cover rounded bg-primary" />
-                      <div>
-                        <p className="text-white">{'title' in item ? item.title : item.name}</p>
-                        <p className="text-sm text-muted">{new Date('release_date' in item ? item.release_date : item.first_air_date).getFullYear() || 'N/A'}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <div className="mt-4">
-                 <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                  {links.map((link, index) => (
-                    <div key={index} className="flex gap-2 items-center">
-                      <input type="text" placeholder="Label (e.g., 1080p)" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className={`${inputClass} w-1/3`} />
-                      <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className={`${inputClass} w-2/3`} />
-                      <button type="button" onClick={() => removeLink(index)} className="p-2 text-danger hover:bg-danger/10 rounded-full transition-colors">
-                        <XIcon className="h-5 w-5" />
-                      </button>
+            <div className="flex justify-between items-start mb-4">
+                <div>
+                    <h3 className="text-lg font-bold text-white">Add New Content</h3>
+                    <div className="mt-2 flex items-center gap-2 bg-primary p-1 rounded-lg">
+                        <ModeButton active={mode === 'manual'} onClick={() => handleModeChange('manual')}>Manual Search</ModeButton>
+                        <ModeButton active={mode === 'automate'} onClick={() => handleModeChange('automate')}>Automate from URLs</ModeButton>
                     </div>
-                  ))}
                 </div>
-                <button type="button" onClick={addLink} className="mt-4 flex items-center gap-2 text-sm text-cyan font-semibold hover:brightness-125 transition-all">
-                  <PlusCircleIcon className="h-5 w-5" />
-                  Add another link
-                </button>
-              </div>
+                <button type="button" onClick={onClose} className="text-muted hover:text-white"><XIcon className="h-5 w-5" /></button>
+            </div>
+            
+            {/* MANUAL MODE */}
+            {mode === 'manual' && (
+                <>
+                    {step === 1 ? (
+                        <div className="mt-4">
+                            <div className="relative">
+                            <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search for a movie or TV show..." className={`${inputClass} pl-10`} />
+                            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
+                            </div>
+                            {loading && <Spinner />}
+                            <ul className="mt-2 max-h-80 overflow-y-auto">
+                            {searchResults.map(item => (
+                                <li key={item.id} onClick={() => handleSelect(item)} className="p-2 flex gap-4 items-center hover:bg-cyan/10 rounded cursor-pointer transition-colors">
+                                <img src={item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : ''} alt="" className="w-10 h-14 object-cover rounded bg-primary" />
+                                <div>
+                                    <p className="text-white">{'title' in item ? item.title : item.name}</p>
+                                    <p className="text-sm text-muted">{new Date('release_date' in item ? item.release_date : item.first_air_date).getFullYear() || 'N/A'}</p>
+                                </div>
+                                </li>
+                            ))}
+                            </ul>
+                        </div>
+                    ) : (
+                        <div className="mt-4">
+                            <h4 className="text-lg font-bold text-white mb-2">Adding links for: <span className="text-cyan">{selectedItem && ('title' in selectedItem ? selectedItem.title : selectedItem.name)}</span></h4>
+                            <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                            {links.map((link, index) => (
+                                <div key={index} className="flex gap-2 items-center">
+                                <input type="text" placeholder="Label (e.g., 1080p)" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className={`${inputClass} w-1/3`} />
+                                <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className={`${inputClass} w-2/3`} />
+                                <button type="button" onClick={() => removeLink(index)} className="p-2 text-danger hover:bg-danger/10 rounded-full transition-colors">
+                                    <XIcon className="h-5 w-5" />
+                                </button>
+                                </div>
+                            ))}
+                            </div>
+                            <button type="button" onClick={addLink} className="mt-4 flex items-center gap-2 text-sm text-cyan font-semibold hover:brightness-125 transition-all">
+                            <PlusCircleIcon className="h-5 w-5" />
+                            Add another link
+                            </button>
+                        </div>
+                    )}
+                </>
+            )}
+
+            {/* AUTOMATE MODE */}
+            {mode === 'automate' && (
+                <>
+                    {step === 1 && (
+                        <div className="mt-4">
+                            <textarea
+                                value={urlsToParse}
+                                onChange={e => setUrlsToParse(e.target.value)}
+                                placeholder="Paste one download URL per line..."
+                                rows={8}
+                                className={`${inputClass} font-mono text-xs`}
+                                disabled={isProcessing}
+                            />
+                        </div>
+                    )}
+                    {step === 2 && (
+                        <div className="mt-4 max-h-[60vh] overflow-y-auto pr-2">
+                           <h4 className="font-bold text-white mb-4">Step 2: Review & Confirm</h4>
+                           <div className="space-y-6">
+                                {Array.from(groupedItems.values()).map(group => (
+                                    <div key={group.tmdbMatch.id} className="bg-primary/50 p-4 rounded-lg">
+                                        <div className="flex gap-4 items-start">
+                                            <img src={group.tmdbMatch.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${group.tmdbMatch.poster_path}` : ''} alt="" className="w-16 h-24 object-cover rounded bg-secondary" />
+                                            <div>
+                                                <p className="font-bold text-white text-lg">{'title' in group.tmdbMatch ? group.tmdbMatch.title : group.tmdbMatch.name}</p>
+                                                <p className="text-sm text-muted">{new Date('release_date' in group.tmdbMatch ? group.tmdbMatch.release_date : group.tmdbMatch.first_air_date).getFullYear() || 'N/A'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 pt-3 border-t border-glass-border space-y-2">
+                                            <h5 className="text-xs font-semibold uppercase text-muted">Links to be added:</h5>
+                                            {group.items.map(item => (
+                                                <div key={item.url} className="bg-secondary p-2 rounded text-sm">
+                                                    <p className="text-cyan font-semibold">{generateLinkLabel(item.parsedInfo!)}</p>
+                                                    <p className="text-xs text-muted truncate">{item.url}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                                {processedItems.filter(p => p.status !== 'success').length > 0 && (
+                                     <div>
+                                        <h5 className="font-bold text-danger mb-2">Failed Items</h5>
+                                        {processedItems.filter(p => p.status !== 'success').map((item, index) => (
+                                            <div key={index} className="bg-danger/10 p-2 rounded text-sm mb-2">
+                                                 <p className="text-xs text-muted truncate">{item.url}</p>
+                                                 <p className="text-danger text-xs font-semibold">{item.errorMessage}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                           </div>
+                        </div>
+                    )}
+                </>
             )}
           </div>
           <div className="bg-primary/50 px-6 py-4 flex justify-end gap-2 rounded-b-lg">
-            {step === 2 && <button type="button" onClick={() => setStep(1)} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Back</button>}
+            {mode === 'manual' && step === 2 && <button type="button" onClick={() => setStep(1)} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Back</button>}
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Cancel</button>
-            {step === 2 && (
+
+            {mode === 'manual' && step === 2 && (
               <button type="submit" disabled={loading} className="px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:bg-muted disabled:text-gray-800 disabled:cursor-not-allowed">
                 {loading ? 'Saving...' : 'Save Content'}
               </button>
+            )}
+
+            {mode === 'automate' && step === 1 && (
+                 <button type="button" onClick={handleProcessUrls} disabled={isProcessing} className="w-36 px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:bg-muted disabled:cursor-not-allowed">
+                    {isProcessing ? <SpinnerIcon className="animate-spin h-5 w-5 mx-auto"/> : 'Process URLs'}
+                </button>
+            )}
+
+            {mode === 'automate' && step === 2 && (
+                <>
+                    <button type="button" onClick={() => setStep(1)} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Back</button>
+                    <button type="button" onClick={handleSaveAutomated} disabled={loading} className="w-28 px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:bg-muted disabled:cursor-not-allowed">
+                        {loading ? <SpinnerIcon className="animate-spin h-5 w-5 mx-auto"/> : 'Save All'}
+                    </button>
+                </>
             )}
           </div>
         </form>
@@ -923,7 +1183,7 @@ const MoviesTab: React.FC = () => {
           className="flex items-center justify-center gap-2 bg-cyan text-primary font-bold py-2 px-4 rounded-md hover:brightness-125 transition-all w-full sm:w-auto flex-shrink-0"
         >
           <PlusCircleIcon className="h-5 w-5" />
-          <span>Add New Links</span>
+          <span>Add New Content</span>
         </button>
       </div>
 
@@ -998,7 +1258,7 @@ const MoviesTab: React.FC = () => {
         <p className="text-center py-10 text-muted">No content found matching your search.</p>
       )}
 
-      {isAddModalOpen && <MovieAddModal onClose={() => setIsAddModalOpen(false)} onSave={fetchMovies} />}
+      {isAddModalOpen && <MovieAddModal onClose={() => setIsAddModalOpen(false)} onSave={fetchMovies} allMovies={movies} />}
       {movieToEdit && <MovieEditModal movie={movieToEdit} onClose={() => setMovieToEdit(null)} onSave={fetchMovies} />}
       <ConfirmationModal
         isOpen={!!movieToDelete}
