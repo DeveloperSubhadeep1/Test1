@@ -816,7 +816,8 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave, allMovie
   };
 
   const handleSelect = (item: MovieSummary | TVSummary) => {
-    const type = (item as any).media_type || ('title' in item ? 'movie' : 'tv');
+    // FIX: Use a more specific type assertion instead of 'any' to access the 'media_type' property, which exists on multi-search results but not in the base types.
+    const type = (item as { media_type?: ContentType }).media_type || ('title' in item ? 'movie' : 'tv');
     setSelectedItem({ ...item, type });
     setStep(2);
   };
@@ -879,7 +880,11 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave, allMovie
         const tmdbResults = await searchTMDB(searchQuery);
         
         const bestMatch = tmdbResults.results.find(
-            r => r.media_type === 'movie' || r.media_type === 'tv'
+            // FIX: Use a type assertion to safely access the 'media_type' property.
+            r => {
+                const mediaType = (r as { media_type?: ContentType }).media_type;
+                return mediaType === 'movie' || mediaType === 'tv';
+            }
         ) as (MovieSummary | TVSummary) & { media_type: ContentType } | undefined;
         
         if (!bestMatch) {
