@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 const SkeletonCard: React.FC<{ className?: string }> = ({ className }) => <div className={`glass-panel p-4 rounded-lg animate-pulse ${className}`} />;
