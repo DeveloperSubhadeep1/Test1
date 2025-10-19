@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const nodemailer = require('nodemailer');
 const mongoose = require('mongoose');
-const axios = require('axios');
 
 // Import Mongoose Models
 const User = require('../models/User');
@@ -296,9 +295,10 @@ router.post('/utils/parse-url', async (req, res) => {
 
         let size = null;
         try {
-            const headResponse = await axios.head(url);
-            if (headResponse.headers['content-length']) {
-                size = formatBytes(parseInt(headResponse.headers['content-length'], 10));
+            const headResponse = await fetch(url, { method: 'HEAD' });
+            const contentLength = headResponse.headers.get('content-length');
+            if (contentLength) {
+                size = formatBytes(parseInt(contentLength, 10));
             }
         } catch (fetchError) {
             console.warn(`Could not fetch HEAD for ${url}:`, fetchError.message);
