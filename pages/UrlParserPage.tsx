@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import { useToast } from '../hooks/useToast';
 import { apiParseUrl } from '../services/api';
-import { LinkIcon, SpinnerIcon } from '../components/Icons';
+import { LinkIcon, SpinnerIcon, CopyIcon } from '../components/Icons';
 
 interface ParsedData {
   movieName: string;
@@ -11,33 +11,6 @@ interface ParsedData {
   quality: string | null;
   size: string | null;
 }
-
-const ResultCard: React.FC<{ data: ParsedData }> = ({ data }) => {
-    return (
-        <div className="glass-panel p-6 rounded-lg animate-fade-in mt-8">
-            <h3 className="text-2xl font-bold text-white mb-4">{data.movieName || 'Unknown Title'}</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                    <p className="text-muted">Year</p>
-                    <p className="font-semibold text-lg">{data.year || 'N/A'}</p>
-                </div>
-                <div>
-                    <p className="text-muted">Quality</p>
-                    <p className="font-semibold text-lg">{data.quality || 'N/A'}</p>
-                </div>
-                <div>
-                    <p className="text-muted">Languages</p>
-                    <p className="font-semibold text-lg">{data.languages.length > 0 ? data.languages.join(', ') : 'N/A'}</p>
-                </div>
-                <div>
-                    <p className="text-muted">File Size</p>
-                    <p className="font-semibold text-lg">{data.size || 'N/A'}</p>
-                </div>
-            </div>
-        </div>
-    );
-};
-
 
 const UrlParserPage: React.FC = () => {
     usePageMetadata({
@@ -50,6 +23,59 @@ const UrlParserPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<ParsedData | null>(null);
     const { addToast } = useToast();
+
+    const ResultCard: React.FC<{ data: ParsedData }> = ({ data }) => {
+        const handleCopy = () => {
+            const infoString = [
+                data.movieName,
+                data.year,
+                data.languages.join(' '),
+                data.quality,
+                data.size
+            ].filter(Boolean).join(' ');
+
+            navigator.clipboard.writeText(infoString).then(() => {
+                addToast('Info copied to clipboard!', 'success');
+            }).catch(err => {
+                addToast('Failed to copy info.', 'error');
+                console.error('Copy failed:', err);
+            });
+        };
+
+        return (
+            <div className="glass-panel p-6 rounded-lg animate-fade-in mt-8">
+                <div className="flex justify-between items-start mb-4">
+                    <h3 className="text-2xl font-bold text-white">{data.movieName || 'Unknown Title'}</h3>
+                    <button 
+                        onClick={handleCopy}
+                        className="flex items-center gap-2 text-sm bg-secondary text-muted px-3 py-1.5 rounded-full hover:bg-gray-700 hover:text-white transition-colors flex-shrink-0"
+                        title="Copy info to clipboard"
+                    >
+                        <CopyIcon className="h-4 w-4" />
+                        <span>Copy</span>
+                    </button>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p className="text-muted">Year</p>
+                        <p className="font-semibold text-lg">{data.year || 'N/A'}</p>
+                    </div>
+                    <div>
+                        <p className="text-muted">Quality</p>
+                        <p className="font-semibold text-lg">{data.quality || 'N/A'}</p>
+                    </div>
+                    <div>
+                        <p className="text-muted">Languages</p>
+                        <p className="font-semibold text-lg">{data.languages.length > 0 ? data.languages.join(', ') : 'N/A'}</p>
+                    </div>
+                    <div>
+                        <p className="text-muted">File Size</p>
+                        <p className="font-semibold text-lg">{data.size || 'N/A'}</p>
+                    </div>
+                </div>
+            </div>
+        );
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

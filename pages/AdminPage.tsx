@@ -816,8 +816,16 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave, allMovie
   };
 
   const handleSelect = (item: TMDBSearchResult) => {
-    const { media_type, ...rest } = item;
-    setSelectedItem({ ...rest, type: media_type } as ContentItem);
+    // FIX: Correctly create the ContentItem by narrowing the discriminated union first.
+    let contentItem: ContentItem;
+    if (item.media_type === 'movie') {
+        const { media_type, ...rest } = item;
+        contentItem = { ...rest, type: 'movie' };
+    } else {
+        const { media_type, ...rest } = item;
+        contentItem = { ...rest, type: 'tv' };
+    }
+    setSelectedItem(contentItem);
     setStep(2);
   };
 
@@ -884,8 +892,16 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave, allMovie
             throw new Error(`No movie/TV match found for "${parsedInfo.movieName}".`);
         }
         
-        const { media_type, ...restOfBestMatch } = bestMatch;
-        const tmdbMatch = { ...restOfBestMatch, type: media_type } as ContentItem;
+        // FIX: Correctly create the ContentItem by narrowing the discriminated union first.
+        // Destructuring a union directly (`{ media_type, ...rest }`) can lead to incorrect type inference for the `rest` object.
+        let tmdbMatch: ContentItem;
+        if (bestMatch.media_type === 'movie') {
+            const { media_type, ...rest } = bestMatch;
+            tmdbMatch = { ...rest, type: 'movie' };
+        } else { // media_type is 'tv'
+            const { media_type, ...rest } = bestMatch;
+            tmdbMatch = { ...rest, type: 'tv' };
+        }
         
         return { url, parsedInfo, tmdbMatch, status: 'success' };
 
