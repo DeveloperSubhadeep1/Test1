@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo, useRef } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { usePageMetadata } from '../hooks/usePageMetadata';
-import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
 import {
   getMetrics,
   getStoredMovies,
@@ -11,10 +10,9 @@ import {
   deleteSupportTicket,
   updateStoredMovie,
   addStoredMovie,
+  searchTMDB,
   apiTestEmail,
   getDbStats,
-  getStoredMovie,
-  searchTMDB,
 } from '../services/api';
 import {
   Metrics,
@@ -22,11 +20,12 @@ import {
   AdminUserView,
   SupportTicket,
   DownloadLink,
-  ContentType,
-  DbStats,
   MovieSummary,
   TVSummary,
+  ContentType,
+  DbStats,
 } from '../types';
+import Spinner from '../components/Spinner';
 import ConfirmationModal from '../components/ConfirmationModal';
 import { useToast } from '../hooks/useToast';
 import {
@@ -42,12 +41,10 @@ import {
   SettingsIcon,
   SpinnerIcon,
   DatabaseIcon,
-  FilmIcon,
-  CheckCircleIcon,
 } from '../components/Icons';
+import { useDebounce } from '../hooks/useDebounce';
+import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
 import { Avatar } from '../components/Avatars';
-import { DashboardSkeleton, TableSkeleton, CardListSkeleton, TicketSkeleton, DatabaseSkeleton } from '../components/AdminPageSkeletons';
-import { parseFilenameForAutomate } from '../utils';
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Tab Button Component
@@ -149,6 +146,7 @@ interface ArcData {
 }
 interface CircularChartProps {
   metrics: Metrics;
+  // FIX: Make props Partial as the component is designed to handle a subset of metrics.
   colors: Partial<Record<keyof Metrics, string>>;
   metricConfig: Partial<Record<keyof Metrics, { label: string; color: string; icon: React.ReactNode }>>;
   onHover: (tooltipData: TooltipData) => void;
@@ -160,6 +158,8 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
 
     const arcData = useMemo(() => {
         const colorKeys = Object.keys(colors) as Array<keyof Metrics>;
+        // FIX: Calculate total based ONLY on the metrics that will be displayed in the chart.
+        // This ensures the chart segments add up to a full circle (100%).
         const total = colorKeys.reduce((sum, key) => sum + (Number(metrics[key]) || 0), 0);
         
         const finalArcData: ArcData[] = [];
@@ -192,6 +192,8 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
         canvas.style.height = `${canvasSize}px`;
         ctx.scale(devicePixelRatio, devicePixelRatio);
 
+        // FIX: Re-calculate total based on displayed metrics to match the arc calculation,
+        // ensuring the number in the center is also correct.
         const colorKeys = Object.keys(colors) as Array<keyof Metrics>;
         const total = colorKeys.reduce((sum, key) => sum + (Number(metrics[key]) || 0), 0);
 
@@ -238,6 +240,7 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
                 const animatedEndAngle = arc.startAngle + (arc.endAngle - arc.startAngle) * progress;
                 ctx.beginPath();
                 ctx.arc(centerX, centerY, radius, arc.startAngle, animatedEndAngle);
+                // FIX: Add non-null assertion as `colors` is Partial but logic ensures key exists.
                 ctx.strokeStyle = colors[arc.key]!;
                 ctx.lineWidth = arc.key === hoveredKey ? defaultLineWidth + 4 : defaultLineWidth;
                 ctx.stroke();
@@ -292,6 +295,7 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
         if (foundSegment) {
             setHoveredKey(foundSegment.key);
             const value = Number(metrics[foundSegment.key]) || 0;
+            // FIX: Add non-null assertion as logic ensures metricConfig has the same keys as colors.
             const label = metricConfig[foundSegment.key]!.label;
             onHover({
                 visible: true,
@@ -345,9 +349,10 @@ const DashboardTab: React.FC = () => {
       totalDownloads: { label: 'Total Downloads', color: '#9A16DD', icon: <DownloadIcon className="h-5 w-5" /> },
       totalUsers: { label: 'Total Users', color: '#8B949E', icon: <UsersIcon className="h-5 w-5" /> },
       totalSupportTickets: { label: 'Support Tickets', color: '#FF2E63', icon: <MessageSquareIcon className="h-5 w-5" /> },
+      // Note: totalCollections is available in `metrics` but not displayed here as a card or in the chart legend.
   };
 
-  if (loading) return <DashboardSkeleton />;
+  if (loading) return <Spinner />;
   
   const chartColors = {
       totalLinks: metricConfig.totalLinks.color,
@@ -414,7 +419,7 @@ const UsersTab: React.FC = () => {
     getUsers().then(setUsers).catch(() => addToast('Failed to load users.', 'error')).finally(() => setLoading(false));
   }, [addToast]);
 
-  if (loading) return <><CardListSkeleton /><TableSkeleton /></>;
+  if (loading) return <Spinner />;
 
   return (
     <>
@@ -486,7 +491,6 @@ const SupportTicketsTab: React.FC = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [ticketToDelete, setTicketToDelete] = useState<SupportTicket | null>(null);
-  const [approvingTicketId, setApprovingTicketId] = useState<string | null>(null);
   const { addToast } = useToast();
 
   const fetchTickets = useCallback(async () => {
@@ -516,66 +520,8 @@ const SupportTicketsTab: React.FC = () => {
     }
     setTicketToDelete(null);
   };
-  
-  const handleApprove = async (ticket: SupportTicket) => {
-    setApprovingTicketId(ticket._id);
-    try {
-        if (!ticket.contentTitle) {
-            throw new Error("Ticket is missing a content title.");
-        }
 
-        const labelMatch = ticket.message.match(/Label: (.*)/);
-        const urlMatch = ticket.message.match(/URL: (.*)/);
-
-        if (!labelMatch || !urlMatch || !labelMatch[1] || !urlMatch[1]) {
-            throw new Error("Could not parse link details from message.");
-        }
-
-        const label = labelMatch[1].trim();
-        const url = urlMatch[1].trim();
-
-        const searchResults = await searchTMDB(ticket.contentTitle);
-        const tmdbItem = searchResults.results[0];
-
-        if (!tmdbItem) {
-            throw new Error(`Content "${ticket.contentTitle}" not found on TMDB.`);
-        }
-
-        const { id: tmdbId, media_type: type } = tmdbItem as any;
-        if (type !== 'movie' && type !== 'tv') {
-            throw new Error("Found content is not a movie or TV show.");
-        }
-        const title = 'title' in tmdbItem ? tmdbItem.title : tmdbItem.name;
-
-        const storedMovie = await getStoredMovie(tmdbId, type);
-        
-        const newLink: DownloadLink = { label, url, suggestedBy: ticket.username };
-
-        if (storedMovie) {
-            const updatedLinks = [...storedMovie.download_links, newLink];
-            await updateStoredMovie(storedMovie._id, { download_links: updatedLinks });
-            addToast(`Added new link to "${title}".`, 'success');
-        } else {
-            await addStoredMovie({
-                tmdb_id: tmdbId,
-                type,
-                title,
-                download_links: [newLink],
-                download_count: 0,
-            });
-            addToast(`Added new content "${title}" with link.`, 'success');
-        }
-        await deleteSupportTicket(ticket._id);
-        fetchTickets();
-    } catch (error) {
-        addToast(error instanceof Error ? error.message : 'Failed to approve link.', 'error');
-    } finally {
-        setApprovingTicketId(null);
-    }
-  };
-
-
-  if (loading) return <TicketSkeleton />;
+  if (loading) return <Spinner />;
 
   return (
     <>
@@ -586,30 +532,12 @@ const SupportTicketsTab: React.FC = () => {
               <div className="flex justify-between items-start">
                 <div>
                   <h4 className="font-bold text-white">{ticket.subject}</h4>
-                  {ticket.username && <p className="text-sm text-cyan">From: <span className="font-semibold">{ticket.username}</span></p>}
                   {ticket.contentTitle && <p className="text-sm text-muted">Content: {ticket.contentTitle}</p>}
                   <p className="text-xs text-muted mt-1">{new Date(ticket.timestamp).toLocaleString()}</p>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {ticket.subject === 'Link Suggestion' && ticket.contentTitle && (
-                    <button 
-                      onClick={() => handleApprove(ticket)} 
-                      disabled={approvingTicketId === ticket._id}
-                      className="p-2 rounded-full bg-primary/50 text-cyan hover:bg-cyan/20 disabled:text-cyan/50 disabled:cursor-wait transition-colors" title="Approve & Add Link"
-                    >
-                      {approvingTicketId === ticket._id 
-                        ? <SpinnerIcon className="animate-spin h-5 w-5" /> 
-                        : <CheckCircleIcon className="h-5 w-5" />}
-                    </button>
-                  )}
-                  <button 
-                    onClick={() => setTicketToDelete(ticket)} 
-                    className="p-2 rounded-full bg-primary/50 text-danger hover:bg-danger/20 transition-colors" 
-                    title="Delete Ticket"
-                  >
-                    <TrashIcon className="h-5 w-5" />
-                  </button>
-                </div>
+                <button onClick={() => setTicketToDelete(ticket)} className="p-2 text-muted hover:text-danger transition-colors" title="Delete Ticket">
+                  <TrashIcon className="h-5 w-5" />
+                </button>
               </div>
               <p className="mt-2 text-sm whitespace-pre-wrap text-gray-300">{ticket.message}</p>
             </div>
@@ -715,7 +643,7 @@ const DatabaseTab: React.FC = () => {
     fetchData();
   }, [addToast]);
 
-  if (loading) return <DatabaseSkeleton />;
+  if (loading) return <Spinner />;
 
   return (
     <div className="glass-panel p-6 rounded-lg flex flex-col items-center justify-center min-h-[50vh]">
@@ -740,13 +668,13 @@ interface MovieEditModalProps {
   onSave: () => void;
 }
 const MovieEditModal: React.FC<MovieEditModalProps> = ({ movie, onClose, onSave }) => {
-  const [links, setLinks] = useState<DownloadLink[]>(() => (movie.download_links.length > 0 ? JSON.parse(JSON.stringify(movie.download_links)) : [{ label: '', url: '' }]));
+  const [links, setLinks] = useState<DownloadLink[]>(() => (movie.download_links.length > 0 ? movie.download_links : [{ label: '', url: '' }]));
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
 
-  const handleLinkChange = (index: number, field: keyof DownloadLink, value: string) => {
+  const handleLinkChange = (index: number, field: 'label' | 'url', value: string) => {
     const newLinks = [...links];
-    (newLinks[index] as any)[field] = value;
+    newLinks[index][field] = value;
     setLinks(newLinks);
   };
 
@@ -775,18 +703,16 @@ const MovieEditModal: React.FC<MovieEditModalProps> = ({ movie, onClose, onSave 
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-      <div className="glass-panel rounded-lg shadow-xl w-full max-w-3xl border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
+      <div className="glass-panel rounded-lg shadow-xl w-full max-w-2xl border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
         <form onSubmit={handleSubmit}>
           <div className="p-6">
             <h3 className="text-lg font-bold text-white">Edit Links for: <span className="text-cyan">{movie.title}</span></h3>
-            
-            <div className="space-y-4 mt-4 max-h-80 overflow-y-auto pr-2">
+            <div className="space-y-4 mt-4 max-h-96 overflow-y-auto pr-2">
               {links.map((link, index) => (
-                <div key={index} className="grid grid-cols-12 gap-2 items-center">
-                  <input type="text" placeholder="Label" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className={`${inputClass} col-span-3`} />
-                  <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className={`${inputClass} col-span-5`} />
-                  <input type="text" placeholder="Suggested By" value={link.suggestedBy || ''} onChange={e => handleLinkChange(index, 'suggestedBy', e.target.value)} className={`${inputClass} col-span-3`} />
-                  <button type="button" onClick={() => removeLink(index)} className="p-2 text-danger hover:bg-danger/10 rounded-full transition-colors col-span-1">
+                <div key={index} className="flex gap-2 items-center">
+                  <input type="text" placeholder="Label (e.g., 1080p)" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className={`${inputClass} w-1/3`} />
+                  <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className={`${inputClass} w-2/3`} />
+                  <button type="button" onClick={() => removeLink(index)} className="p-2 text-danger hover:bg-danger/10 rounded-full transition-colors">
                     <XIcon className="h-5 w-5" />
                   </button>
                 </div>
@@ -814,78 +740,45 @@ interface MovieAddModalProps {
   onSave: () => void;
 }
 const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
-  const [urlInput, setUrlInput] = useState('');
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationResults, setVerificationResults] = useState<(MovieSummary | TVSummary)[]>([]);
+  const [step, setStep] = useState(1);
+  const [query, setQuery] = useState('');
+  const debouncedQuery = useDebounce(query, 500);
+  const [searchResults, setSearchResults] = useState<(MovieSummary | TVSummary)[]>([]);
   const [selectedItem, setSelectedItem] = useState<(MovieSummary | TVSummary) & { type: ContentType } | null>(null);
   const [links, setLinks] = useState<DownloadLink[]>([{ label: '', url: '' }]);
   const [loading, setLoading] = useState(false);
   const { addToast } = useToast();
 
-  const handleFetchDetails = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!urlInput.trim()) {
-      addToast('Please enter a URL.', 'error');
-      return;
+  useEffect(() => {
+    if (debouncedQuery.trim().length > 2) {
+      setLoading(true);
+      searchTMDB(debouncedQuery)
+        .then(res => setSearchResults(res.results))
+        .catch(() => addToast('Search failed', 'error'))
+        .finally(() => setLoading(false));
+    } else {
+      setSearchResults([]);
     }
-    setIsVerifying(true);
-    setVerificationResults([]);
-    try {
-      const filenameWithQuery = urlInput.substring(urlInput.lastIndexOf('/') + 1);
-      const filename = decodeURIComponent(filenameWithQuery.split('?')[0]);
-      
-      const parsedInfo = parseFilenameForAutomate(filename);
-      
-      if (!parsedInfo.movieName) {
-        throw new Error('Could not automatically determine the title from the URL.');
-      }
+  }, [debouncedQuery, addToast]);
 
-      const query = parsedInfo.year ? `${parsedInfo.movieName} ${parsedInfo.year}` : parsedInfo.movieName;
-      const data = await searchTMDB(query);
-      
-      const results = data.results.filter(item => (item as any).media_type === 'movie' || (item as any).media_type === 'tv');
-      setVerificationResults(results);
-
-      if (results.length === 0) {
-        addToast(`No TMDB results found for "${query}".`, 'info');
-      }
-    } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to parse URL or search for content.', 'error');
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const handleSelectResult = (item: MovieSummary | TVSummary) => {
+  const handleSelect = (item: MovieSummary | TVSummary) => {
     const type = (item as any).media_type || ('title' in item ? 'movie' : 'tv');
     setSelectedItem({ ...item, type });
-    
-    const filenameWithQuery = urlInput.substring(urlInput.lastIndexOf('/') + 1);
-    const filename = decodeURIComponent(filenameWithQuery.split('?')[0]);
-    const parsedInfo = parseFilenameForAutomate(filename);
-
-    const labelParts = [];
-    if (parsedInfo.quality) labelParts.push(parsedInfo.quality);
-    if (parsedInfo.languages.length > 0) labelParts.push(parsedInfo.languages.join('/'));
-    if (parsedInfo.size) labelParts.push(parsedInfo.size);
-    
-    const generatedLabel = labelParts.length > 0 ? labelParts.join(' ') : 'Default';
-    
-    setLinks([{ label: generatedLabel, url: urlInput }]);
+    setStep(2);
   };
 
-  const handleLinkChange = (index: number, field: keyof DownloadLink, value: string) => {
+  const handleLinkChange = (index: number, field: 'label' | 'url', value: string) => {
     const newLinks = [...links];
-    (newLinks[index] as any)[field] = value;
+    newLinks[index][field] = value;
     setLinks(newLinks);
   };
+
   const addLink = () => setLinks([...links, { label: '', url: '' }]);
   const removeLink = (index: number) => setLinks(links.filter((_, i) => i !== index));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedItem) return;
-
     const validLinks = links.filter(link => link.label.trim() && link.url.trim());
     if (validLinks.length === 0) {
       addToast('Please add at least one valid link.', 'error');
@@ -893,137 +786,75 @@ const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave }) => {
     }
     setLoading(true);
     try {
-        const existingMovie = await getStoredMovie(selectedItem.id, selectedItem.type);
-        const title = 'title' in selectedItem ? selectedItem.title : selectedItem.name;
-
-        if (existingMovie) {
-            const updatedLinks = [...existingMovie.download_links, ...validLinks];
-            await updateStoredMovie(existingMovie._id, { download_links: updatedLinks });
-            addToast(`Added new link(s) to existing entry for "${title}".`, 'success');
-        } else {
-            await addStoredMovie({
-                tmdb_id: selectedItem.id,
-                type: selectedItem.type,
-                title,
-                download_links: validLinks,
-                download_count: 0,
-            });
-            addToast(`New content "${title}" added successfully.`, 'success');
-        }
-        onSave();
-        onClose();
+      await addStoredMovie({
+        tmdb_id: selectedItem.id,
+        type: selectedItem.type,
+        title: 'title' in selectedItem ? selectedItem.title : selectedItem.name,
+        download_links: validLinks,
+        download_count: 0,
+      });
+      addToast('New content added successfully.', 'success');
+      onSave();
+      onClose();
     } catch (error) {
       addToast(error instanceof Error ? error.message : 'Failed to add content.', 'error');
     } finally {
       setLoading(false);
     }
   };
-  
-  const handleGoBack = () => {
-    setSelectedItem(null);
-    setLinks([{ label: '', url: '' }]);
-  };
-  
-  const renderInitialStep = () => (
-    <div className="mt-4">
-      <form onSubmit={handleFetchDetails} className="flex gap-4 items-end">
-          <div className="flex-grow">
-              <label htmlFor="urlInput" className="block text-sm font-medium text-muted mb-1">Download URL</label>
-              <input
-                  type="url"
-                  id="urlInput"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  placeholder="Paste a link to automatically fetch details..."
-                  className={inputClass}
-                  autoComplete="off"
-              />
-          </div>
-          <button type="submit" disabled={isVerifying} className="flex-shrink-0 px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:bg-muted">
-              {isVerifying ? <SpinnerIcon className="animate-spin h-5 w-5 mx-auto" /> : 'Fetch Details'}
-          </button>
-      </form>
 
-      {verificationResults.length > 0 && (
-        <div className="mt-4 border-t border-glass-border pt-4">
-          <h4 className="font-semibold text-white mb-2">Step 2: Please verify the content</h4>
-          <ul className="space-y-2 max-h-64 overflow-y-auto pr-2">
-            {verificationResults.map(item => {
-              const title = 'title' in item ? item.title : item.name;
-              const releaseDate = 'release_date' in item ? item.release_date : item.first_air_date;
-              const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
-              const posterUrl = item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : null;
-              
-              return (
-                <li key={item.id}>
-                    <button
-                    type="button"
-                    onClick={() => handleSelectResult(item)}
-                    className="w-full text-left flex items-center p-2 rounded-md hover:bg-cyan/10 transition-colors"
-                    >
-                    {posterUrl ? (
-                        <img src={posterUrl} alt={title} className="w-10 h-14 object-cover rounded-sm mr-3" />
-                    ) : (
-                        <div className="w-10 h-14 bg-secondary rounded-sm mr-3 flex items-center justify-center">
-                        <FilmIcon className="h-5 w-5 text-muted"/>
-                        </div>
-                    )}
-                    <div>
-                        <p className="font-bold text-white">{title}</p>
-                        <p className="text-sm text-muted">{year}</p>
-                    </div>
-                    </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderLinkForm = () => {
-    if (!selectedItem) return null;
-    return (
-      <div className="mt-4">
-        <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-          {links.map((link, index) => (
-            <div key={index} className="grid grid-cols-12 gap-2 items-center">
-              <input type="text" placeholder="Label" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className={`${inputClass} col-span-4`} />
-              <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className={`${inputClass} col-span-7`} />
-              <button type="button" onClick={() => removeLink(index)} className="p-2 text-danger hover:bg-danger/10 rounded-full transition-colors col-span-1">
-                <XIcon className="h-5 w-5" />
-              </button>
-            </div>
-          ))}
-        </div>
-        <button type="button" onClick={addLink} className="mt-4 flex items-center gap-2 text-sm text-cyan font-semibold hover:brightness-125 transition-all">
-          <PlusCircleIcon className="h-5 w-5" />
-          Add another link
-        </button>
-      </div>
-    );
-  };
-  
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-      <div className="glass-panel rounded-lg shadow-xl w-full max-w-3xl border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
+     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+      <div className="glass-panel rounded-lg shadow-xl w-full max-w-2xl border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
         <form onSubmit={handleSubmit}>
           <div className="p-6">
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold text-white">
-                {selectedItem ? `Step 3: Add links for "${'title' in selectedItem ? selectedItem.title : selectedItem.name}"` : 'Step 1: Add New Content via Link'}
-              </h3>
+              <h3 className="text-lg font-bold text-white">{step === 1 ? 'Step 1: Find Content' : `Step 2: Add links for ${selectedItem && ('title' in selectedItem ? selectedItem.title : selectedItem.name)}`}</h3>
               <button type="button" onClick={onClose} className="text-muted hover:text-white"><XIcon className="h-5 w-5" /></button>
             </div>
-
-            {selectedItem ? renderLinkForm() : renderInitialStep()}
-            
+            {step === 1 ? (
+              <div className="mt-4">
+                <div className="relative">
+                  <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search for a movie or TV show..." className={`${inputClass} pl-10`} />
+                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
+                </div>
+                {loading && <Spinner />}
+                <ul className="mt-2 max-h-80 overflow-y-auto">
+                  {searchResults.map(item => (
+                    <li key={item.id} onClick={() => handleSelect(item)} className="p-2 flex gap-4 items-center hover:bg-cyan/10 rounded cursor-pointer transition-colors">
+                      <img src={item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : ''} alt="" className="w-10 h-14 object-cover rounded bg-primary" />
+                      <div>
+                        <p className="text-white">{'title' in item ? item.title : item.name}</p>
+                        <p className="text-sm text-muted">{new Date('release_date' in item ? item.release_date : item.first_air_date).getFullYear() || 'N/A'}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="mt-4">
+                 <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                  {links.map((link, index) => (
+                    <div key={index} className="flex gap-2 items-center">
+                      <input type="text" placeholder="Label (e.g., 1080p)" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className={`${inputClass} w-1/3`} />
+                      <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className={`${inputClass} w-2/3`} />
+                      <button type="button" onClick={() => removeLink(index)} className="p-2 text-danger hover:bg-danger/10 rounded-full transition-colors">
+                        <XIcon className="h-5 w-5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={addLink} className="mt-4 flex items-center gap-2 text-sm text-cyan font-semibold hover:brightness-125 transition-all">
+                  <PlusCircleIcon className="h-5 w-5" />
+                  Add another link
+                </button>
+              </div>
+            )}
           </div>
           <div className="bg-primary/50 px-6 py-4 flex justify-end gap-2 rounded-b-lg">
-            {selectedItem && <button type="button" onClick={handleGoBack} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Back to Verification</button>}
+            {step === 2 && <button type="button" onClick={() => setStep(1)} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Back</button>}
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Cancel</button>
-            {selectedItem && (
+            {step === 2 && (
               <button type="submit" disabled={loading} className="px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:bg-muted disabled:text-gray-800 disabled:cursor-not-allowed">
                 {loading ? 'Saving...' : 'Save Content'}
               </button>
@@ -1078,7 +909,7 @@ const MoviesTab: React.FC = () => {
     setMovieToDelete(null);
   };
 
-  if (loading) return <><CardListSkeleton /><TableSkeleton /></>;
+  if (loading) return <Spinner />;
 
   return (
     <>
