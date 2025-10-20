@@ -13,7 +13,7 @@ import { usePageMetadata } from '../hooks/usePageMetadata';
 import DetailsPageSkeleton from '../components/DetailsPageSkeleton';
 import TelegramAd from '../components/TelegramAd';
 import CastCard from '../components/CastCard';
-import { CalendarIcon, ClockIcon, DownloadIcon, HeartIcon, BookmarkIcon, ShareIcon, SpinnerIcon, PlusCircleIcon, PlayIcon, ArrowLeftIcon } from '../components/Icons';
+import { CalendarIcon, ClockIcon, DownloadIcon, HeartIcon, BookmarkIcon, ShareIcon, SpinnerIcon, PlusCircleIcon, PlayIcon, ArrowLeftIcon, StarIcon } from '../components/Icons';
 import ExpandableText from '../components/ExpandableText';
 import AddToCollectionModal from '../components/AddToCollectionModal';
 import ScoreRing from '../components/ScoreRing';
@@ -56,10 +56,10 @@ const DownloadLinkButton: React.FC<{ link: DownloadLink; title: string; year: st
     return (
         <button
             onClick={() => onDownload(link)}
-            className="w-full flex items-center justify-between bg-accent text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-opacity text-left"
+            className="group w-full flex items-center justify-between bg-accent text-white font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-opacity text-left"
         >
             <span className="truncate">{displayLabel}</span>
-            <DownloadIcon className="h-6 w-6 flex-shrink-0 ml-4" />
+            <DownloadIcon className="h-6 w-6 flex-shrink-0 ml-4 transition-transform duration-300 group-hover:scale-110" />
         </button>
     );
 };
@@ -353,23 +353,32 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
                         </div>
 
                         <div className="flex items-center gap-4 my-6">
-                        <ScoreRing score={details.vote_average} />
-                        <span className="font-bold">User<br/>Score</span>
-                        <div className="h-10 w-px bg-gray-700"></div>
-                        <div className="flex items-center gap-2">
-                            <button onClick={handleOpenCollectionModal} title="Add to collection" className="h-11 w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Add to collection">
-                                <PlusCircleIcon className="h-6 w-6 text-white" />
-                            </button>
-                            <button onClick={handleWatchlistToggle} title={onWl ? 'Remove from watchlist' : 'Add to watchlist'} className="h-11 w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Toggle Watchlist">
-                                <BookmarkIcon className={`h-6 w-6 transition-all ${onWl ? 'fill-accent stroke-accent' : 'text-white'}`} />
-                            </button>
-                            <button onClick={handleFavoriteToggle} title={isFav ? 'Remove from favorites' : 'Add to favorites'} className="h-11 w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Toggle Favorite">
-                                <HeartIcon className={`h-6 w-6 transition-all ${isFav ? 'fill-red-500 stroke-red-500' : 'text-white'}`} />
-                            </button>
-                            <button onClick={handleShare} title="Share" className="h-11 w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Share this content">
-                                <ShareIcon className="h-6 w-6 text-white" />
-                            </button>
-                        </div>
+                          <div>
+                            <div className="flex items-center gap-4">
+                              <ScoreRing score={details.vote_average} />
+                              <span className="font-bold">User<br/>Score</span>
+                            </div>
+                             <div className="flex items-center justify-center gap-1.5 mt-2">
+                                <StarIcon className="h-5 w-5 text-yellow-400" />
+                                <span className="font-bold text-white text-lg">{details.vote_average.toFixed(1)}</span>
+                                <span className="text-muted text-sm">/ 10</span>
+                            </div>
+                          </div>
+                          <div className="h-10 w-px bg-gray-700"></div>
+                          <div className="flex items-center gap-2">
+                              <button onClick={handleOpenCollectionModal} title="Add to collection" className="group h-11 w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Add to collection">
+                                  <PlusCircleIcon className="h-6 w-6 text-white transition-transform duration-300 group-hover:scale-110" />
+                              </button>
+                              <button onClick={handleWatchlistToggle} title={onWl ? 'Remove from watchlist' : 'Add to watchlist'} className="group h-11 w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Toggle Watchlist">
+                                  <BookmarkIcon className={`h-6 w-6 transition-all group-hover:scale-110 ${onWl ? 'fill-accent stroke-accent' : 'text-white'}`} />
+                              </button>
+                              <button onClick={handleFavoriteToggle} title={isFav ? 'Remove from favorites' : 'Add to favorites'} className="group h-11 w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Toggle Favorite">
+                                  <HeartIcon className={`h-6 w-6 transition-all group-hover:scale-110 ${isFav ? 'fill-red-500 stroke-red-500' : 'text-white'}`} />
+                              </button>
+                              <button onClick={handleShare} title="Share" className="group h-11 w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Share this content">
+                                  <ShareIcon className="h-6 w-6 text-white transition-transform duration-300 group-hover:scale-110" />
+                              </button>
+                          </div>
                         </div>
                         
                         <h2 className="text-xl font-semibold mt-6 mb-2">Overview</h2>
@@ -394,9 +403,9 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
                             {trailerKey && (
                             <Link
                                 to={`/trailer?key=${trailerKey}&title=${encodeURIComponent(title)}`}
-                                className="flex items-center gap-2 bg-white/90 text-black font-bold py-3 px-6 rounded-lg hover:bg-white transition-colors duration-300"
+                                className="group flex items-center gap-2 bg-white/90 text-black font-bold py-3 px-6 rounded-lg hover:bg-white transition-colors duration-300"
                                 >
-                                <PlayIcon className="h-6 w-6" />
+                                <PlayIcon className="h-6 w-6 transition-transform duration-300 group-hover:scale-110" />
                                 <span>Play Trailer</span>
                                 </Link>
                             )}
@@ -473,8 +482,8 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
                         <div className="glass-panel p-6 rounded-lg">
                             <h2 className="text-2xl font-bold mb-2">Help the Community</h2>
                             <p className="text-muted mb-4">Found a working link? Help us keep our library up-to-date by suggesting it.</p>
-                            <Link to="/contribute" state={{ contentTitle: title, tmdbId: details.id, type }} className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-accent/80 text-white font-bold py-3 px-4 rounded-lg hover:bg-accent transition-colors">
-                                <PlusCircleIcon className="h-6 w-6" />
+                            <Link to="/contribute" state={{ contentTitle: title, tmdbId: details.id, type }} className="group w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-accent/80 text-white font-bold py-3 px-4 rounded-lg hover:bg-accent transition-colors">
+                                <PlusCircleIcon className="h-6 w-6 transition-transform duration-300 group-hover:scale-110" />
                                 <span>Suggest a Link</span>
                             </Link>
                         </div>

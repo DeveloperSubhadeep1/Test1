@@ -30,10 +30,10 @@ const Notifications: React.FC = () => {
     <div className="relative" ref={containerRef}>
       <button
         onClick={toggleOpen}
-        className="relative p-2 rounded-full text-light-muted dark:text-gray-400 hover:text-light-text dark:hover:text-white hover:bg-light-secondary dark:hover:bg-primary transition-colors"
+        className="group relative p-2 rounded-full text-light-muted dark:text-gray-400 hover:text-light-text dark:hover:text-white hover:bg-light-secondary dark:hover:bg-primary transition-colors"
         aria-label="View notifications"
       >
-        <BellIcon className="h-5 w-5" />
+        <BellIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
         {unreadCount > 0 && (
           <span className="absolute top-0 right-0 block h-2.5 w-2.5 transform -translate-y-1/4 translate-x-1/4">
              <span className="absolute inline-flex h-full w-full rounded-full bg-cyan opacity-75 animate-ping"></span>

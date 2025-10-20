@@ -25,7 +25,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onLinkClick, onClose }) => {
   };
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-4 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+    `group flex items-center gap-4 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
       isActive
         ? 'bg-light-accent dark:bg-accent text-white'
         : 'text-light-muted dark:text-gray-300 hover:bg-light-secondary dark:hover:bg-secondary hover:text-light-text dark:hover:text-white'
@@ -62,11 +62,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onLinkClick, onClose }) => {
             </NavLink>
             <button
               onClick={handleLogout}
-              className="p-2 rounded-full text-light-muted dark:text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition-colors flex-shrink-0"
+              className="group p-2 rounded-full text-light-muted dark:text-gray-400 hover:text-red-500 hover:bg-red-500/10 transition-colors flex-shrink-0"
               title="Logout"
               aria-label="Logout"
             >
-              <LogOutIcon className="h-5 w-5" />
+              <LogOutIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
             </button>
           </div>
         ) : (
@@ -84,23 +84,23 @@ const Sidebar: React.FC<SidebarProps> = ({ onLinkClick, onClose }) => {
       <div className="flex-1 flex flex-col overflow-y-auto">
         <nav className="flex flex-col gap-2">
             <NavLink to="/" className={navLinkClass} end onClick={onLinkClick}>
-                <HomeIcon className="h-5 w-5" />
+                <HomeIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
                 <span>Home</span>
             </NavLink>
             <NavLink to="/genres" className={navLinkClass} onClick={onLinkClick}>
-                <GridIcon className="h-5 w-5" />
+                <GridIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
                 <span>Genres</span>
             </NavLink>
             <NavLink to="/favorites" className={navLinkClass} onClick={onLinkClick}>
-                <HeartIcon className="h-5 w-5" />
+                <HeartIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
                 <span>Favorites</span>
             </NavLink>
             <NavLink to="/watchlist" className={navLinkClass} onClick={onLinkClick}>
-                <BookmarkIcon className="h-5 w-5" />
+                <BookmarkIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
                 <span>Watchlist</span>
             </NavLink>
             <NavLink to="/collections" className={navLinkClass} onClick={onLinkClick}>
-                <LayersIcon className="h-5 w-5" />
+                <LayersIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
                 <span>My Collections</span>
             </NavLink>
             
@@ -110,11 +110,11 @@ const Sidebar: React.FC<SidebarProps> = ({ onLinkClick, onClose }) => {
                     <h5 className="text-xs font-semibold text-muted uppercase tracking-wider">Admin</h5>
                 </div>
                 <NavLink to="/admin" className={navLinkClass} onClick={onLinkClick} end>
-                    <UserCogIcon className="h-5 w-5" />
+                    <UserCogIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
                     <span>Dashboard</span>
                 </NavLink>
                 <NavLink to="/admin?tab=url-parser" className={navLinkClass} onClick={onLinkClick}>
-                    <LinkIcon className="h-5 w-5" />
+                    <LinkIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
                     <span>URL Parser</span>
                 </NavLink>
               </>

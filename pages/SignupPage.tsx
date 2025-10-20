@@ -103,10 +103,10 @@ const SignupPage: React.FC = () => {
                  <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-light-muted dark:text-muted hover:text-light-text dark:hover:text-white"
+                    className="group absolute inset-y-0 right-0 pr-3 flex items-center text-light-muted dark:text-muted hover:text-light-text dark:hover:text-white"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                    {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                    {showPassword ? <EyeOffIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" /> : <EyeIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />}
                 </button>
             </div>
             <p className="text-xs text-light-muted dark:text-muted mt-1">Must be at least 6 characters long.</p>

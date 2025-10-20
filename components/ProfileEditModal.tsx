@@ -65,8 +65,8 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({ onClose }) => {
         <form onSubmit={handleSubmit}>
           <div className="p-5 border-b border-glass-border flex justify-between items-center">
             <h3 className="text-lg font-bold text-white">Edit Your Profile</h3>
-            <button onClick={onClose} type="button" className="p-1 rounded-full hover:bg-white/10 transition-colors">
-              <XIcon className="h-5 w-5 text-muted" />
+            <button onClick={onClose} type="button" className="group p-1 rounded-full hover:bg-white/10 transition-colors">
+              <XIcon className="h-5 w-5 text-muted transition-transform duration-300 group-hover:scale-110" />
             </button>
           </div>
 

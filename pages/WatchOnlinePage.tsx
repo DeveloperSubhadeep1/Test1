@@ -8,8 +8,8 @@ import { DownloadIcon } from '../components/Icons';
 
 // Helper component for external player buttons
 const PlayerButton: React.FC<{ onClick: () => void; imgSrc: string; text: string; }> = ({ onClick, imgSrc, text }) => (
-    <button onClick={onClick} className="glass-panel hover:bg-white/10 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-3">
-        <img src={imgSrc} alt="" className="h-7" />
+    <button onClick={onClick} className="group glass-panel hover:bg-white/10 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-3">
+        <img src={imgSrc} alt="" className="h-7 transition-transform duration-300 group-hover:scale-110" />
         <span className="text-sm">{text}</span>
     </button>
 );
@@ -111,9 +111,9 @@ const WatchOnlinePage: React.FC = () => {
                             <PlayerButton onClick={openInHD} imgSrc="https://i.postimg.cc/rFT43LNh/hd.png" text="Watch in HD Player" />
                              <button
                                 onClick={handleDownload}
-                                className="bg-cyan/90 hover:bg-cyan text-primary font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-3"
+                                className="group bg-cyan/90 hover:bg-cyan text-primary font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-3"
                             >
-                                <DownloadIcon className="h-6 w-6"/>
+                                <DownloadIcon className="h-6 w-6 transition-transform duration-300 group-hover:scale-110"/>
                                 <span>Download Video</span>
                             </button>
                         </div>

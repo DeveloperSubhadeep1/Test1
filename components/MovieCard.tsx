@@ -76,20 +76,20 @@ const MovieCard: React.FC<MovieCardProps> = ({ item, type, onRemove }) => {
         {onRemove ? (
              <button
                 onClick={handleRemoveClick}
-                className="absolute top-2 right-2 z-10 p-1.5 bg-black/60 backdrop-blur-sm rounded-full text-white transition-all duration-300 hover:bg-red-500/80"
+                className="group absolute top-2 right-2 z-10 p-1.5 bg-black/60 backdrop-blur-sm rounded-full text-white transition-all duration-300 hover:bg-red-500/80"
                 title="Remove from collection"
                 aria-label="Remove from collection"
             >
-                <XCircleIcon className="h-5 w-5" />
+                <XCircleIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-125" />
             </button>
         ) : (
             <button
               onClick={handleWatchlistToggle}
-              className="absolute top-2 right-2 z-10 p-1.5 bg-black/60 backdrop-blur-sm rounded-full text-white transition-all duration-300 hover:bg-light-accent/80 dark:hover:bg-accent/80"
+              className="group absolute top-2 right-2 z-10 p-1.5 bg-black/60 backdrop-blur-sm rounded-full text-white transition-all duration-300 hover:bg-light-accent/80 dark:hover:bg-accent/80"
               title={onWl ? 'Remove from watchlist' : 'Add to watchlist'}
               aria-label="Toggle Watchlist"
             >
-              <BookmarkIcon className={`h-5 w-5 ${onWl ? 'fill-accent stroke-accent' : ''}`} />
+              <BookmarkIcon className={`h-5 w-5 transition-transform duration-300 group-hover:scale-125 ${onWl ? 'fill-accent stroke-accent' : ''}`} />
             </button>
         )}
         <div className="absolute bottom-0 left-0 p-4">

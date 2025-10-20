@@ -168,8 +168,8 @@ const CollectionDetailsPage: React.FC = () => {
             {collection.isPublic && (
                  <button 
                     onClick={handleShare}
-                    className="flex items-center gap-2 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-3 py-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-light-text dark:hover:text-white transition-colors">
-                    <ShareIcon className="h-4 w-4" />
+                    className="group flex items-center gap-2 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-3 py-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-light-text dark:hover:text-white transition-colors">
+                    <ShareIcon className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
                     <span>Share</span>
                 </button>
             )}
@@ -177,15 +177,15 @@ const CollectionDetailsPage: React.FC = () => {
                 <>
                     <button 
                         onClick={() => setIsEditModalOpen(true)}
-                        className="flex items-center gap-2 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-3 py-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-light-text dark:hover:text-white transition-colors">
-                        <EditIcon className="h-4 w-4" />
+                        className="group flex items-center gap-2 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-3 py-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-light-text dark:hover:text-white transition-colors">
+                        <EditIcon className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
                         <span>Edit</span>
                     </button>
                      <button 
                         onClick={() => setIsDeleteModalOpen(true)}
-                        className="flex items-center gap-2 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-3 py-1.5 rounded-full hover:bg-red-500/20 dark:hover:bg-red-500/20 hover:text-red-500 transition-colors"
+                        className="group flex items-center gap-2 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-3 py-1.5 rounded-full hover:bg-red-500/20 dark:hover:bg-red-500/20 hover:text-red-500 transition-colors"
                     >
-                        <TrashIcon className="h-4 w-4" />
+                        <TrashIcon className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
                         <span>Delete</span>
                     </button>
                 </>

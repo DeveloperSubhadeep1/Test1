@@ -20,14 +20,14 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           <div className="flex flex-1 items-center justify-start">
             <button
               onClick={onMenuClick}
-              className="p-2 mr-2 rounded-md text-light-muted dark:text-gray-400 hover:text-light-text dark:hover:text-white hover:bg-light-secondary dark:hover:bg-primary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-light-accent dark:focus:ring-white"
+              className="group p-2 mr-2 rounded-md text-light-muted dark:text-gray-400 hover:text-light-text dark:hover:text-white hover:bg-light-secondary dark:hover:bg-primary focus:outline-none focus:ring-2 focus:ring-inset focus:ring-light-accent dark:focus:ring-white"
               aria-label="Open navigation menu"
             >
-              <MenuIcon className="h-6 w-6" />
+              <MenuIcon className="h-6 w-6 transition-transform duration-300 group-hover:scale-110" />
             </button>
             
-            <Link to="/" className="flex-shrink-0 flex items-center space-x-2 text-light-text dark:text-white text-xl font-bold">
-              <FilmIcon className="h-8 w-8 text-light-accent dark:text-accent" />
+            <Link to="/" className="group flex-shrink-0 flex items-center space-x-2 text-light-text dark:text-white text-xl font-bold">
+              <FilmIcon className="h-8 w-8 text-light-accent dark:text-accent transition-transform duration-300 group-hover:scale-110" />
               <span className="hidden sm:inline">CineStream</span>
             </Link>
           </div>
@@ -41,13 +41,13 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
           <div className="flex flex-1 items-center justify-end gap-2">
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-full text-light-muted dark:text-gray-400 hover:text-light-text dark:hover:text-white hover:bg-light-secondary dark:hover:bg-primary transition-colors"
+              className="group p-2 rounded-full text-light-muted dark:text-gray-400 hover:text-light-text dark:hover:text-white hover:bg-light-secondary dark:hover:bg-primary transition-colors"
               aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
             >
               {theme === 'light' ? (
-                <MoonIcon className="h-5 w-5" />
+                <MoonIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
               ) : (
-                <SunIcon className="h-5 w-5" />
+                <SunIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
               )}
             </button>
             

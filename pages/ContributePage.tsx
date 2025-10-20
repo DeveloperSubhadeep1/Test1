@@ -143,7 +143,7 @@ const ContributePage: React.FC = () => {
             <button
               type="submit"
               disabled={isSubmitting || !turnstileToken}
-              className="w-full flex items-center justify-center gap-2 bg-light-accent dark:bg-accent text-white font-bold py-3 px-4 rounded-md hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group w-full flex items-center justify-center gap-2 bg-light-accent dark:bg-accent text-white font-bold py-3 px-4 rounded-md hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <>
@@ -152,7 +152,7 @@ const ContributePage: React.FC = () => {
                 </>
               ) : (
                 <>
-                    <LinkIcon className="h-5 w-5" />
+                    <LinkIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
                     <span>Submit for Review</span>
                 </>
               )}

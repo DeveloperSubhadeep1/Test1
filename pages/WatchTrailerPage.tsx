@@ -22,10 +22,10 @@ const WatchTrailerPage: React.FC = () => {
         <div className="fixed inset-0 bg-black flex flex-col items-center justify-center p-4 animate-fade-in z-50">
             <button 
                 onClick={handleBack}
-                className="absolute top-4 left-4 z-20 flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full text-white hover:bg-white/20 transition-colors"
+                className="group absolute top-4 left-4 z-20 flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full text-white hover:bg-white/20 transition-colors"
                 aria-label="Go back"
             >
-                <ArrowLeftIcon className="h-5 w-5" />
+                <ArrowLeftIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
                 <span>Back</span>
             </button>
             

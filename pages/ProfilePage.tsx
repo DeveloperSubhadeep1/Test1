@@ -61,8 +61,8 @@ const ProfilePage: React.FC = () => {
         return history.length > 0 ? (
            <>
             <div className="text-right mb-4">
-              <button onClick={clearHistory} className="flex items-center gap-2 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-3 py-1.5 rounded-full hover:bg-red-500/20 dark:hover:bg-red-500/20 hover:text-red-500 transition-colors ml-auto">
-                <TrashIcon className="h-4 w-4" />
+              <button onClick={clearHistory} className="group flex items-center gap-2 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-3 py-1.5 rounded-full hover:bg-red-500/20 dark:hover:bg-red-500/20 hover:text-red-500 transition-colors ml-auto">
+                <TrashIcon className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
                 <span>Clear History</span>
               </button>
             </div>
@@ -79,7 +79,7 @@ const ProfilePage: React.FC = () => {
   const TabButton: React.FC<{ tab: ActivityTab; label: string; count: number; icon: React.ReactNode }> = ({ tab, label, count, icon }) => (
     <button
       onClick={() => setActiveTab(tab)}
-      className={`flex-1 flex items-center justify-center gap-2 p-3 text-sm font-bold transition-all duration-300 border-b-2 ${
+      className={`group flex-1 flex items-center justify-center gap-2 p-3 text-sm font-bold transition-all duration-300 border-b-2 ${
         activeTab === tab
           ? 'text-light-accent dark:text-cyan border-light-accent dark:border-cyan'
           : 'text-light-muted dark:text-muted border-transparent hover:text-light-text dark:hover:text-white'
@@ -118,18 +118,18 @@ const ProfilePage: React.FC = () => {
           </div>
           <button
             onClick={() => setIsEditModalOpen(true)}
-            className="mt-2 sm:mt-0 sm:ml-auto flex items-center justify-center gap-2 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-4 py-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-light-text dark:hover:text-white transition-colors flex-shrink-0"
+            className="group mt-2 sm:mt-0 sm:ml-auto flex items-center justify-center gap-2 text-sm bg-light-secondary dark:bg-secondary text-light-muted dark:text-muted px-4 py-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-light-text dark:hover:text-white transition-colors flex-shrink-0"
           >
-            <EditIcon className="h-4 w-4" />
+            <EditIcon className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
             Edit Profile
           </button>
         </header>
         
         <main>
             <div className="border-b border-light-border dark:border-gray-800 flex">
-                <TabButton tab="favorites" label="Favorites" count={favorites.length} icon={<HeartIcon className="h-4 w-4" />} />
-                <TabButton tab="watchlist" label="Watchlist" count={watchlist.length} icon={<BookmarkIcon className="h-4 w-4" />} />
-                <TabButton tab="history" label="History" count={history.length} icon={<ClockIcon className="h-4 w-4" />} />
+                <TabButton tab="favorites" label="Favorites" count={favorites.length} icon={<HeartIcon className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />} />
+                <TabButton tab="watchlist" label="Watchlist" count={watchlist.length} icon={<BookmarkIcon className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />} />
+                <TabButton tab="history" label="History" count={history.length} icon={<ClockIcon className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />} />
             </div>
             <div className="mt-6">
                 {(favoritesLoading || watchlistLoading || historyLoading) && activeTab === 'favorites' ? <p>Loading...</p> : renderContent()}

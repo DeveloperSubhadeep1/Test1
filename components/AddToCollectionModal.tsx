@@ -53,8 +53,8 @@ const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({ item, onClo
       <div className="glass-panel rounded-lg shadow-xl w-full max-w-md border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
         <div className="p-5 border-b border-glass-border flex justify-between items-center">
           <h3 className="text-lg font-bold text-white">Add "{itemTitle}" to a collection</h3>
-          <button onClick={onClose} className="p-1 rounded-full hover:bg-white/10 transition-colors">
-            <XIcon className="h-5 w-5 text-muted" />
+          <button onClick={onClose} className="group p-1 rounded-full hover:bg-white/10 transition-colors">
+            <XIcon className="h-5 w-5 text-muted transition-transform duration-300 group-hover:scale-110" />
           </button>
         </div>
         
@@ -121,9 +121,9 @@ const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({ item, onClo
             ) : (
               <button
                 onClick={() => setShowCreateForm(true)}
-                className="w-full flex items-center justify-center gap-2 p-3 rounded-md text-cyan font-semibold hover:bg-cyan/10 transition-colors"
+                className="group w-full flex items-center justify-center gap-2 p-3 rounded-md text-cyan font-semibold hover:bg-cyan/10 transition-colors"
               >
-                <PlusCircleIcon className="h-5 w-5" />
+                <PlusCircleIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
                 <span>Create a new collection</span>
               </button>
             )}
