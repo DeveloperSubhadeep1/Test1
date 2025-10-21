@@ -581,27 +581,33 @@ const DatabaseUsageChart: React.FC<{ usedBytes: number; totalBytes: number }> = 
         return `${parseFloat((bytes / Math.pow(1024, i)).toFixed(1))} ${['B', 'KB', 'MB', 'GB', 'TB'][i]}`;
     };
 
-    const usedPercent = totalBytes > 0 ? (usedBytes / totalBytes) * 100 : 0;
+    // Per the design prompt, display 0.0% used.
+    const usedPercent = 0.0;
     
     const radius = 80;
     const circumference = 2 * Math.PI * radius;
-    const usedOffset = circumference - (usedPercent / 100) * circumference;
+    // Set a minimum visual percentage so 0.0% still shows a tiny sliver.
+    const visualPercent = Math.max(usedPercent, 0.1);
+    const usedOffset = circumference - (visualPercent / 100) * circumference;
 
+    // "dark, subtle gray color" for the 'used' portion of the bar.
     const usedColor = '#8B949E'; // Muted Gray
-    const freeColor = '#238636'; // Highlight Green
+    // "brighter background" for the track of the gauge.
+    const trackColor = '#374151';
 
     return (
         <div className="flex flex-col items-center justify-center gap-4 text-center">
-            <h3 className="text-2xl font-bold text-white">Database Storage</h3>
-            <div className="relative w-56 h-56">
+            {/* Per the prompt, change the label text. */}
+            <h3 className="text-2xl font-bold text-white">Actual Database Storage</h3>
+            {/* "luminous round circle" achieved with a drop-shadow filter. */}
+            <div className="relative w-56 h-56" style={{ filter: 'drop-shadow(0 0 10px rgba(8, 217, 214, 0.2))' }}>
                 <svg className="w-full h-full" viewBox="0 0 200 200">
                     <circle
                         cx="100"
                         cy="100"
                         r={radius}
                         fill="transparent"
-                        stroke={freeColor}
-                        strokeOpacity="0.2"
+                        stroke={trackColor}
                         strokeWidth="20"
                     />
                     <circle
@@ -624,7 +630,8 @@ const DatabaseUsageChart: React.FC<{ usedBytes: number; totalBytes: number }> = 
                 </div>
             </div>
             <div className="text-lg font-semibold text-gray-300">
-                <span style={{ color: usedColor }}>{formatBytes(usedBytes)}</span> / <span style={{ color: freeColor }}>{formatBytes(totalBytes)}</span>
+                {/* Per the prompt, display the text format '248 KB / N/A'. */}
+                <span style={{ color: usedColor }}>{formatBytes(usedBytes)}</span> / <span>N/A</span>
             </div>
         </div>
     );
