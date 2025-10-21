@@ -208,10 +208,9 @@ const FULL_BLOCKLIST_REGEX = new RegExp(`(${CHANNEL_NAMES_FOR_REGEX.join('|')})`
 function parseFilename(filename) {
     const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
     
-    // UPDATED: Clean the filename in multiple stages for robustness.
     let cleanedName = nameWithoutExt
-        .replace(/\[.*?\]/g, '')              // Stage 1: Remove bracketed content like [TGx].
-        .replace(FULL_BLOCKLIST_REGEX, '');   // Stage 2: Remove any known channel/group name from the comprehensive list.
+        .replace(/\[.*?\]/g, '')
+        .replace(FULL_BLOCKLIST_REGEX, '');
         
     let normalized = cleanedName.replace(/[._()+-]/g, " ").replace(/\s+/g, ' ').trim();
 
@@ -220,33 +219,43 @@ function parseFilename(filename) {
     let episode = null;
     let movieName = '';
 
-    // Find Season/Episode (e.g., S02E09)
-    const seMatch = normalized.match(/\b[sS](\d{1,2})[eE](\d{1,2})\b/);
-    let seIndex = -1;
-    if (seMatch) {
-        season = parseInt(seMatch[1], 10);
-        episode = parseInt(seMatch[2], 10);
-        seIndex = normalized.indexOf(seMatch[0]);
-    }
+    const matchIndices = [];
 
-    // Find Year (e.g., 2023)
     const yearMatch = normalized.match(/\b(19\d{2}|20\d{2})\b/);
-    let yearIndex = -1;
     if (yearMatch) {
         const potentialYear = parseInt(yearMatch[0], 10);
         if (potentialYear > 1900 && potentialYear < new Date().getFullYear() + 5) {
             year = yearMatch[0];
-            yearIndex = normalized.indexOf(yearMatch[0]);
+            matchIndices.push(normalized.indexOf(yearMatch[0]));
+        }
+    }
+
+    let seMatch = normalized.match(/(?:Season|S|Series|Part)[\s._-]?(\d{1,2})(?:[\s._-x](?:E|Ep|Episode|EP)?[\s._-]?)(\d{1,3})\b/i);
+    if (!seMatch) {
+        seMatch = normalized.match(/\b(\d{1,2})x(\d{1,3})\b/i);
+    }
+    
+    if (seMatch) {
+        season = parseInt(seMatch[1], 10);
+        episode = parseInt(seMatch[2], 10);
+        matchIndices.push(normalized.indexOf(seMatch[0]));
+    } else {
+        const seasonMatch = normalized.match(/(?:Season|S|Series|Part)[\s._-]?(\d{1,2})\b/i);
+        if (seasonMatch) {
+            season = parseInt(seasonMatch[1], 10);
+            matchIndices.push(normalized.indexOf(seasonMatch[0]));
+        }
+
+        const episodeMatch = normalized.match(/(?:Episode|Ep|E|EP)[\s._-]?(\d{1,3})\b/i);
+        if (episodeMatch) {
+            episode = parseInt(episodeMatch[1], 10);
+            matchIndices.push(normalized.indexOf(episodeMatch[0]));
         }
     }
     
     let titleEndIndex = -1;
-    if (seIndex !== -1 && yearIndex !== -1) {
-        titleEndIndex = Math.min(seIndex, yearIndex);
-    } else if (seIndex !== -1) {
-        titleEndIndex = seIndex;
-    } else if (yearIndex !== -1) {
-        titleEndIndex = yearIndex;
+    if (matchIndices.length > 0) {
+        titleEndIndex = Math.min(...matchIndices);
     }
 
     if (titleEndIndex !== -1) {
@@ -268,8 +277,6 @@ function parseFilename(filename) {
         }
     }
 
-    // FIX: Add check for empty movieName after cleaning.
-    // This prevents errors when the filename only contains noise words.
     if (!movieName.trim()) {
       throw new Error("Could not extract a valid title from the filename. The name may only contain channel tags or release info.");
     }

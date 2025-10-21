@@ -61,44 +61,59 @@ function coreFilenameParser(filename: string): { moviename: string; year: string
     let episode: number | null = null;
     let moviename = '';
 
-    // Find Season/Episode (e.g., S02E09)
-    const seMatch = normalized.match(/\b[sS](\d{1,2})[eE](\d{1,2})\b/);
-    let seIndex = -1;
-    if (seMatch) {
-        season = parseInt(seMatch[1], 10);
-        episode = parseInt(seMatch[2], 10);
-        seIndex = normalized.indexOf(seMatch[0]);
-    }
+    const matchIndices: number[] = [];
 
-    // Find Year (e.g., 2023)
+    // Find Year
     const yearMatch = normalized.match(/\b(19\d{2}|20\d{2})\b/);
-    let yearIndex = -1;
     if (yearMatch) {
         const potentialYear = parseInt(yearMatch[0], 10);
         if (potentialYear > 1900 && potentialYear < new Date().getFullYear() + 5) {
             year = yearMatch[0];
-            yearIndex = normalized.indexOf(yearMatch[0]);
+            matchIndices.push(normalized.indexOf(yearMatch[0]));
+        }
+    }
+
+    // Find Season/Episode using comprehensive regex patterns
+    // Pattern 1: Combined formats like S01E01, Season 01 Episode 01, S01x01
+    let seMatch = normalized.match(/(?:Season|S|Series|Part)[\s._-]?(\d{1,2})(?:[\s._-x](?:E|Ep|Episode|EP)?[\s._-]?)(\d{1,3})\b/i);
+    // Pattern 2: Fallback for formats like 1x02
+    if (!seMatch) {
+        seMatch = normalized.match(/\b(\d{1,2})x(\d{1,3})\b/i);
+    }
+    
+    if (seMatch) {
+        season = parseInt(seMatch[1], 10);
+        episode = parseInt(seMatch[2], 10);
+        matchIndices.push(normalized.indexOf(seMatch[0]));
+    } else {
+        // If no combined match, look for season and episode independently
+        const seasonMatch = normalized.match(/(?:Season|S|Series|Part)[\s._-]?(\d{1,2})\b/i);
+        if (seasonMatch) {
+            season = parseInt(seasonMatch[1], 10);
+            matchIndices.push(normalized.indexOf(seasonMatch[0]));
+        }
+
+        const episodeMatch = normalized.match(/(?:Episode|Ep|E|EP)[\s._-]?(\d{1,3})\b/i);
+        if (episodeMatch) {
+            episode = parseInt(episodeMatch[1], 10);
+            matchIndices.push(normalized.indexOf(episodeMatch[0]));
         }
     }
     
-    // Determine where the title ends. It's usually before the season/episode or year.
+    // Determine where the title ends. It's the first occurrence of any metadata.
     let titleEndIndex = -1;
-    if (seIndex !== -1 && yearIndex !== -1) {
-        titleEndIndex = Math.min(seIndex, yearIndex);
-    } else if (seIndex !== -1) {
-        titleEndIndex = seIndex;
-    } else if (yearIndex !== -1) {
-        titleEndIndex = yearIndex;
+    if (matchIndices.length > 0) {
+        titleEndIndex = Math.min(...matchIndices);
     }
 
     if (titleEndIndex !== -1) {
         moviename = normalized.substring(0, titleEndIndex).trim();
     } else {
-        // Fallback: If no year or SxxExx, find where metadata keywords start
+        // Fallback: If no metadata found, find where quality/language keywords start
         const parts = normalized.split(' ');
         const keywords = ['4k', '2160p', '1080p', '720p', '480p', 'web-dl', 'webdl', 'webrip', 'bluray', 'hdtv', 'hdrip', 'x264', 'hindi', 'english', 'eng', 'dual', 'audio'];
         let firstMetaIndex = -1;
-        for (let i = 1; i < parts.length; i++) {
+        for (let i = 1; i < parts.length; i++) { // Start from 1 to avoid matching if title itself is a keyword
             if (keywords.includes(parts[i].toLowerCase())) {
                 firstMetaIndex = i;
                 break;
