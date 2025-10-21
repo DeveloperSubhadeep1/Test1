@@ -37,17 +37,29 @@ const DownloadLinkButton: React.FC<{ link: DownloadLink; title: string; year: st
             const infoSource = `${filename} ${link.label || ''}`;
             const details = parseMediaFilename(infoSource);
 
-            let label = `${title} (${year})`;
+            const parts = [title];
+    
+            if (details.season !== null && details.episode !== null) {
+                const seasonStr = String(details.season).padStart(2, '0');
+                const episodeStr = String(details.episode).padStart(2, '0');
+                parts.push(`S${seasonStr}E${episodeStr}`);
+            } else {
+                parts.push(`(${year})`);
+            }
+
+            if (details.quality) {
+                parts.push(details.quality);
+            }
 
             if (details.languages.length > 0) {
-                // Join with a comma for better readability, e.g., (Hindi, English)
-                label += ` (${details.languages.join(', ')})`;
-            }
-            if (details.size) {
-                label += ` [${details.size}]`;
+                parts.push(`(${details.languages.join(', ')})`);
             }
 
-            setDisplayLabel(label);
+            if (details.size) {
+                parts.push(`[${details.size}]`);
+            }
+            
+            setDisplayLabel(parts.join(' '));
         };
 
         generateLabel();

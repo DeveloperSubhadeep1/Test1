@@ -151,9 +151,9 @@ export function parseFilenameForAutomate(filename: string): { movieName: string;
  * Parses a source string (filename + label) to extract displayable metadata for download buttons.
  * It does not need to determine the title or year.
  */
-export function parseMediaFilename(source: string): { languages: string[]; quality: string | null; size: string | null; } {
-    const { languages, quality, size } = coreFilenameParser(source);
-    return { languages, quality, size };
+export function parseMediaFilename(source: string): { languages: string[]; quality: string | null; size: string | null; season: number | null; episode: number | null; } {
+    const { languages, quality, size, season, episode } = coreFilenameParser(source);
+    return { languages, quality, size, season, episode };
 }
 
 /**
