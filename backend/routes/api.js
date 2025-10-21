@@ -262,6 +262,12 @@ function parseFilename(filename) {
         }
     }
 
+    // FIX: Add check for empty movieName after cleaning.
+    // This prevents errors when the filename only contains noise words.
+    if (!movieName.trim()) {
+      throw new Error("Could not extract a valid title from the filename. The name may only contain channel tags or release info.");
+    }
+
     const lowerNormalized = normalized.toLowerCase();
     
     let quality = null;
@@ -371,6 +377,10 @@ router.post('/utils/parse-url', async (req, res) => {
 
     } catch (error) {
         console.error('Error parsing URL:', error);
+        // FIX: Catch the specific error for empty titles and return a 400 Bad Request.
+        if (error.message && error.message.includes("Could not extract a valid title")) {
+            return res.status(400).json({ message: error.message });
+        }
         res.status(500).json({ message: 'Server error while parsing URL.' });
     }
 });
