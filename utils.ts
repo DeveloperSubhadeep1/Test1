@@ -33,8 +33,11 @@ function coreFilenameParser(filename: string): { moviename: string; year: string
 
     // --- Step 2: Normalize the string for further parsing.
     const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
-    const normalized = nameWithoutExt.replace(/[._\[\]()]/g, " ").replace(/\s+/g, ' ').trim();
+    let normalized = nameWithoutExt.replace(/[._\[\]()]/g, " ").replace(/\s+/g, ' ').trim();
     
+    // NEW: Remove channel/user tags (e.g., @ClipmateMovies)
+    normalized = normalized.replace(/@\w+\s*/g, '').trim();
+
     // --- Step 3: Parse metadata from the normalized string.
     let year: string | null = null;
     let season: number | null = null;

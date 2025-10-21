@@ -195,7 +195,10 @@ function formatBytes(bytes, decimals = 2) {
 
 function parseFilename(filename) {
     const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
-    const normalized = nameWithoutExt.replace(/[._\[\]()+-]/g, " ").replace(/\s+/g, ' ').trim();
+    let normalized = nameWithoutExt.replace(/[._\[\]()+-]/g, " ").replace(/\s+/g, ' ').trim();
+
+    // NEW: Remove channel/user tags (e.g., @ClipmateMovies)
+    normalized = normalized.replace(/@\w+\s*/g, '').trim();
 
     let year = null;
     let season = null;
@@ -1021,7 +1024,7 @@ router.post('/admin/test-email', getUserId, requireAdmin, async (req, res) => {
         if (error.code === 'EAUTH' || error.responseCode === 535) {
              errorMessage += `1. **Authentication Failed:** The \`EMAIL_USER\` or \`EMAIL_PASS\` environment variables are incorrect.\n2. **Check your password:** Ensure you are using a 16-character **Google App Password**, not your regular Gmail password.\n3. **Check for spaces:** Make sure there are no spaces in the password you pasted into your environment variables.`;
         } else if (error.code === 'ETIMEDOUT') {
-             errorMessage += `1. **Connection Timed Out:** The server could not connect to the SMTP host (\`smtp.gmail.com\`).\n2. **Check for Security Alerts:** Sign in to the \`${process.env.EMAIL_USER}\` Gmail account and look for any "Security Alert" or "Sign-in attempt blocked" emails. You **must** approve the sign-in from your server's location.\n3. **Firewall Issues:** A firewall on your hosting provider (less likely on Render/Koyeb) might be blocking outbound connections on port 465.`;
+             errorMessage += `1. **Connection Timed Out:** The server could not connect to the SMTP host (\`smtp.gmail.com\`).\n2. **Check for Security Alerts:** Sign in to the \`${process.env.EMAIL_USER}\` Gmail account and look for any "Security Alert" or "Sign-in attempt blocked" emails. You **MUST** approve the sign-in from your server's location.\n3. **Firewall Issues:** A firewall on your hosting provider (less likely on Render/Koyeb) might be blocking outbound connections on port 465.`;
         } else {
              errorMessage += `An unexpected error occurred. Please check the server logs for more details.`;
         }
