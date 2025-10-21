@@ -943,7 +943,8 @@ router.get('/db-stats', getUserId, requireAdmin, async (req, res) => {
     try {
         const stats = await mongoose.connection.db.stats();
         const usedBytes = stats.storageSize;
-        const totalBytes = stats.totalSize;
+        // For free tier MongoDB Atlas, total storage is 512MB. This is not available from db.stats().
+        const totalBytes = 512 * 1024 * 1024; // 512 MB
         res.json({ usedBytes, totalBytes });
     } catch (error) {
         console.error("Error fetching DB stats:", error);
