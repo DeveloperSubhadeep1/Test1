@@ -196,40 +196,60 @@ function formatBytes(bytes, decimals = 2) {
 function parseFilename(filename) {
     const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
     const normalized = nameWithoutExt.replace(/[._\[\]()+-]/g, " ").replace(/\s+/g, ' ').trim();
-    const parts = normalized.split(' ');
 
     let year = null;
-    let yearIndex = -1;
+    let season = null;
+    let episode = null;
+    let movieName = '';
 
-    for (let i = parts.length - 1; i > 0; i--) {
-        if (/^\d{4}$/.test(parts[i])) {
-            const potentialYear = parseInt(parts[i], 10);
-            if (potentialYear > 1900 && potentialYear < new Date().getFullYear() + 5) {
-                year = parts[i];
-                yearIndex = i;
-                break;
-            }
-        }
+    // Find Season/Episode (e.g., S02E09)
+    const seMatch = normalized.match(/\b[sS](\d{1,2})[eE](\d{1,2})\b/);
+    let seIndex = -1;
+    if (seMatch) {
+        season = parseInt(seMatch[1], 10);
+        episode = parseInt(seMatch[2], 10);
+        seIndex = normalized.indexOf(seMatch[0]);
     }
 
-    let titleParts = yearIndex !== -1 ? parts.slice(0, yearIndex) : [...parts];
+    // Find Year (e.g., 2023)
+    const yearMatch = normalized.match(/\b(19\d{2}|20\d{2})\b/);
+    let yearIndex = -1;
+    if (yearMatch) {
+        const potentialYear = parseInt(yearMatch[0], 10);
+        if (potentialYear > 1900 && potentialYear < new Date().getFullYear() + 5) {
+            year = yearMatch[0];
+            yearIndex = normalized.indexOf(yearMatch[0]);
+        }
+    }
+    
+    let titleEndIndex = -1;
+    if (seIndex !== -1 && yearIndex !== -1) {
+        titleEndIndex = Math.min(seIndex, yearIndex);
+    } else if (seIndex !== -1) {
+        titleEndIndex = seIndex;
+    } else if (yearIndex !== -1) {
+        titleEndIndex = yearIndex;
+    }
 
-    if (yearIndex === -1) {
+    if (titleEndIndex !== -1) {
+        movieName = normalized.substring(0, titleEndIndex).trim();
+    } else {
+        const parts = normalized.split(' ');
         const keywords = ['4k', '2160p', '1080p', '720p', '480p', 'web-dl', 'webdl', 'webrip', 'bluray', 'hdtv', 'hdrip', 'x264', 'hindi', 'english', 'eng', 'dual', 'audio'];
         let firstMetaIndex = -1;
-        for (let i = 1; i < titleParts.length; i++) {
-            if (keywords.includes(titleParts[i].toLowerCase())) {
+        for (let i = 1; i < parts.length; i++) {
+            if (keywords.includes(parts[i].toLowerCase())) {
                 firstMetaIndex = i;
                 break;
             }
         }
         if (firstMetaIndex !== -1) {
-            titleParts.splice(firstMetaIndex, titleParts.length - firstMetaIndex);
+            movieName = parts.slice(0, firstMetaIndex).join(' ');
+        } else {
+            movieName = normalized;
         }
     }
 
-    const movieName = titleParts.join(' ').replace(/–/g, '-').replace(/\s+/g, ' ').trim();
-    
     const lowerNormalized = normalized.toLowerCase();
     
     let quality = null;
@@ -251,21 +271,16 @@ function parseFilename(filename) {
         'punjabi': 'Punjabi',
     };
 
+    const parts = normalized.split(' ');
     const lowerParts = parts.map(p => p.toLowerCase());
 
     for (let i = 0; i < lowerParts.length; i++) {
         const part = lowerParts[i];
         
-        // Handle 'eng' to differentiate audio from subtitles
-        if (part === 'eng') {
-            const nextPart = (i + 1 < lowerParts.length) ? lowerParts[i+1] : null;
-            if (nextPart === 'sub' || nextPart === 'subs') {
-                i++; // Skip 'eng' and also skip 'sub(s)' on the next iteration
-                continue;
-            }
+        if (part === 'eng' && (lowerParts[i + 1] === 'sub' || lowerParts[i + 1] === 'subs')) {
+            i++;
+            continue;
         }
-
-        // Handle 'esub' and 'esubs' which are clearly subtitles
         if (part === 'esub' || part === 'esubs') {
             continue;
         }
@@ -276,7 +291,7 @@ function parseFilename(filename) {
         }
     }
 
-    return { movieName, year, languages, quality };
+    return { movieName, year, languages, quality, season, episode };
 }
 
 // --- Util Routes ---
@@ -294,7 +309,7 @@ router.post('/utils/parse-url', async (req, res) => {
         }
         
         const decodedFilename = decodeURIComponent(filenameWithExt);
-        let { movieName, year, languages, quality } = parseFilename(decodedFilename);
+        let { movieName, year, languages, quality, season, episode } = parseFilename(decodedFilename);
 
         // If year is not found in filename, try to get it from TMDb
         if (!year && movieName) {
@@ -334,7 +349,9 @@ router.post('/utils/parse-url', async (req, res) => {
             year: year ? parseInt(year, 10) : null,
             languages,
             quality,
-            size
+            size,
+            season,
+            episode,
         });
 
     } catch (error) {

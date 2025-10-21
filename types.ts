@@ -173,4 +173,6 @@ export interface ParsedUrlData {
     languages: string[];
     quality: string | null;
     size: string | null;
+    season: number | null;
+    episode: number | null;
 }

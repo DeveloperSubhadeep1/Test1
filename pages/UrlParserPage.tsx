@@ -3,14 +3,7 @@ import { usePageMetadata } from '../hooks/usePageMetadata';
 import { useToast } from '../hooks/useToast';
 import { apiParseUrl } from '../services/api';
 import { LinkIcon, SpinnerIcon, CopyIcon } from '../components/Icons';
-
-interface ParsedData {
-  movieName: string;
-  year: number | null;
-  languages: string[];
-  quality: string | null;
-  size: string | null;
-}
+import { ParsedUrlData } from '../types';
 
 const UrlParserPage: React.FC = () => {
     usePageMetadata({
@@ -21,18 +14,32 @@ const UrlParserPage: React.FC = () => {
 
     const [url, setUrl] = useState('');
     const [loading, setLoading] = useState(false);
-    const [result, setResult] = useState<ParsedData | null>(null);
+    const [result, setResult] = useState<ParsedUrlData | null>(null);
     const { addToast } = useToast();
 
-    const ResultCard: React.FC<{ data: ParsedData }> = ({ data }) => {
+    const ResultCard: React.FC<{ data: ParsedUrlData }> = ({ data }) => {
         const handleCopy = () => {
-            const infoString = [
+            const infoParts = [
                 data.movieName,
-                data.year,
-                data.languages.join(' '),
-                data.quality,
-                data.size
-            ].filter(Boolean).join(' ');
+            ];
+            if (data.season && data.episode) {
+                const seasonStr = String(data.season).padStart(2, '0');
+                const episodeStr = String(data.episode).padStart(2, '0');
+                infoParts.push(`S${seasonStr}E${episodeStr}`);
+            } else if (data.year) {
+                infoParts.push(String(data.year));
+            }
+            if (data.languages.length > 0) {
+                infoParts.push(data.languages.join(' '));
+            }
+            if (data.quality) {
+                infoParts.push(data.quality);
+            }
+            if (data.size) {
+                infoParts.push(data.size);
+            }
+            
+            const infoString = infoParts.filter(Boolean).join(' ');
 
             navigator.clipboard.writeText(infoString).then(() => {
                 addToast('Info copied to clipboard!', 'success');
@@ -41,6 +48,8 @@ const UrlParserPage: React.FC = () => {
                 console.error('Copy failed:', err);
             });
         };
+        
+        const isTV = data.season !== null && data.episode !== null;
 
         return (
             <div className="glass-panel p-6 rounded-lg animate-fade-in mt-8">
@@ -55,22 +64,35 @@ const UrlParserPage: React.FC = () => {
                         <span>Copy</span>
                     </button>
                 </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                        <p className="text-muted">Year</p>
-                        <p className="font-semibold text-lg">{data.year || 'N/A'}</p>
-                    </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                     {isTV ? (
+                        <>
+                            <div>
+                                <p className="text-muted">Season</p>
+                                <p className="font-semibold text-lg">{data.season}</p>
+                            </div>
+                            <div>
+                                <p className="text-muted">Episode</p>
+                                <p className="font-semibold text-lg">{data.episode}</p>
+                            </div>
+                        </>
+                    ) : (
+                        <div>
+                            <p className="text-muted">Year</p>
+                            <p className="font-semibold text-lg">{data.year || 'N/A'}</p>
+                        </div>
+                    )}
                     <div>
                         <p className="text-muted">Quality</p>
                         <p className="font-semibold text-lg">{data.quality || 'N/A'}</p>
                     </div>
                     <div>
-                        <p className="text-muted">Languages</p>
-                        <p className="font-semibold text-lg">{data.languages.length > 0 ? data.languages.join(', ') : 'N/A'}</p>
-                    </div>
-                    <div>
                         <p className="text-muted">File Size</p>
                         <p className="font-semibold text-lg">{data.size || 'N/A'}</p>
+                    </div>
+                    <div className="col-span-2 sm:col-span-3">
+                        <p className="text-muted">Languages</p>
+                        <p className="font-semibold text-lg">{data.languages.length > 0 ? data.languages.join(', ') : 'N/A'}</p>
                     </div>
                 </div>
             </div>

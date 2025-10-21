@@ -917,7 +917,7 @@ const ContentModal: React.FC<{
   
   const handleAutomate = async (url: string, index: number) => {
         try {
-            const { movieName, year, languages, quality, size } = await apiParseUrl(url);
+            const { movieName, year, languages, quality, size, season, episode } = await apiParseUrl(url);
             
             // Search TMDB with parsed title and year
             const searchRes = await searchContentByType(`${movieName} ${year || ''}`, contentType);
@@ -930,7 +930,7 @@ const ContentModal: React.FC<{
                 setTmdbId(null);
             }
             
-            const newLabel = generateLinkLabel({ quality, languages, size });
+            const newLabel = generateLinkLabel({ quality, languages, size, season, episode });
             updateLink(index, 'label', newLabel);
 
         } catch (error) {

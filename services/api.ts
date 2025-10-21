@@ -179,6 +179,8 @@ export const apiParseUrl = (url: string): Promise<{
     languages: string[];
     quality: string | null;
     size: string | null;
+    season: number | null;
+    episode: number | null;
 }> => dbFetch('/utils/parse-url', { method: 'POST', body: JSON.stringify({ url }) });
 
 

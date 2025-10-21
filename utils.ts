@@ -23,7 +23,7 @@ export const generateSlug = (title: string, year?: string | number): string => {
  * A robust, shared function to parse metadata from a filename string.
  * It uses the year as a primary delimiter to separate title from metadata.
  */
-function coreFilenameParser(filename: string): { moviename: string; year: string | null; languages: string[]; quality: string | null; size: string | null } {
+function coreFilenameParser(filename: string): { moviename: string; year: string | null; languages: string[]; quality: string | null; size: string | null; season: number | null, episode: number | null } {
     // --- Step 1: Extract size BEFORE normalization, as normalization can break the format (e.g., "1.23 GB").
     let size: string | null = null;
     const sizeMatch = filename.match(/(\d+(\.\d+)?\s?(gb|mb))/i);
@@ -34,45 +34,64 @@ function coreFilenameParser(filename: string): { moviename: string; year: string
     // --- Step 2: Normalize the string for further parsing.
     const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
     const normalized = nameWithoutExt.replace(/[._\[\]()]/g, " ").replace(/\s+/g, ' ').trim();
-    const parts = normalized.split(' ');
-
+    
+    // --- Step 3: Parse metadata from the normalized string.
     let year: string | null = null;
-    let yearIndex = -1;
+    let season: number | null = null;
+    let episode: number | null = null;
+    let moviename = '';
 
-    // Find the year from the end; it's the most reliable delimiter.
-    for (let i = parts.length - 1; i > 0; i--) {
-        if (/^\d{4}$/.test(parts[i])) {
-            const potentialYear = parseInt(parts[i], 10);
-            if (potentialYear > 1900 && potentialYear < new Date().getFullYear() + 2) {
-                year = parts[i];
-                yearIndex = i;
-                break;
-            }
-        }
+    // Find Season/Episode (e.g., S02E09)
+    const seMatch = normalized.match(/\b[sS](\d{1,2})[eE](\d{1,2})\b/);
+    let seIndex = -1;
+    if (seMatch) {
+        season = parseInt(seMatch[1], 10);
+        episode = parseInt(seMatch[2], 10);
+        seIndex = normalized.indexOf(seMatch[0]);
     }
 
-    // Title is everything before the year.
-    const titleParts = yearIndex !== -1 ? parts.slice(0, yearIndex) : [...parts];
+    // Find Year (e.g., 2023)
+    const yearMatch = normalized.match(/\b(19\d{2}|20\d{2})\b/);
+    let yearIndex = -1;
+    if (yearMatch) {
+        const potentialYear = parseInt(yearMatch[0], 10);
+        if (potentialYear > 1900 && potentialYear < new Date().getFullYear() + 5) {
+            year = yearMatch[0];
+            yearIndex = normalized.indexOf(yearMatch[0]);
+        }
+    }
     
-    // If no year was found, we need to guess where the title ends by looking for the first metadata keyword.
-    if (yearIndex === -1) {
+    // Determine where the title ends. It's usually before the season/episode or year.
+    let titleEndIndex = -1;
+    if (seIndex !== -1 && yearIndex !== -1) {
+        titleEndIndex = Math.min(seIndex, yearIndex);
+    } else if (seIndex !== -1) {
+        titleEndIndex = seIndex;
+    } else if (yearIndex !== -1) {
+        titleEndIndex = yearIndex;
+    }
+
+    if (titleEndIndex !== -1) {
+        moviename = normalized.substring(0, titleEndIndex).trim();
+    } else {
+        // Fallback: If no year or SxxExx, find where metadata keywords start
+        const parts = normalized.split(' ');
         const keywords = ['4k', '2160p', '1080p', '720p', '480p', 'web-dl', 'webdl', 'webrip', 'bluray', 'hdtv', 'hdrip', 'x264', 'hindi', 'english', 'eng', 'dual', 'audio'];
         let firstMetaIndex = -1;
-        // Start from index 1 to avoid matching if title itself is a keyword (e.g., the movie 'Dual')
-        for (let i = 1; i < titleParts.length; i++) {
-            if (keywords.includes(titleParts[i].toLowerCase())) {
+        for (let i = 1; i < parts.length; i++) {
+            if (keywords.includes(parts[i].toLowerCase())) {
                 firstMetaIndex = i;
                 break;
             }
         }
         if (firstMetaIndex !== -1) {
-            titleParts.splice(firstMetaIndex);
+            moviename = parts.slice(0, firstMetaIndex).join(' ');
+        } else {
+            moviename = normalized; // Assume the whole thing is the title
         }
     }
 
-    const moviename = titleParts.join(' ').trim();
-    
-    // --- Step 3: Parse remaining metadata from the normalized string.
+    // --- Step 4: Parse quality and languages from the whole normalized string
     const lowerNormalized = normalized.toLowerCase();
     
     let quality: string | null = null;
@@ -93,18 +112,16 @@ function coreFilenameParser(filename: string): { moviename: string; year: string
         'dual': 'Dual Audio', 'audio': 'Dual Audio',
     };
     
+    const parts = normalized.split(' ');
     const lowerParts = parts.map(p => p.toLowerCase());
 
     for (let i = 0; i < lowerParts.length; i++) {
         const pKey = lowerParts[i];
 
         // Handle 'eng' to differentiate audio from subtitles
-        if (pKey === 'eng') {
-            const nextPart = (i + 1 < lowerParts.length) ? lowerParts[i + 1] : null;
-            if (nextPart === 'sub' || nextPart === 'subs') {
-                i++; // Skip 'eng' and also skip 'sub(s)' on the next iteration
-                continue;
-            }
+        if (pKey === 'eng' && (i + 1 < lowerParts.length) && (lowerParts[i + 1] === 'sub' || lowerParts[i + 1] === 'subs')) {
+            i++; // Skip 'eng' and also skip 'sub(s)' on the next iteration
+            continue;
         }
         
         // Handle 'esub(s)' which are clearly subtitles
@@ -118,16 +135,16 @@ function coreFilenameParser(filename: string): { moviename: string; year: string
         }
     }
 
-    return { moviename, year, languages, quality, size };
+    return { moviename, year, languages, quality, size, season, episode };
 }
 
 
 /**
  * Parses a filename to extract the movie name and other metadata for the Admin Panel automation.
  */
-export function parseFilenameForAutomate(filename: string): { movieName: string; year: number | null; languages: string[]; quality: string | null; size: string | null; } {
-    const { moviename, year, languages, quality, size } = coreFilenameParser(filename);
-    return { movieName: moviename, year: year ? parseInt(year, 10) : null, languages, quality, size };
+export function parseFilenameForAutomate(filename: string): { movieName: string; year: number | null; languages: string[]; quality: string | null; size: string | null; season: number | null; episode: number | null; } {
+    const { moviename, year, languages, quality, size, season, episode } = coreFilenameParser(filename);
+    return { movieName: moviename, year: year ? parseInt(year, 10) : null, languages, quality, size, season, episode };
 }
 
 /**
@@ -142,8 +159,13 @@ export function parseMediaFilename(source: string): { languages: string[]; quali
 /**
  * Generates a clean, readable label for a download link from parsed media details.
  */
-export function generateLinkLabel(details: { quality?: string | null; languages?: string[]; size?: string | null }): string {
+export function generateLinkLabel(details: { quality?: string | null; languages?: string[]; size?: string | null; season?: number | null; episode?: number | null }): string {
     const parts: string[] = [];
+    if (details.season && details.episode) {
+        const seasonStr = String(details.season).padStart(2, '0');
+        const episodeStr = String(details.episode).padStart(2, '0');
+        parts.push(`S${seasonStr}E${episodeStr}`);
+    }
     if (details.quality) {
         parts.push(details.quality);
     }
