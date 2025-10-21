@@ -52,8 +52,16 @@ export const searchTMDB = async (query: string): Promise<{ results: TMDBSearchRe
     return { results: filteredResults };
 };
 
-export const searchContentByType = async (query: string, type: ContentType): Promise<{ results: (MovieSummary | TVSummary)[] }> => {
-    const data = await tmdbFetch(`/search/${type}`, { query });
+export const searchContentByType = async (query: string, type: ContentType, year?: string | number): Promise<{ results: (MovieSummary | TVSummary)[] }> => {
+    const params: Record<string, string> = { query };
+    if (year) {
+        if (type === 'movie') {
+            params.primary_release_year = String(year);
+        } else {
+            params.first_air_date_year = String(year);
+        }
+    }
+    const data = await tmdbFetch(`/search/${type}`, params);
     // Filter out items without posters for a cleaner UI
     return { results: data.results.filter((item: any) => item.poster_path) };
 };

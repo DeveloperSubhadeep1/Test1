@@ -28,6 +28,8 @@ import {
   ContentItem,
   ContentType,
   DbStats,
+  MovieSummary,
+  TVSummary,
 } from '../types';
 import Spinner from '../components/Spinner';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -919,24 +921,33 @@ const ContentModal: React.FC<{
     try {
         const { movieName, year, languages, quality, size, season, episode } = await apiParseUrl(url);
         
-        // Determine content type based on parsed data (e.g., presence of season/episode)
         const detectedType: ContentType = (season !== null && episode !== null) ? 'tv' : 'movie';
         
-        // This is crucial: update the modal's internal state for content type
         setContentType(detectedType);
 
-        // Search TMDB with parsed title, year, and the now-correct type
-        const searchRes = await searchContentByType(`${movieName} ${year || ''}`, detectedType);
-        
-        if (searchRes.results.length > 0) {
-            // The result from searchContentByType doesn't include media_type, so we add it back
-            // for handleSelectSearchResult to work correctly.
-            const firstResult = searchRes.results[0];
+        // A more robust, multi-step search process.
+        let finalResults: (MovieSummary | TVSummary)[] = [];
+
+        // 1. Try the most specific search first: title + year.
+        if (year) {
+            const res = await searchContentByType(movieName, detectedType, year);
+            if (res.results.length > 0) {
+                finalResults = res.results;
+            }
+        }
+
+        // 2. If that fails, or if there was no year, fall back to title-only search.
+        if (finalResults.length === 0) {
+            const res = await searchContentByType(movieName, detectedType);
+            finalResults = res.results;
+        }
+
+        if (finalResults.length > 0) {
+            const firstResult = finalResults[0];
             const resultAsTMDBSearch = { ...firstResult, media_type: detectedType } as TMDBSearchResult;
             handleSelectSearchResult(resultAsTMDBSearch);
         } else {
             addToast(`Could not find a match for "${movieName}" on TMDB.`, 'info');
-            // Even if no match, we can still set the title field and clear the ID
             setTitle(movieName);
             setTmdbId(null);
         }
