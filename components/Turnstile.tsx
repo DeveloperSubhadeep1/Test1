@@ -18,7 +18,7 @@ interface TurnstileProps {
 const Turnstile: React.FC<TurnstileProps> = ({ 
     onSuccess, 
     onExpire, 
-    siteKey = '0x4AAAAAAB6QOuyxQZcdRNSZ',
+    siteKey = '0x4AAAAAAB77aMdefxYyDsH1',
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null); // Use a ref to avoid re-renders on widgetId change
