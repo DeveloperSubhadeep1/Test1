@@ -195,10 +195,13 @@ function formatBytes(bytes, decimals = 2) {
 
 function parseFilename(filename) {
     const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
-    let normalized = nameWithoutExt.replace(/[._\[\]()+-]/g, " ").replace(/\s+/g, ' ').trim();
-
-    // NEW: Remove channel/user tags (e.g., @ClipmateMovies)
-    normalized = normalized.replace(/@\w+\s*/g, '').trim();
+    
+    // UPDATED: More robustly remove channel/user tags and other noise before normalization.
+    const cleanedName = nameWithoutExt
+        .replace(/\[.*?\]/g, '')       // Remove content in square brackets, e.g., [TGx]
+        .replace(/@[\w.-]+/g, '');   // Remove @-tags like @user, @user.name, @user-name
+        
+    let normalized = cleanedName.replace(/[._()+-]/g, " ").replace(/\s+/g, ' ').trim();
 
     let year = null;
     let season = null;
