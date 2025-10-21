@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import { useToast } from '../hooks/useToast';
 import { apiParseUrl } from '../services/api';
-import { LinkIcon, SpinnerIcon, CopyIcon } from '../components/Icons';
+import { LinkIcon, SpinnerIcon, CopyIcon, PlusCircleIcon } from '../components/Icons';
 import { ParsedUrlData } from '../types';
+import { Link } from 'react-router-dom';
 
 const UrlParserPage: React.FC = () => {
     usePageMetadata({
@@ -53,16 +54,26 @@ const UrlParserPage: React.FC = () => {
 
         return (
             <div className="glass-panel p-6 rounded-lg animate-fade-in mt-8">
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex justify-between items-start mb-4 gap-4">
                     <h3 className="text-2xl font-bold text-white">{data.movieName || 'Unknown Title'}</h3>
-                    <button 
-                        onClick={handleCopy}
-                        className="flex items-center gap-2 text-sm bg-secondary text-muted px-3 py-1.5 rounded-full hover:bg-gray-700 hover:text-white transition-colors flex-shrink-0"
-                        title="Copy info to clipboard"
-                    >
-                        <CopyIcon className="h-4 w-4" />
-                        <span>Copy</span>
-                    </button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        <button 
+                            onClick={handleCopy}
+                            className="flex items-center gap-2 text-sm bg-secondary text-muted px-3 py-1.5 rounded-full hover:bg-gray-700 hover:text-white transition-colors"
+                            title="Copy info to clipboard"
+                        >
+                            <CopyIcon className="h-4 w-4" />
+                        </button>
+                        {data.movieName && (
+                            <Link
+                                to={`/admin?tab=content&search=${encodeURIComponent(data.movieName)}`}
+                                className="flex items-center gap-2 text-sm bg-highlight text-white px-3 py-1.5 rounded-full hover:bg-green-600 transition-colors"
+                                title="Add this content to the database"
+                            >
+                                <PlusCircleIcon className="h-4 w-4" />
+                            </Link>
+                        )}
+                    </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
                      {isTV ? (

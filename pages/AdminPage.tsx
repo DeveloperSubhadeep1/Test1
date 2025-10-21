@@ -417,12 +417,15 @@ const DashboardTab: React.FC = () => {
 const ContentManagementTab: React.FC = () => {
     const [movies, setMovies] = useState<StoredMovie[]>([]);
     const [loading, setLoading] = useState(true);
-    const [showModal, setShowModal] = useState(false);
     const [editingMovie, setEditingMovie] = useState<StoredMovie | null>(null);
     const { addToast } = useToast();
     const [movieToDelete, setMovieToDelete] = useState<StoredMovie | null>(null);
+    
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [showModal, setShowModal] = useState(!!searchParams.get('search'));
 
     const fetchMovies = useCallback(() => {
+        setLoading(true);
         getStoredMovies()
             .then(setMovies)
             .catch(() => addToast('Failed to load content.', 'error'))
@@ -432,10 +435,25 @@ const ContentManagementTab: React.FC = () => {
     useEffect(() => {
         fetchMovies();
     }, [fetchMovies]);
+    
+    useEffect(() => {
+        if (searchParams.get('search')) {
+            setShowModal(true);
+            setEditingMovie(null); // Ensure we're in "Add New" mode
+        }
+    }, [searchParams]);
 
-    const handleSave = () => {
+    const handleModalClose = () => {
         setShowModal(false);
         setEditingMovie(null);
+        // Clean up URL on close
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('search');
+        setSearchParams(newParams, { replace: true });
+    };
+
+    const handleSave = () => {
+        handleModalClose();
         fetchMovies();
     };
 
@@ -471,7 +489,12 @@ const ContentManagementTab: React.FC = () => {
                 </button>
             </div>
             {showModal && (
-                <ContentModal movie={editingMovie} onClose={() => { setShowModal(false); setEditingMovie(null); }} onSave={handleSave} />
+                <ContentModal
+                    movie={editingMovie}
+                    onClose={handleModalClose}
+                    onSave={handleSave}
+                    initialSearchQuery={searchParams.get('search')}
+                />
             )}
             {movieToDelete && (
                 <ConfirmationModal 
@@ -876,7 +899,8 @@ const ContentModal: React.FC<{
   movie: StoredMovie | null;
   onClose: () => void;
   onSave: () => void;
-}> = ({ movie, onClose, onSave }) => {
+  initialSearchQuery?: string | null;
+}> = ({ movie, onClose, onSave, initialSearchQuery }) => {
   const [tmdbId, setTmdbId] = useState<number | null>(movie?.tmdb_id || null);
   const [contentType, setContentType] = useState<ContentType>(movie?.type || 'movie');
   const [title, setTitle] = useState(movie?.title || '');
@@ -884,7 +908,7 @@ const ContentModal: React.FC<{
   const { addToast } = useToast();
 
   // Search functionality
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery || '');
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [searchResults, setSearchResults] = useState<TMDBSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
