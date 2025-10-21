@@ -4,15 +4,16 @@ import { AuthContext } from '../context/AuthContext';
 import { FilmIcon, HomeIcon, HeartIcon, BookmarkIcon, UserCogIcon, GridIcon, XIcon, LayersIcon, LinkIcon } from './Icons';
 import { Avatar } from './Avatars';
 
-interface SidebarProps {
-  onLinkClick?: () => void;
-  onClose?: () => void;
-}
-
 // FIX: Corrected the malformed viewBox attribute which caused a JSX parsing error.
 const LogOutIcon: React.FC<{className?: string}> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
 );
+
+// FIX: Defined the missing SidebarProps interface to resolve the type error.
+interface SidebarProps {
+  onLinkClick?: () => void;
+  onClose?: () => void;
+}
 
 const Sidebar: React.FC<SidebarProps> = ({ onLinkClick, onClose }) => {
   const { currentUser, isAdmin, logout } = useContext(AuthContext);
@@ -91,6 +92,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onLinkClick, onClose }) => {
                 <GridIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
                 <span>Genres</span>
             </NavLink>
+            <NavLink to="/url-parser" className={navLinkClass} onClick={onLinkClick}>
+                <LinkIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
+                <span>URL Parser</span>
+            </NavLink>
             <NavLink to="/favorites" className={navLinkClass} onClick={onLinkClick}>
                 <HeartIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
                 <span>Favorites</span>
@@ -112,10 +117,6 @@ const Sidebar: React.FC<SidebarProps> = ({ onLinkClick, onClose }) => {
                 <NavLink to="/admin" className={navLinkClass} onClick={onLinkClick} end>
                     <UserCogIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
                     <span>Dashboard</span>
-                </NavLink>
-                <NavLink to="/admin?tab=url-parser" className={navLinkClass} onClick={onLinkClick}>
-                    <LinkIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
-                    <span>URL Parser</span>
                 </NavLink>
               </>
             )}

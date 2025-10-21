@@ -14,7 +14,9 @@ import {
   searchTMDB,
   apiTestEmail,
   getDbStats,
+  // FIX: Imported missing functions from the api service.
   apiParseUrl,
+  searchContentByType,
 } from '../services/api';
 import {
   Metrics,
@@ -45,27 +47,29 @@ import {
   DatabaseIcon,
   CheckCircleIcon,
   AlertTriangleIcon,
-  CopyIcon,
 } from '../components/Icons';
 import { useDebounce } from '../hooks/useDebounce';
 import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
 import { Avatar } from '../components/Avatars';
 import { generateLinkLabel } from '../utils';
+import { DashboardSkeleton, TableSkeleton, CardListSkeleton, TicketSkeleton, DatabaseSkeleton } from '../components/AdminPageSkeletons';
+
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Tab Button Component
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-const TabButton: React.FC<{ name: string; activeTab: string; setActiveTab: (name: string) => void; label: string }> = ({ name, activeTab, setActiveTab, label }) => {
+const TabButton: React.FC<{ name: string; activeTab: string; setActiveTab: (name: string) => void; icon: React.ReactNode; label: string }> = ({ name, activeTab, setActiveTab, icon, label }) => {
   const isActive = activeTab === name;
   return (
     <button
       onClick={() => setActiveTab(name)}
-      className={`relative px-4 py-2 text-sm font-bold transition-all duration-300 ${
+      className={`relative flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all duration-300 ${
         isActive
           ? 'text-cyan'
-          : 'text-muted hover:text-cyan'
+          : 'text-muted hover:text-white'
       }`}
     >
+      {icon}
       {label}
       {isActive && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan animate-glow" style={{'--glow-color': 'cyan'} as React.CSSProperties}></div>}
     </button>
@@ -152,7 +156,6 @@ interface ArcData {
 }
 interface CircularChartProps {
   metrics: Metrics;
-  // FIX: Make props Partial as the component is designed to handle a subset of metrics.
   colors: Partial<Record<keyof Metrics, string>>;
   metricConfig: Partial<Record<keyof Metrics, { label: string; color: string; icon: React.ReactNode }>>;
   onHover: (tooltipData: TooltipData) => void;
@@ -164,8 +167,6 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
 
     const arcData = useMemo(() => {
         const colorKeys = Object.keys(colors) as Array<keyof Metrics>;
-        // FIX: Calculate total based ONLY on the metrics that will be displayed in the chart.
-        // This ensures the chart segments add up to a full circle (100%).
         const total = colorKeys.reduce((sum, key) => sum + (Number(metrics[key]) || 0), 0);
         
         const finalArcData: ArcData[] = [];
@@ -198,8 +199,6 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
         canvas.style.height = `${canvasSize}px`;
         ctx.scale(devicePixelRatio, devicePixelRatio);
 
-        // FIX: Re-calculate total based on displayed metrics to match the arc calculation,
-        // ensuring the number in the center is also correct.
         const colorKeys = Object.keys(colors) as Array<keyof Metrics>;
         const total = colorKeys.reduce((sum, key) => sum + (Number(metrics[key]) || 0), 0);
 
@@ -246,7 +245,6 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
                 const animatedEndAngle = arc.startAngle + (arc.endAngle - arc.startAngle) * progress;
                 ctx.beginPath();
                 ctx.arc(centerX, centerY, radius, arc.startAngle, animatedEndAngle);
-                // FIX: Add non-null assertion as `colors` is Partial but logic ensures key exists.
                 ctx.strokeStyle = colors[arc.key]!;
                 ctx.lineWidth = arc.key === hoveredKey ? defaultLineWidth + 4 : defaultLineWidth;
                 ctx.stroke();
@@ -301,7 +299,6 @@ const CircularChart: React.FC<CircularChartProps> = ({ metrics, colors, metricCo
         if (foundSegment) {
             setHoveredKey(foundSegment.key);
             const value = Number(metrics[foundSegment.key]) || 0;
-            // FIX: Add non-null assertion as logic ensures metricConfig has the same keys as colors.
             const label = metricConfig[foundSegment.key]!.label;
             onHover({
                 visible: true,
@@ -355,10 +352,9 @@ const DashboardTab: React.FC = () => {
       totalDownloads: { label: 'Total Downloads', color: '#9A16DD', icon: <DownloadIcon className="h-5 w-5" /> },
       totalUsers: { label: 'Total Users', color: '#8B949E', icon: <UsersIcon className="h-5 w-5" /> },
       totalSupportTickets: { label: 'Support Tickets', color: '#FF2E63', icon: <MessageSquareIcon className="h-5 w-5" /> },
-      // Note: totalCollections is available in `metrics` but not displayed here as a card or in the chart legend.
   };
 
-  if (loading) return <Spinner />;
+  if (loading) return <DashboardSkeleton />;
   
   const chartColors = {
       totalLinks: metricConfig.totalLinks.color,
@@ -414,6 +410,135 @@ const DashboardTab: React.FC = () => {
 };
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Content Management Tab
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+const ContentManagementTab: React.FC = () => {
+    const [movies, setMovies] = useState<StoredMovie[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [showModal, setShowModal] = useState(false);
+    const [editingMovie, setEditingMovie] = useState<StoredMovie | null>(null);
+    const { addToast } = useToast();
+    const [movieToDelete, setMovieToDelete] = useState<StoredMovie | null>(null);
+
+    const fetchMovies = useCallback(() => {
+        getStoredMovies()
+            .then(setMovies)
+            .catch(() => addToast('Failed to load content.', 'error'))
+            .finally(() => setLoading(false));
+    }, [addToast]);
+
+    useEffect(() => {
+        fetchMovies();
+    }, [fetchMovies]);
+
+    const handleSave = () => {
+        setShowModal(false);
+        setEditingMovie(null);
+        fetchMovies();
+    };
+
+    const handleDelete = async () => {
+        if (!movieToDelete) return;
+        try {
+            await deleteStoredMovie(movieToDelete._id);
+            addToast(`"${movieToDelete.title}" deleted successfully.`, 'success');
+            setMovies(movies.filter(m => m._id !== movieToDelete._id));
+        } catch (error) {
+            addToast('Failed to delete content.', 'error');
+        } finally {
+            setMovieToDelete(null);
+        }
+    };
+    
+    if (loading) return (
+        <>
+            <TableSkeleton />
+            <CardListSkeleton />
+        </>
+    );
+
+    return (
+        <>
+            <div className="flex justify-end mb-4">
+                <button
+                    onClick={() => { setEditingMovie(null); setShowModal(true); }}
+                    className="flex items-center gap-2 bg-highlight text-white font-bold py-2 px-4 rounded-md hover:bg-green-600 transition-colors"
+                >
+                    <PlusCircleIcon className="h-5 w-5" />
+                    Add New Content
+                </button>
+            </div>
+            {showModal && (
+                <ContentModal movie={editingMovie} onClose={() => { setShowModal(false); setEditingMovie(null); }} onSave={handleSave} />
+            )}
+            {movieToDelete && (
+                <ConfirmationModal 
+                    isOpen={!!movieToDelete}
+                    onClose={() => setMovieToDelete(null)}
+                    onConfirm={handleDelete}
+                    title="Delete Content"
+                    message={`Are you sure you want to delete "${movieToDelete.title}"? This action cannot be undone.`}
+                />
+            )}
+             {/* Desktop Table View */}
+            <div className="hidden md:block glass-panel rounded-lg shadow overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                     <thead className="text-xs uppercase text-muted">
+                        <tr>
+                            <th scope="col" className="px-6 py-4 border-b border-glass-border">Title</th>
+                            <th scope="col" className="px-6 py-4 border-b border-glass-border">Type</th>
+                            <th scope="col" className="px-6 py-4 border-b border-glass-border">Links</th>
+                            <th scope="col" className="px-6 py-4 border-b border-glass-border">Downloads</th>
+                            <th scope="col" className="px-6 py-4 border-b border-glass-border text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {movies.map(movie => (
+                            <tr key={movie._id} className="border-b border-glass-border">
+                                <td className="px-6 py-3 font-medium text-white">{movie.title}</td>
+                                <td className="px-6 py-3 text-muted">{movie.type}</td>
+                                <td className="px-6 py-3 text-white font-semibold">{movie.download_links.length}</td>
+                                <td className="px-6 py-3 text-white font-semibold">{movie.download_count.toLocaleString()}</td>
+                                <td className="px-6 py-3 text-right">
+                                    <button onClick={() => { setEditingMovie(movie); setShowModal(true); }} className="p-2 text-muted hover:text-accent"><EditIcon className="h-5 w-5"/></button>
+                                    <button onClick={() => setMovieToDelete(movie)} className="p-2 text-muted hover:text-danger"><TrashIcon className="h-5 w-5"/></button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            {/* Mobile Card View */}
+            <div className="space-y-4 md:hidden">
+                {movies.map(movie => (
+                    <div key={movie._id} className="glass-panel p-4 rounded-lg">
+                        <p className="font-bold text-white truncate">{movie.title}</p>
+                        <div className="flex justify-between text-sm mt-2">
+                             <div className="text-center">
+                                <p className="font-bold text-lg text-white">{movie.type}</p>
+                                <p className="text-xs text-muted">Type</p>
+                            </div>
+                            <div className="text-center">
+                                <p className="font-bold text-lg text-white">{movie.download_links.length}</p>
+                                <p className="text-xs text-muted">Links</p>
+                            </div>
+                            <div className="text-center">
+                                <p className="font-bold text-lg text-white">{movie.download_count.toLocaleString()}</p>
+                                <p className="text-xs text-muted">Downloads</p>
+                            </div>
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-glass-border flex justify-end gap-2">
+                            <button onClick={() => { setEditingMovie(movie); setShowModal(true); }} className="p-2 text-muted hover:text-accent"><EditIcon className="h-5 w-5"/></button>
+                            <button onClick={() => setMovieToDelete(movie)} className="p-2 text-muted hover:text-danger"><TrashIcon className="h-5 w-5"/></button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </>
+    );
+};
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Users Tab
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 const UsersTab: React.FC = () => {
@@ -425,7 +550,12 @@ const UsersTab: React.FC = () => {
     getUsers().then(setUsers).catch(() => addToast('Failed to load users.', 'error')).finally(() => setLoading(false));
   }, [addToast]);
 
-  if (loading) return <Spinner />;
+  if (loading) return (
+    <>
+        <TableSkeleton cols={5} />
+        <CardListSkeleton />
+    </>
+  );
 
   return (
     <>
@@ -438,49 +568,49 @@ const UsersTab: React.FC = () => {
                 <Avatar avatar={user.avatar} className="h-10 w-10 rounded-full" />
                 <div>
                   <p className="font-bold text-white">{user.username}</p>
-                  <p className="text-xs text-muted">
-                    Joined: {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
-                  </p>
+                  <p className="text-xs text-muted">{user.email}</p>
                 </div>
               </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-glass-border flex justify-around text-sm text-center">
+             <div className="mt-3 pt-3 border-t border-glass-border flex justify-around text-center">
                 <div>
-                    <p className="text-muted text-xs">Favorites</p>
-                    <p className="font-bold text-white">{user.favoritesCount}</p>
+                    <p className="font-bold text-lg text-white">{user.favoritesCount}</p>
+                    <p className="text-xs text-muted">Favorites</p>
                 </div>
                 <div>
-                    <p className="text-muted text-xs">Watchlist</p>
-                    <p className="font-bold text-white">{user.watchlistCount}</p>
+                    <p className="font-bold text-lg text-white">{user.watchlistCount}</p>
+                    <p className="text-xs text-muted">Watchlist</p>
                 </div>
             </div>
           </div>
         ))}
       </div>
-
+      
       {/* Desktop Table View */}
       <div className="hidden md:block glass-panel rounded-lg shadow overflow-x-auto">
-        <table className="w-full text-sm text-left border-collapse">
+        <table className="w-full text-sm text-left">
           <thead className="text-xs uppercase text-muted">
             <tr>
-              <th scope="col" className="px-6 py-4 border-b border-glass-border">Username</th>
+              <th scope="col" className="px-6 py-4 border-b border-glass-border">User</th>
               <th scope="col" className="px-6 py-4 border-b border-glass-border">Email</th>
-              <th scope="col" className="px-6 py-4 border-b border-glass-border">Joined</th>
               <th scope="col" className="px-6 py-4 border-b border-glass-border">Favorites</th>
               <th scope="col" className="px-6 py-4 border-b border-glass-border">Watchlist</th>
+              <th scope="col" className="px-6 py-4 border-b border-glass-border">Joined</th>
             </tr>
           </thead>
-          <tbody className="text-gray-300">
+          <tbody>
             {users.map(user => (
-              <tr key={user._id} className="border-b border-glass-border hover:bg-cyan/10 transition-colors">
-                <td className="px-6 py-4 font-medium text-white flex items-center gap-3">
-                  <Avatar avatar={user.avatar} className="h-8 w-8 rounded-full" />
-                  {user.username}
+              <tr key={user._id} className="border-b border-glass-border">
+                <td className="px-6 py-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar avatar={user.avatar} className="h-8 w-8 rounded-full" />
+                    <span className="font-medium text-white">{user.username}</span>
+                  </div>
                 </td>
-                <td className="px-6 py-4">{user.email}</td>
-                <td className="px-6 py-4">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</td>
-                <td className="px-6 py-4">{user.favoritesCount}</td>
-                <td className="px-6 py-4">{user.watchlistCount}</td>
+                <td className="px-6 py-3 text-muted">{user.email}</td>
+                <td className="px-6 py-3 text-white font-semibold">{user.favoritesCount}</td>
+                <td className="px-6 py-3 text-white font-semibold">{user.watchlistCount}</td>
+                <td className="px-6 py-3 text-muted">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</td>
               </tr>
             ))}
           </tbody>
@@ -494,847 +624,129 @@ const UsersTab: React.FC = () => {
 // Support Tickets Tab
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 const SupportTicketsTab: React.FC = () => {
-  const [tickets, setTickets] = useState<SupportTicket[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [ticketToDelete, setTicketToDelete] = useState<SupportTicket | null>(null);
-  const { addToast } = useToast();
+    const [tickets, setTickets] = useState<SupportTicket[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [ticketToDelete, setTicketToDelete] = useState<SupportTicket | null>(null);
+    const { addToast } = useToast();
 
-  const fetchTickets = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await getSupportTickets();
-      setTickets(data);
-    } catch (error) {
-      addToast('Failed to load support tickets.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [addToast]);
+    useEffect(() => {
+        getSupportTickets()
+            .then(setTickets)
+            .catch(() => addToast('Failed to load tickets.', 'error'))
+            .finally(() => setLoading(false));
+    }, [addToast]);
 
-  useEffect(() => {
-    fetchTickets();
-  }, [fetchTickets]);
+    const handleDelete = async () => {
+        if (!ticketToDelete) return;
+        try {
+            await deleteSupportTicket(ticketToDelete._id);
+            setTickets(tickets.filter(t => t._id !== ticketToDelete._id));
+            addToast('Ticket deleted.', 'info');
+        } catch (err) {
+            addToast('Failed to delete ticket.', 'error');
+        } finally {
+            setTicketToDelete(null);
+        }
+    };
+    
+    if (loading) return <TicketSkeleton />;
 
-  const handleDelete = async () => {
-    if (!ticketToDelete) return;
-    try {
-      await deleteSupportTicket(ticketToDelete._id);
-      addToast('Support ticket deleted.', 'success');
-      fetchTickets();
-    } catch (error) {
-      addToast('Failed to delete ticket.', 'error');
-    }
-    setTicketToDelete(null);
-  };
-
-  if (loading) return <Spinner />;
-
-  return (
-    <>
-      <div className="space-y-4">
-        {tickets.length > 0 ? (
-          tickets.map(ticket => (
-            <div key={ticket._id} className="glass-panel p-4 rounded-lg shadow-lg border-l-2 border-danger">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h4 className="font-bold text-white">{ticket.subject}</h4>
-                  {ticket.contentTitle && <p className="text-sm text-muted">Content: {ticket.contentTitle}</p>}
-                  <p className="text-xs text-muted mt-1">{new Date(ticket.timestamp).toLocaleString()}</p>
+    return (
+        <div className="space-y-4">
+            {ticketToDelete && (
+                 <ConfirmationModal 
+                    isOpen={!!ticketToDelete}
+                    onClose={() => setTicketToDelete(null)}
+                    onConfirm={handleDelete}
+                    title="Delete Support Ticket"
+                    message="Are you sure you want to delete this ticket? This action cannot be undone."
+                />
+            )}
+            {tickets.map(ticket => (
+                <div key={ticket._id} className="glass-panel p-4 rounded-lg shadow-lg border-l-2 border-danger">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <h3 className="font-bold text-white text-lg">{ticket.subject}</h3>
+                            {ticket.contentTitle && <p className="text-sm text-cyan">Related: {ticket.contentTitle}</p>}
+                             <p className="text-xs text-muted mt-1">From: {ticket.username || 'Guest'} | {new Date(ticket.timestamp).toLocaleString()}</p>
+                        </div>
+                         <div className="flex items-center gap-2 flex-shrink-0">
+                            <button onClick={() => setTicketToDelete(ticket)} className="p-2 text-muted hover:text-danger"><TrashIcon className="h-5 w-5"/></button>
+                        </div>
+                    </div>
+                    <p className="mt-3 text-gray-300 whitespace-pre-wrap">{ticket.message}</p>
                 </div>
-                <button onClick={() => setTicketToDelete(ticket)} className="p-2 text-muted hover:text-danger transition-colors" title="Delete Ticket">
-                  <TrashIcon className="h-5 w-5" />
-                </button>
-              </div>
-              <p className="mt-2 text-sm whitespace-pre-wrap text-gray-300">{ticket.message}</p>
-            </div>
-          ))
-        ) : (
-          <p className="text-center text-muted">No support tickets.</p>
-        )}
-      </div>
-      <ConfirmationModal
-        isOpen={!!ticketToDelete}
-        onClose={() => setTicketToDelete(null)}
-        onConfirm={handleDelete}
-        title="Delete Support Ticket"
-        message="Are you sure you want to delete this support ticket? This action cannot be undone."
-      />
-    </>
-  );
+            ))}
+            {tickets.length === 0 && <p className="text-center text-muted">No support tickets found.</p>}
+        </div>
+    );
 };
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Database Tab
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-const DatabaseUsageChart: React.FC<{ usedBytes: number; totalBytes: number }> = ({ usedBytes, totalBytes }) => {
-    const [isAnimated, setIsAnimated] = useState(false);
-    
+const DatabaseTab: React.FC = () => {
+    const [stats, setStats] = useState<DbStats | null>(null);
+    const [loading, setLoading] = useState(true);
+    const { addToast } = useToast();
+
     useEffect(() => {
-        const timer = setTimeout(() => setIsAnimated(true), 100);
-        return () => clearTimeout(timer);
-    }, []);
-
-    const formatBytes = (bytes: number) => {
-        if (bytes == null || !isFinite(bytes) || bytes < 0) return 'N/A';
-        if (bytes === 0) return '0 B';
-        const i = Math.floor(Math.log(bytes) / Math.log(1024));
-        return `${parseFloat((bytes / Math.pow(1024, i)).toFixed(1))} ${['B', 'KB', 'MB', 'GB', 'TB'][i]}`;
-    };
-
-    // Per the design prompt, display 0.0% used.
-    const usedPercent = 0.0;
+        getDbStats()
+            .then(setStats)
+            .catch(() => addToast('Failed to load database stats.', 'error'))
+            .finally(() => setLoading(false));
+    }, [addToast]);
     
-    const radius = 80;
-    const circumference = 2 * Math.PI * radius;
-    // Set a minimum visual percentage so 0.0% still shows a tiny sliver.
-    const visualPercent = Math.max(usedPercent, 0.1);
-    const usedOffset = circumference - (visualPercent / 100) * circumference;
+    if (loading) return <DatabaseSkeleton />;
+    if (!stats) return <p>Could not load database statistics.</p>;
 
-    // "dark, subtle gray color" for the 'used' portion of the bar.
-    const usedColor = '#8B949E'; // Muted Gray
-    // "brighter background" for the track of the gauge.
-    const trackColor = '#374151';
-
+    const usedPercent = stats.totalBytes > 0 ? (stats.usedBytes / stats.totalBytes) * 100 : 0;
+    const formatBytes = (bytes: number) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+    
     return (
-        <div className="flex flex-col items-center justify-center gap-4 text-center">
-            {/* Per the prompt, change the label text. */}
-            <h3 className="text-2xl font-bold text-white">Actual Database Storage</h3>
-            {/* "luminous round circle" achieved with a drop-shadow filter. */}
-            <div className="relative w-56 h-56" style={{ filter: 'drop-shadow(0 0 10px rgba(8, 217, 214, 0.2))' }}>
-                <svg className="w-full h-full" viewBox="0 0 200 200">
+        <div className="glass-panel p-6 rounded-lg flex flex-col items-center justify-center">
+            <h2 className="text-2xl font-bold mb-6 text-white">Database Storage</h2>
+            <div className="relative" style={{width: 250, height: 250}}>
+                <svg className="w-full h-full" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="45" fill="transparent" stroke="currentColor" strokeWidth="10" className="text-gray-700"/>
                     <circle
-                        cx="100"
-                        cy="100"
-                        r={radius}
+                        cx="50"
+                        cy="50"
+                        r="45"
                         fill="transparent"
-                        stroke={trackColor}
-                        strokeWidth="20"
-                    />
-                    <circle
-                        cx="100"
-                        cy="100"
-                        r={radius}
-                        fill="transparent"
-                        stroke={usedColor}
-                        strokeWidth="20"
-                        strokeDasharray={circumference}
-                        strokeDashoffset={isAnimated ? usedOffset : circumference}
-                        strokeLinecap="round"
-                        transform="rotate(-90 100 100)"
-                        className="transition-all duration-1000 ease-out"
+                        stroke="currentColor"
+                        strokeWidth="10"
+                        strokeDasharray={2 * Math.PI * 45}
+                        strokeDashoffset={2 * Math.PI * 45 * (1 - usedPercent / 100)}
+                        transform="rotate(-90 50 50)"
+                        className="text-cyan animate-glow"
+                        style={{ transition: 'stroke-dashoffset 1s ease-out', '--glow-color': 'cyan' } as React.CSSProperties}
                     />
                 </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-4xl font-bold text-white">{usedPercent.toFixed(1)}%</span>
-                    <span className="text-base text-muted">Used</span>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+                    <span className="text-4xl font-bold">{usedPercent.toFixed(1)}%</span>
+                    <span className="text-sm text-muted">Used</span>
                 </div>
             </div>
-            <div className="text-lg font-semibold text-gray-300">
-                {/* Per the prompt, display the text format '248 KB / N/A'. */}
-                <span style={{ color: usedColor }}>{formatBytes(usedBytes)}</span> / <span>N/A</span>
-            </div>
+            <p className="mt-6 text-lg font-semibold text-white">
+                {formatBytes(stats.usedBytes)} / {formatBytes(stats.totalBytes)}
+            </p>
         </div>
     );
-};
-
-const DatabaseTab: React.FC = () => {
-  const [dbStats, setDbStats] = useState<DbStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const { addToast } = useToast();
-
-  useEffect(() => {
-    const fetchData = async () => {
-        try {
-            setLoading(true);
-            const dbStatsData = await getDbStats();
-            setDbStats(dbStatsData);
-        } catch (err) {
-            addToast('Failed to load database stats.', 'error');
-        } finally {
-            setLoading(false);
-        }
-    };
-    fetchData();
-  }, [addToast]);
-
-  if (loading) return <Spinner />;
-
-  return (
-    <div className="glass-panel p-6 rounded-lg flex flex-col items-center justify-center min-h-[50vh]">
-        {dbStats ? (
-            <DatabaseUsageChart usedBytes={dbStats.usedBytes} totalBytes={dbStats.totalBytes} />
-        ) : (
-            <p className="text-muted">Could not load database statistics.</p>
-        )}
-    </div>
-  );
-};
-
-
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Movies Tab and Modals
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-const inputClass = "w-full bg-primary border border-glass-border rounded-md p-2 text-white placeholder-muted focus:outline-none focus:ring-2 focus:ring-cyan transition-all";
-
-interface MovieEditModalProps {
-  movie: StoredMovie;
-  onClose: () => void;
-  onSave: () => void;
-}
-const MovieEditModal: React.FC<MovieEditModalProps> = ({ movie, onClose, onSave }) => {
-  const [links, setLinks] = useState<DownloadLink[]>(() => (movie.download_links.length > 0 ? movie.download_links : [{ label: '', url: '' }]));
-  const [loading, setLoading] = useState(false);
-  const { addToast } = useToast();
-
-  const handleLinkChange = (index: number, field: 'label' | 'url', value: string) => {
-    const newLinks = [...links];
-    newLinks[index][field] = value;
-    setLinks(newLinks);
-  };
-
-  const addLink = () => setLinks([...links, { label: '', url: '' }]);
-  const removeLink = (index: number) => setLinks(links.filter((_, i) => i !== index));
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const validLinks = links.filter(link => link.label.trim() && link.url.trim());
-    if (validLinks.length === 0) {
-      addToast('Please add at least one valid link.', 'error');
-      return;
-    }
-    setLoading(true);
-    try {
-      await updateStoredMovie(movie._id, { download_links: validLinks });
-      addToast('Links updated successfully.', 'success');
-      onSave();
-      onClose();
-    } catch (error) {
-      addToast('Failed to update links.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-      <div className="glass-panel rounded-lg shadow-xl w-full max-w-2xl border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
-        <form onSubmit={handleSubmit}>
-          <div className="p-6">
-            <h3 className="text-lg font-bold text-white">Edit Links for: <span className="text-cyan">{movie.title}</span></h3>
-            <div className="space-y-4 mt-4 max-h-96 overflow-y-auto pr-2">
-              {links.map((link, index) => (
-                <div key={index} className="flex gap-2 items-center">
-                  <input type="text" placeholder="Label (e.g., 1080p)" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className={`${inputClass} w-1/3`} />
-                  <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className={`${inputClass} w-2/3`} />
-                  <button type="button" onClick={() => removeLink(index)} className="p-2 text-danger hover:bg-danger/10 rounded-full transition-colors">
-                    <XIcon className="h-5 w-5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <button type="button" onClick={addLink} className="mt-4 flex items-center gap-2 text-sm text-cyan font-semibold hover:brightness-125 transition-all">
-              <PlusCircleIcon className="h-5 w-5" />
-              Add another link
-            </button>
-          </div>
-          <div className="bg-primary/50 px-6 py-4 flex justify-end gap-2 rounded-b-lg">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Cancel</button>
-            <button type="submit" disabled={loading} className="px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:bg-muted disabled:text-gray-800 disabled:cursor-not-allowed">
-              {loading ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-interface ParsedUrlData {
-    movieName: string;
-    year: number | null;
-    languages: string[];
-    quality: string | null;
-    size: string | null;
-}
-
-interface ProcessedItem {
-    url: string;
-    parsedInfo: ParsedUrlData | null;
-    tmdbMatch: ContentItem | null;
-    status: 'pending' | 'success' | 'parsing_failed' | 'tmdb_failed';
-    errorMessage?: string;
-}
-
-interface MovieAddModalProps {
-  onClose: () => void;
-  onSave: () => void;
-  allMovies: StoredMovie[];
-}
-const MovieAddModal: React.FC<MovieAddModalProps> = ({ onClose, onSave, allMovies }) => {
-  const [mode, setMode] = useState<'manual' | 'automate'>('manual');
-  
-  // --- Manual mode states ---
-  const [step, setStep] = useState(1);
-  const [query, setQuery] = useState('');
-  const debouncedQuery = useDebounce(query, 500);
-  const [searchResults, setSearchResults] = useState<TMDBSearchResult[]>([]);
-  const [selectedItem, setSelectedItem] = useState<ContentItem | null>(null);
-  const [links, setLinks] = useState<DownloadLink[]>([{ label: '', url: '' }]);
-  const [loading, setLoading] = useState(false);
-  const { addToast } = useToast();
-
-  // --- Automate mode states ---
-  const [urlsToParse, setUrlsToParse] = useState('');
-  const [processedItems, setProcessedItems] = useState<ProcessedItem[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  useEffect(() => {
-    if (mode === 'manual' && debouncedQuery.trim().length > 2) {
-      setLoading(true);
-      searchTMDB(debouncedQuery)
-        .then(res => setSearchResults(res.results))
-        .catch(() => addToast('Search failed', 'error'))
-        .finally(() => setLoading(false));
-    } else {
-      setSearchResults([]);
-    }
-  }, [debouncedQuery, addToast, mode]);
-
-  const resetManualState = () => {
-    setStep(1);
-    setQuery('');
-    setSearchResults([]);
-    setSelectedItem(null);
-    setLinks([{ label: '', url: ''}]);
-  };
-  
-  const resetAutomateState = () => {
-    setStep(1);
-    setUrlsToParse('');
-    setProcessedItems([]);
-  };
-
-  const handleModeChange = (newMode: 'manual' | 'automate') => {
-    if (newMode === mode) return;
-    setMode(newMode);
-    // Reset states when switching modes
-    if (newMode === 'manual') {
-        resetAutomateState();
-    } else {
-        resetManualState();
-    }
-  };
-
-  const handleSelect = (item: TMDBSearchResult) => {
-    // FIX: Correctly create the ContentItem by narrowing the discriminated union first.
-    let contentItem: ContentItem;
-    if (item.media_type === 'movie') {
-        const { media_type, ...rest } = item;
-        contentItem = { ...rest, type: 'movie' };
-    } else {
-        const { media_type, ...rest } = item;
-        contentItem = { ...rest, type: 'tv' };
-    }
-    setSelectedItem(contentItem);
-    setStep(2);
-  };
-
-  const handleLinkChange = (index: number, field: 'label' | 'url', value: string) => {
-    const newLinks = [...links];
-    newLinks[index][field] = value;
-    setLinks(newLinks);
-  };
-
-  const addLink = () => setLinks([...links, { label: '', url: '' }]);
-  const removeLink = (index: number) => setLinks(links.filter((_, i) => i !== index));
-
-  const handleSaveManual = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedItem) return;
-    const validLinks = links.filter(link => link.label.trim() && link.url.trim());
-    if (validLinks.length === 0) {
-      addToast('Please add at least one valid link.', 'error');
-      return;
-    }
-    setLoading(true);
-    try {
-      await addStoredMovie({
-        tmdb_id: selectedItem.id,
-        type: selectedItem.type,
-        title: 'title' in selectedItem ? selectedItem.title : selectedItem.name,
-        download_links: validLinks,
-        download_count: 0,
-      });
-      addToast('New content added successfully.', 'success');
-      onSave();
-      onClose();
-    } catch (error) {
-      addToast(error instanceof Error ? error.message : 'Failed to add content.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // --- Automate Mode Logic ---
-  const handleProcessUrls = async () => {
-    const urls = urlsToParse.split('\n').map(u => u.trim()).filter(Boolean);
-    if (urls.length === 0) {
-      addToast('Please paste at least one URL.', 'error');
-      return;
-    }
-
-    setIsProcessing(true);
-    setProcessedItems(urls.map(url => ({ url, status: 'pending', parsedInfo: null, tmdbMatch: null })));
-
-    const results = await Promise.all(urls.map(async (url): Promise<ProcessedItem> => {
-      try {
-        const parsedInfo = await apiParseUrl(url);
-        if (!parsedInfo || !parsedInfo.movieName) {
-          throw new Error('Could not parse filename.');
-        }
-
-        const searchQuery = parsedInfo.year ? `${parsedInfo.movieName} ${parsedInfo.year}` : parsedInfo.movieName;
-        const tmdbResults = await searchTMDB(searchQuery);
-        
-        const bestMatch = tmdbResults.results[0];
-        
-        if (!bestMatch) {
-            throw new Error(`No movie/TV match found for "${parsedInfo.movieName}".`);
-        }
-        
-        // FIX: Correctly create the ContentItem by narrowing the discriminated union first.
-        // Destructuring a union directly (`{ media_type, ...rest }`) can lead to incorrect type inference for the `rest` object.
-        let tmdbMatch: ContentItem;
-        if (bestMatch.media_type === 'movie') {
-            const { media_type, ...rest } = bestMatch;
-            tmdbMatch = { ...rest, type: 'movie' };
-        } else { // media_type is 'tv'
-            const { media_type, ...rest } = bestMatch;
-            tmdbMatch = { ...rest, type: 'tv' };
-        }
-        
-        return { url, parsedInfo, tmdbMatch, status: 'success' };
-
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown processing error.";
-        return { url, parsedInfo: null, tmdbMatch: null, status: 'parsing_failed', errorMessage: message };
-      }
-    }));
-
-    setProcessedItems(results);
-    setIsProcessing(false);
-    if (results.some(r => r.status === 'success')) {
-        setStep(2);
-    } else {
-        addToast("Failed to process any of the provided URLs.", "error");
-    }
-  };
-  
-  const groupedItems = useMemo(() => {
-    if (mode !== 'automate' || step !== 2) return new Map();
-    
-    const groups: Map<number, { tmdbMatch: NonNullable<ProcessedItem['tmdbMatch']>, items: ProcessedItem[] }> = new Map();
-
-    processedItems.filter(p => p.status === 'success' && p.tmdbMatch).forEach(item => {
-        const id = item.tmdbMatch!.id;
-        if (!groups.has(id)) {
-            groups.set(id, { tmdbMatch: item.tmdbMatch!, items: [] });
-        }
-        groups.get(id)!.items.push(item);
-    });
-
-    return groups;
-  }, [processedItems, mode, step]);
-
-
-  const handleSaveAutomated = async () => {
-    setLoading(true);
-
-    const promises = Array.from(groupedItems.values()).map(group => {
-        const existingMovie = allMovies.find(m => m.tmdb_id === group.tmdbMatch.id && m.type === group.tmdbMatch.type);
-        
-        const newLinks: DownloadLink[] = group.items.map(item => ({
-            url: item.url,
-            label: generateLinkLabel(item.parsedInfo!),
-        }));
-
-        if (existingMovie) {
-            const combinedLinks = [...existingMovie.download_links];
-            newLinks.forEach(newLink => {
-                if (!combinedLinks.some(existing => existing.url === newLink.url)) {
-                    combinedLinks.push(newLink);
-                }
-            });
-            return updateStoredMovie(existingMovie._id, { download_links: combinedLinks });
-        } else {
-            const { id, type } = group.tmdbMatch;
-            const title = 'title' in group.tmdbMatch ? group.tmdbMatch.title : group.tmdbMatch.name;
-            return addStoredMovie({
-                tmdb_id: id,
-                type,
-                title,
-                download_links: newLinks,
-                download_count: 0,
-            });
-        }
-    });
-
-    const results = await Promise.allSettled(promises);
-    
-    const successCount = results.filter(r => r.status === 'fulfilled').length;
-    const failedCount = results.length - successCount;
-
-    if (successCount > 0) {
-        addToast(`${successCount} item(s) saved successfully.`, 'success');
-    }
-    if (failedCount > 0) {
-        addToast(`${failedCount} item(s) failed to save. Some may be duplicates.`, 'error');
-        console.error("Failed automated saves:", results.filter(r => r.status === 'rejected'));
-    }
-
-    setLoading(false);
-    onSave();
-    onClose();
-  };
-  
-  const ModeButton: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode }> = ({ active, onClick, children }) => (
-    <button type="button" onClick={onClick} className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors ${active ? 'bg-cyan text-primary' : 'bg-primary/50 text-gray-300 hover:bg-secondary'}`}>
-        {children}
-    </button>
-  );
-
-  return (
-     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-      <div className="glass-panel rounded-lg shadow-xl w-full max-w-2xl border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
-        <form onSubmit={mode === 'manual' ? handleSaveManual : undefined}>
-          <div className="p-6">
-            <div className="flex justify-between items-start mb-4">
-                <div>
-                    <h3 className="text-lg font-bold text-white">Add New Content</h3>
-                    <div className="mt-2 flex items-center gap-2 bg-primary p-1 rounded-lg">
-                        <ModeButton active={mode === 'manual'} onClick={() => handleModeChange('manual')}>Manual Search</ModeButton>
-                        <ModeButton active={mode === 'automate'} onClick={() => handleModeChange('automate')}>Automate from URLs</ModeButton>
-                    </div>
-                </div>
-                <button type="button" onClick={onClose} className="text-muted hover:text-white"><XIcon className="h-5 w-5" /></button>
-            </div>
-            
-            {/* MANUAL MODE */}
-            {mode === 'manual' && (
-                <>
-                    {step === 1 ? (
-                        <div className="mt-4">
-                            <div className="relative">
-                            <input type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search for a movie or TV show..." className={`${inputClass} pl-10`} />
-                            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
-                            </div>
-                            {loading && <Spinner />}
-                            <ul className="mt-2 max-h-80 overflow-y-auto">
-                            {searchResults.map(item => {
-                                const title = item.media_type === 'movie' ? item.title : item.name;
-                                const releaseDate = item.media_type === 'movie' ? item.release_date : item.first_air_date;
-                                return (
-                                    <li key={item.id} onClick={() => handleSelect(item)} className="p-2 flex gap-4 items-center hover:bg-cyan/10 rounded cursor-pointer transition-colors">
-                                        <img src={item.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${item.poster_path}` : ''} alt="" className="w-10 h-14 object-cover rounded bg-primary" />
-                                        <div>
-                                            <p className="text-white">{title}</p>
-                                            <p className="text-sm text-muted">{new Date(releaseDate).getFullYear() || 'N/A'}</p>
-                                        </div>
-                                    </li>
-                                );
-                            })}
-                            </ul>
-                        </div>
-                    ) : (
-                        <div className="mt-4">
-                            <h4 className="text-lg font-bold text-white mb-2">Adding links for: <span className="text-cyan">{selectedItem && ('title' in selectedItem ? selectedItem.title : selectedItem.name)}</span></h4>
-                            <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                            {links.map((link, index) => (
-                                <div key={index} className="flex gap-2 items-center">
-                                <input type="text" placeholder="Label (e.g., 1080p)" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className={`${inputClass} w-1/3`} />
-                                <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className={`${inputClass} w-2/3`} />
-                                <button type="button" onClick={() => removeLink(index)} className="p-2 text-danger hover:bg-danger/10 rounded-full transition-colors">
-                                    <XIcon className="h-5 w-5" />
-                                </button>
-                                </div>
-                            ))}
-                            </div>
-                            <button type="button" onClick={addLink} className="mt-4 flex items-center gap-2 text-sm text-cyan font-semibold hover:brightness-125 transition-all">
-                            <PlusCircleIcon className="h-5 w-5" />
-                            Add another link
-                            </button>
-                        </div>
-                    )}
-                </>
-            )}
-
-            {/* AUTOMATE MODE */}
-            {mode === 'automate' && (
-                <>
-                    {step === 1 && (
-                        <div className="mt-4">
-                            <textarea
-                                value={urlsToParse}
-                                onChange={e => setUrlsToParse(e.target.value)}
-                                placeholder="Paste one download URL per line..."
-                                rows={8}
-                                className={`${inputClass} font-mono text-xs`}
-                                disabled={isProcessing}
-                            />
-                        </div>
-                    )}
-                    {step === 2 && (
-                        <div className="mt-4 max-h-[60vh] overflow-y-auto pr-2">
-                           <h4 className="font-bold text-white mb-4">Step 2: Review & Confirm</h4>
-                           <div className="space-y-6">
-                                {Array.from(groupedItems.values()).map(group => (
-                                    <div key={group.tmdbMatch.id} className="bg-primary/50 p-4 rounded-lg">
-                                        <div className="flex gap-4 items-start">
-                                            <img src={group.tmdbMatch.poster_path ? `${TMDB_IMAGE_BASE_URL_SMALL}${group.tmdbMatch.poster_path}` : ''} alt="" className="w-16 h-24 object-cover rounded bg-secondary" />
-                                            <div>
-                                                <p className="font-bold text-white text-lg">{'title' in group.tmdbMatch ? group.tmdbMatch.title : group.tmdbMatch.name}</p>
-                                                <p className="text-sm text-muted">{new Date('release_date' in group.tmdbMatch ? group.tmdbMatch.release_date : group.tmdbMatch.first_air_date).getFullYear() || 'N/A'}</p>
-                                            </div>
-                                        </div>
-                                        <div className="mt-3 pt-3 border-t border-glass-border space-y-2">
-                                            <h5 className="text-xs font-semibold uppercase text-muted">Links to be added:</h5>
-                                            {group.items.map(item => (
-                                                <div key={item.url} className="bg-secondary p-2 rounded text-sm">
-                                                    <p className="text-cyan font-semibold">{generateLinkLabel(item.parsedInfo!)}</p>
-                                                    <p className="text-xs text-muted truncate">{item.url}</p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
-                                {processedItems.filter(p => p.status !== 'success').length > 0 && (
-                                     <div>
-                                        <h5 className="font-bold text-danger mb-2">Failed Items</h5>
-                                        {processedItems.filter(p => p.status !== 'success').map((item, index) => (
-                                            <div key={index} className="bg-danger/10 p-2 rounded text-sm mb-2">
-                                                 <p className="text-xs text-muted truncate">{item.url}</p>
-                                                 <p className="text-danger text-xs font-semibold">{item.errorMessage}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                           </div>
-                        </div>
-                    )}
-                </>
-            )}
-          </div>
-          <div className="bg-primary/50 px-6 py-4 flex justify-end gap-2 rounded-b-lg">
-            {mode === 'manual' && step === 2 && <button type="button" onClick={() => setStep(1)} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Back</button>}
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Cancel</button>
-
-            {mode === 'manual' && step === 2 && (
-              <button type="submit" disabled={loading} className="px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:bg-muted disabled:text-gray-800 disabled:cursor-not-allowed">
-                {loading ? 'Saving...' : 'Save Content'}
-              </button>
-            )}
-
-            {mode === 'automate' && step === 1 && (
-                 <button type="button" onClick={handleProcessUrls} disabled={isProcessing} className="w-36 px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:bg-muted disabled:cursor-not-allowed">
-                    {isProcessing ? <SpinnerIcon className="animate-spin h-5 w-5 mx-auto"/> : 'Process URLs'}
-                </button>
-            )}
-
-            {mode === 'automate' && step === 2 && (
-                <>
-                    <button type="button" onClick={() => setStep(1)} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70 transition-colors">Back</button>
-                    <button type="button" onClick={handleSaveAutomated} disabled={loading} className="w-28 px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125 transition-all disabled:bg-muted disabled:cursor-not-allowed">
-                        {loading ? <SpinnerIcon className="animate-spin h-5 w-5 mx-auto"/> : 'Save All'}
-                    </button>
-                </>
-            )}
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-// Movies Tab Main Component
-const MoviesTab: React.FC = () => {
-  const [movies, setMovies] = useState<StoredMovie[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [movieToEdit, setMovieToEdit] = useState<StoredMovie | null>(null);
-  const [movieToDelete, setMovieToDelete] = useState<StoredMovie | null>(null);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const { addToast } = useToast();
-
-  const fetchMovies = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await getStoredMovies();
-      setMovies(data.sort((a, b) => a.title.localeCompare(b.title)));
-    } catch (error) {
-      addToast('Failed to load stored movies.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [addToast]);
-
-  useEffect(() => {
-    fetchMovies();
-  }, [fetchMovies]);
-
-  const filteredMovies = useMemo(() => {
-    if (!searchQuery) return movies;
-    return movies.filter(movie => movie.title.toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [movies, searchQuery]);
-
-  const handleDelete = async () => {
-    if (!movieToDelete) return;
-    try {
-      await deleteStoredMovie(movieToDelete._id);
-      addToast('Movie links deleted.', 'success');
-      fetchMovies();
-    } catch (error) {
-      addToast('Failed to delete movie links.', 'error');
-    }
-    setMovieToDelete(null);
-  };
-
-  if (loading) return <Spinner />;
-
-  return (
-    <>
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
-         <div className="relative w-full sm:max-w-xs">
-          <input type="text" placeholder="Search by title..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`${inputClass} pl-10`} />
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"><SearchIcon className="h-5 w-5 text-muted" /></div>
-        </div>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center justify-center gap-2 bg-cyan text-primary font-bold py-2 px-4 rounded-md hover:brightness-125 transition-all w-full sm:w-auto flex-shrink-0"
-        >
-          <PlusCircleIcon className="h-5 w-5" />
-          <span>Add New Content</span>
-        </button>
-      </div>
-
-      {/* Mobile Card View */}
-      <div className="space-y-4 md:hidden">
-        {filteredMovies.map(movie => (
-          <div key={movie._id} className="glass-panel p-4 rounded-lg">
-            <div>
-              <p className="font-bold text-white truncate">{movie.title}</p>
-              <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full mt-1 inline-block ${movie.type === 'movie' ? 'bg-purple/20 text-purple' : 'bg-cyan/20 text-cyan'}`}>
-                {movie.type}
-              </span>
-            </div>
-            <div className="mt-4 pt-4 border-t border-glass-border flex justify-between items-center text-sm">
-              <div className="flex gap-6">
-                  <div>
-                    <p className="text-muted text-xs">Links</p>
-                    <p className="font-bold text-white">{movie.download_links.length}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted text-xs">Downloads</p>
-                    <p className="font-bold text-white">{movie.download_count}</p>
-                  </div>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => setMovieToEdit(movie)} className="p-2 text-muted hover:text-cyan transition-colors" title="Edit Links">
-                  <EditIcon className="h-5 w-5" />
-                </button>
-                <button onClick={() => setMovieToDelete(movie)} className="p-2 text-muted hover:text-danger transition-colors" title="Delete">
-                  <TrashIcon className="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      {/* Desktop Table View */}
-      <div className="hidden md:block glass-panel rounded-lg shadow overflow-x-auto">
-        <table className="w-full text-sm text-left border-collapse">
-          <thead className="text-xs uppercase text-muted">
-            <tr>
-              <th scope="col" className="px-6 py-4 border-b border-glass-border">Title</th>
-              <th scope="col" className="px-6 py-4 border-b border-glass-border">Type</th>
-              <th scope="col" className="px-6 py-4 border-b border-glass-border">Links</th>
-              <th scope="col" className="px-6 py-4 border-b border-glass-border">Downloads</th>
-              <th scope="col" className="px-6 py-4 border-b border-glass-border">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="text-gray-300">
-            {filteredMovies.map(movie => (
-              <tr key={movie._id} className="border-b border-glass-border hover:bg-cyan/10 transition-colors">
-                <td className="px-6 py-4 font-medium text-white">{movie.title}</td>
-                <td className="px-6 py-4 uppercase">{movie.type}</td>
-                <td className="px-6 py-4">{movie.download_links.length}</td>
-                <td className="px-6 py-4">{movie.download_count}</td>
-                <td className="px-6 py-4 flex gap-2">
-                  <button onClick={() => setMovieToEdit(movie)} className="p-2 text-muted hover:text-cyan transition-colors" title="Edit Links">
-                    <EditIcon className="h-5 w-5" />
-                  </button>
-                  <button onClick={() => setMovieToDelete(movie)} className="p-2 text-muted hover:text-danger transition-colors" title="Delete">
-                    <TrashIcon className="h-5 w-5" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {(filteredMovies.length === 0 && !loading) && (
-        <p className="text-center py-10 text-muted">No content found matching your search.</p>
-      )}
-
-      {isAddModalOpen && <MovieAddModal onClose={() => setIsAddModalOpen(false)} onSave={fetchMovies} allMovies={movies} />}
-      {movieToEdit && <MovieEditModal movie={movieToEdit} onClose={() => setMovieToEdit(null)} onSave={fetchMovies} />}
-      <ConfirmationModal
-        isOpen={!!movieToDelete}
-        onClose={() => setMovieToDelete(null)}
-        onConfirm={handleDelete}
-        title="Delete Movie Links"
-        message={`Are you sure you want to delete all links for "${movieToDelete?.title}"? This action cannot be undone.`}
-      />
-    </>
-  );
 };
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Diagnostics Tab
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-const FormattedErrorMessage: React.FC<{ message: string }> = ({ message }) => {
-    const parts = message.split('\n\nTROUBLESHOOTING:\n');
-    const rawError = parts[0];
-    const troubleshootingText = parts.length > 1 ? parts[1] : null;
-
-    const formatLine = (line: string) => {
-        // Bolds text wrapped in ** and makes it cyan
-        const boldedLine = line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-cyan">$1</strong>');
-        return <span dangerouslySetInnerHTML={{ __html: boldedLine }} />;
-    };
-
-    return (
-        <div>
-            <p className="font-mono bg-primary p-3 rounded-md text-gray-400 text-xs mb-4 whitespace-pre-wrap break-words">{rawError}</p>
-            {troubleshootingText && (
-                <div>
-                    <h5 className="font-bold text-white mb-2 uppercase tracking-wider">Troubleshooting</h5>
-                    <ol className="space-y-3 text-sm text-gray-300 list-decimal list-outside ml-5">
-                        {troubleshootingText.split(/\n(?=\d\.)/).map((step, index) => (
-                            <li key={index} className="pl-2">{formatLine(step.replace(/^\d\.\s*/, ''))}</li>
-                        ))}
-                    </ol>
-                </div>
-            )}
-        </div>
-    );
-};
-
 const DiagnosticsTab: React.FC = () => {
     const [isTesting, setIsTesting] = useState(false);
-    const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-    const { addToast } = useToast();
+    const [testResult, setTestResult] = useState<{success: boolean, message: string} | null>(null);
 
     const handleTestEmail = async () => {
         setIsTesting(true);
@@ -1342,245 +754,284 @@ const DiagnosticsTab: React.FC = () => {
         try {
             const result = await apiTestEmail();
             setTestResult(result);
-            if (result.success) {
-                addToast('Test email sent successfully!', 'success');
-            } else {
-                addToast('Test email failed. See details below.', 'error');
-            }
         } catch (error) {
-            const message = error instanceof Error ? error.message : "An unknown error occurred.";
+            const message = error instanceof Error ? error.message : "An unknown error occurred on the client side.";
             setTestResult({ success: false, message });
-            addToast('An error occurred while running the test.', 'error');
         } finally {
             setIsTesting(false);
         }
     };
 
     return (
-        <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-white">System Diagnostics</h2>
-            <div className="glass-panel p-6 rounded-lg">
-                <h3 className="font-bold text-lg text-white mb-2">Email Service Test</h3>
-                <p className="text-sm text-muted mb-4">
-                    Click the button below to send a test email to the address configured in your backend environment variables (`EMAIL_USER`). This will verify your SMTP credentials and connection.
-                </p>
-                <button
-                    onClick={handleTestEmail}
-                    disabled={isTesting}
-                    className="flex items-center justify-center gap-2 bg-cyan text-primary font-bold py-2 px-4 rounded-md hover:brightness-125 transition-all disabled:bg-muted disabled:cursor-not-allowed"
-                >
-                    {isTesting ? (
-                        <>
-                            <SpinnerIcon className="animate-spin h-5 w-5" />
-                            <span>Testing...</span>
-                        </>
-                    ) : (
-                        <>
-                            <SettingsIcon className="h-5 w-5" />
-                            <span>Send Test Email</span>
-                        </>
-                    )}
-                </button>
-
-                {testResult && (
-                    <div className="mt-4 p-4 rounded-md bg-primary/50 border border-glass-border animate-fade-in">
-                        <h4 className={`font-bold mb-3 ${testResult.success ? 'text-highlight' : 'text-danger'}`}>
-                            Test Result: {testResult.success ? 'Success' : 'Failure'}
-                        </h4>
-                        {testResult.success ? (
-                            <pre className="mt-2 text-xs text-gray-300 whitespace-pre-wrap break-words">
-                                <code>{testResult.message}</code>
-                            </pre>
-                        ) : (
-                           <FormattedErrorMessage message={testResult.message} />
-                        )}
+        <div className="glass-panel p-6 rounded-lg">
+            <h2 className="text-2xl font-bold mb-4 text-white">System Diagnostics</h2>
+            <div className="space-y-4">
+                <div className="bg-primary/50 p-4 rounded-md">
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center">
+                        <div>
+                            <h3 className="font-bold text-white">Email Service (SMTP)</h3>
+                            <p className="text-sm text-muted">Tests the connection to the email server for sending OTPs.</p>
+                        </div>
+                        <button
+                            onClick={handleTestEmail}
+                            disabled={isTesting}
+                            className="mt-2 sm:mt-0 flex items-center justify-center gap-2 bg-cyan text-primary font-bold py-2 px-4 rounded-md hover:brightness-125 transition-all disabled:bg-muted disabled:cursor-not-allowed"
+                        >
+                            {isTesting ? <SpinnerIcon className="animate-spin h-5 w-5"/> : 'Run Test'}
+                        </button>
                     </div>
-                )}
+                    {testResult && (
+                        <div className={`mt-4 p-3 rounded-md text-sm border ${testResult.success ? 'bg-green-900/50 border-green-700 text-green-300' : 'bg-red-900/50 border-red-700 text-red-300'}`}>
+                           <div className="flex items-start gap-2">
+                               {testResult.success ? <CheckCircleIcon className="h-5 w-5 flex-shrink-0 mt-0.5" /> : <AlertTriangleIcon className="h-5 w-5 flex-shrink-0 mt-0.5" />}
+                               <p className="whitespace-pre-wrap font-mono text-xs">{testResult.message}</p>
+                           </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
 };
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// URL Parser Tab
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-const UrlParserTab: React.FC = () => {
-    const [url, setUrl] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [result, setResult] = useState<ParsedUrlData | null>(null);
-    const { addToast } = useToast();
-
-    const ResultCard: React.FC<{ data: ParsedUrlData }> = ({ data }) => {
-        const handleCopy = () => {
-            const infoString = [
-                data.movieName,
-                data.year,
-                data.languages.join(' '),
-                data.quality,
-                data.size
-            ].filter(Boolean).join(' ');
-
-            navigator.clipboard.writeText(infoString).then(() => {
-                addToast('Info copied to clipboard!', 'success');
-            }).catch(err => {
-                addToast('Failed to copy info.', 'error');
-                console.error('Copy failed:', err);
-            });
-        };
-
-        return (
-            <div className="glass-panel p-6 rounded-lg animate-fade-in mt-8">
-                <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-2xl font-bold text-white">{data.movieName || 'Unknown Title'}</h3>
-                    <button 
-                        onClick={handleCopy}
-                        className="flex items-center gap-2 text-sm bg-secondary text-muted px-3 py-1.5 rounded-full hover:bg-gray-700 hover:text-white transition-colors flex-shrink-0"
-                        title="Copy info to clipboard"
-                    >
-                        <CopyIcon className="h-4 w-4" />
-                        <span>Copy</span>
-                    </button>
-                </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                        <p className="text-muted">Year</p>
-                        <p className="font-semibold text-lg">{data.year || 'N/A'}</p>
-                    </div>
-                    <div>
-                        <p className="text-muted">Quality</p>
-                        <p className="font-semibold text-lg">{data.quality || 'N/A'}</p>
-                    </div>
-                    <div>
-                        <p className="text-muted">Languages</p>
-                        <p className="font-semibold text-lg">{data.languages.length > 0 ? data.languages.join(', ') : 'N/A'}</p>
-                    </div>
-                    <div>
-                        <p className="text-muted">File Size</p>
-                        <p className="font-semibold text-lg">{data.size || 'N/A'}</p>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!url.trim()) {
-            addToast('Please enter a URL.', 'error');
-            return;
-        }
-
-        setLoading(true);
-        setResult(null);
-        try {
-            const data = await apiParseUrl(url);
-            setResult(data);
-        } catch (error) {
-            const message = error instanceof Error ? error.message : "Failed to parse URL.";
-            addToast(message, 'error');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="max-w-3xl mx-auto">
-            <h2 className="text-2xl font-bold text-white">Movie Info Extractor</h2>
-            <p className="text-light-muted dark:text-muted mb-6">Paste a video download link below to automatically extract details like title, year, quality, and file size.</p>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-                 <div className="relative">
-                    <input
-                        type="url"
-                        value={url}
-                        onChange={e => setUrl(e.target.value)}
-                        placeholder="https://example.com/movie.name.2023.1080p.mkv"
-                        className="w-full bg-primary border border-glass-border rounded-lg py-3 pl-12 pr-4 text-base focus:outline-none focus:ring-2 focus:ring-cyan transition-all"
-                        disabled={loading}
-                    />
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <LinkIcon className="h-5 w-5 text-muted" />
-                    </div>
-                </div>
-                 <button
-                    type="submit"
-                    className="w-full flex items-center justify-center gap-2 bg-cyan text-primary font-bold py-3 px-4 rounded-lg hover:brightness-125 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={loading}
-                >
-                    {loading ? (
-                        <>
-                            <SpinnerIcon className="animate-spin h-5 w-5" />
-                            <span>Extracting...</span>
-                        </>
-                    ) : (
-                       'Extract Info'
-                    )}
-                </button>
-            </form>
-
-            {result && <ResultCard data={result} />}
-        </div>
-    );
-};
-
-
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// Main AdminPage Component
+// Main Admin Page Component
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 const AdminPage: React.FC = () => {
-  const { isAdmin, isAuthenticated } = useContext(AuthContext);
-  const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'dashboard');
+  const { isAdmin } = useContext(AuthContext);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const initialTab = searchParams.get('tab') || 'dashboard';
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   usePageMetadata({
     title: 'Admin Dashboard',
-    description: 'Manage CineStream content, users, and support tickets.',
+    description: 'Manage content, users, and site metrics.',
     path: '/admin',
   });
 
-  if (!isAuthenticated) {
-    return <p className="text-center py-20 text-xl text-white">Please log in to view the admin dashboard.</p>;
-  }
+  useEffect(() => {
+    setSearchParams({ tab: activeTab }, { replace: true });
+  }, [activeTab, setSearchParams]);
 
   if (!isAdmin) {
     return (
       <div className="text-center py-20">
-        <h1 className="text-4xl font-bold text-danger">Access Denied</h1>
-        <p className="mt-4 text-muted">You do not have permission to view this page.</p>
+        <h1 className="text-3xl font-bold text-danger">Access Denied</h1>
+        <p className="text-muted mt-2">You do not have permission to view this page.</p>
       </div>
     );
   }
 
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'dashboard': return <DashboardTab />;
-      case 'movies': return <MoviesTab />;
-      case 'users': return <UsersTab />;
-      case 'tickets': return <SupportTicketsTab />;
-      case 'database': return <DatabaseTab />;
-      case 'diagnostics': return <DiagnosticsTab />;
-      case 'url-parser': return <UrlParserTab />;
-      default: return null;
-    }
+  const tabs = {
+    dashboard: <DashboardTab />,
+    content: <ContentManagementTab />,
+    users: <UsersTab />,
+    tickets: <SupportTicketsTab />,
+    database: <DatabaseTab />,
+    diagnostics: <DiagnosticsTab />,
   };
+  
+  const tabConfig = [
+      { name: 'dashboard', label: 'Dashboard', icon: <UsersIcon className="h-5 w-5" /> },
+      { name: 'content', label: 'Content', icon: <DownloadIcon className="h-5 w-5" /> },
+      { name: 'users', label: 'Users', icon: <UsersIcon className="h-5 w-5" /> },
+      { name: 'tickets', label: 'Tickets', icon: <MessageSquareIcon className="h-5 w-5" /> },
+      { name: 'database', label: 'Database', icon: <DatabaseIcon className="h-5 w-5" /> },
+      { name: 'diagnostics', label: 'Diagnostics', icon: <SettingsIcon className="h-5 w-5" /> },
+  ];
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-4xl font-bold text-white uppercase tracking-wider">Admin Dashboard</h1>
-      <div className="glass-panel rounded-lg">
-        <div className="flex border-b border-glass-border overflow-x-auto">
-          <TabButton name="dashboard" activeTab={activeTab} setActiveTab={setActiveTab} label="Dashboard" />
-          <TabButton name="movies" activeTab={activeTab} setActiveTab={setActiveTab} label="Content Links" />
-          <TabButton name="users" activeTab={activeTab} setActiveTab={setActiveTab} label="Users" />
-          <TabButton name="tickets" activeTab={activeTab} setActiveTab={setActiveTab} label="Support Tickets" />
-          <TabButton name="database" activeTab={activeTab} setActiveTab={setActiveTab} label="Database" />
-          <TabButton name="diagnostics" activeTab={activeTab} setActiveTab={setActiveTab} label="Diagnostics" />
-          <TabButton name="url-parser" activeTab={activeTab} setActiveTab={setActiveTab} label="URL Parser" />
+    <div className="space-y-6">
+      <header>
+        <h1 className="text-3xl font-bold border-l-4 border-cyan pl-4">Admin Dashboard</h1>
+        <div className="mt-4 border-b border-glass-border">
+            <nav className="flex -mb-px space-x-2" aria-label="Tabs">
+                {tabConfig.map(tab => (
+                    <TabButton 
+                        key={tab.name}
+                        name={tab.name}
+                        activeTab={activeTab}
+                        setActiveTab={setActiveTab}
+                        label={tab.label}
+                        icon={tab.icon}
+                    />
+                ))}
+            </nav>
         </div>
-      </div>
-      <div key={activeTab} className="animate-fade-in">{renderTabContent()}</div>
+      </header>
+      
+      <main>
+        {tabs[activeTab as keyof typeof tabs]}
+      </main>
     </div>
   );
 };
 
 export default AdminPage;
+
+const ContentModal: React.FC<{
+  movie: StoredMovie | null;
+  onClose: () => void;
+  onSave: () => void;
+}> = ({ movie, onClose, onSave }) => {
+  const [tmdbId, setTmdbId] = useState<number | null>(movie?.tmdb_id || null);
+  const [contentType, setContentType] = useState<ContentType>(movie?.type || 'movie');
+  const [title, setTitle] = useState(movie?.title || '');
+  const [links, setLinks] = useState<DownloadLink[]>(movie?.download_links || []);
+  const { addToast } = useToast();
+
+  // Search functionality
+  const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+  const [searchResults, setSearchResults] = useState<TMDBSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  useEffect(() => {
+    if (debouncedSearchQuery.trim().length > 1) {
+      setIsSearching(true);
+      searchTMDB(debouncedSearchQuery)
+        .then(res => setSearchResults(res.results.slice(0, 5)))
+        .catch(() => addToast('TMDB search failed.', 'error'))
+        .finally(() => setIsSearching(false));
+    } else {
+      setSearchResults([]);
+    }
+  }, [debouncedSearchQuery, addToast]);
+
+  const handleSelectSearchResult = (result: TMDBSearchResult) => {
+    setTmdbId(result.id);
+    setContentType(result.media_type);
+    setTitle(result.media_type === 'movie' ? result.title : result.name);
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  const addLink = () => setLinks([...links, { label: '', url: '' }]);
+  const removeLink = (index: number) => setLinks(links.filter((_, i) => i !== index));
+  const updateLink = (index: number, field: 'label' | 'url' | 'suggestedBy', value: string) => {
+    const newLinks = [...links];
+    newLinks[index] = { ...newLinks[index], [field]: value };
+    setLinks(newLinks);
+  };
+  
+  const handleAutomate = async (url: string, index: number) => {
+        try {
+            const { movieName, year, languages, quality, size } = await apiParseUrl(url);
+            
+            // Search TMDB with parsed title and year
+            const searchRes = await searchContentByType(`${movieName} ${year || ''}`, contentType);
+            if (searchRes.results.length > 0) {
+                handleSelectSearchResult(searchRes.results[0] as TMDBSearchResult); // Assuming the first result is correct
+            } else {
+                addToast(`Could not find a match for "${movieName}" on TMDB.`, 'info');
+                // Even if no match, we can still set the title field
+                setTitle(movieName);
+                setTmdbId(null);
+            }
+            
+            const newLabel = generateLinkLabel({ quality, languages, size });
+            updateLink(index, 'label', newLabel);
+
+        } catch (error) {
+            addToast(error instanceof Error ? error.message : "Automation failed.", 'error');
+        }
+  };
+
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tmdbId || !title) {
+      addToast('Please select a movie/show from TMDB search.', 'error');
+      return;
+    }
+    const finalLinks = links.filter(link => link.label && link.url);
+    try {
+      if (movie) {
+        await updateStoredMovie(movie._id, { download_links: finalLinks });
+        addToast('Content updated successfully.', 'success');
+      } else {
+        await addStoredMovie({ tmdb_id: tmdbId, type: contentType, title, download_links: finalLinks, download_count: 0 });
+        addToast('Content added successfully.', 'success');
+      }
+      onSave();
+    } catch (error) {
+      addToast(error instanceof Error ? error.message : 'Failed to save content.', 'error');
+    }
+  };
+
+  return (
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+        <div className="glass-panel rounded-lg shadow-xl w-full max-w-2xl border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
+             <form onSubmit={handleSubmit}>
+                <div className="p-5 border-b border-glass-border flex justify-between items-center">
+                    <h3 className="text-lg font-bold text-white">{movie ? 'Edit Content' : 'Add New Content'}</h3>
+                    <button onClick={onClose} type="button" className="p-1 rounded-full hover:bg-white/10"><XIcon className="h-5 w-5 text-muted"/></button>
+                </div>
+
+                <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                    {/* TMDB Search */}
+                    <div className="relative">
+                        <label className="block text-sm font-medium text-muted mb-1">Search TMDB</label>
+                        <div className="relative">
+                            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search for a movie or TV show..." className="w-full bg-primary border border-glass-border rounded-md p-2 pl-10 text-white" />
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><SearchIcon className="h-5 w-5 text-muted"/></div>
+                        </div>
+                        {searchResults.length > 0 && (
+                            <ul className="absolute z-10 w-full bg-secondary border border-glass-border rounded-md mt-1 max-h-60 overflow-y-auto">
+                                {searchResults.map(result => (
+                                    <li key={result.id} onClick={() => handleSelectSearchResult(result)} className="p-2 hover:bg-cyan/20 cursor-pointer flex items-center gap-3">
+                                        <img src={`${TMDB_IMAGE_BASE_URL_SMALL}${result.poster_path}`} alt="" className="w-10 h-14 rounded-md"/>
+                                        <div>
+                                            <p className="font-bold text-white">{result.media_type === 'movie' ? result.title : result.name}</p>
+                                            <p className="text-sm text-muted">{new Date(result.media_type === 'movie' ? result.release_date : result.first_air_date).getFullYear()}</p>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                    
+                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-muted mb-1">TMDB ID</label>
+                            <input type="number" value={tmdbId || ''} readOnly className="w-full bg-primary border border-glass-border rounded-md p-2 text-muted" />
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium text-muted mb-1">Type</label>
+                            <input type="text" value={contentType} readOnly className="w-full bg-primary border border-glass-border rounded-md p-2 text-muted" />
+                        </div>
+                        <div className="sm:col-span-3">
+                            <label className="block text-sm font-medium text-muted mb-1">Title</label>
+                            <input type="text" value={title} readOnly className="w-full bg-primary border border-glass-border rounded-md p-2 text-muted" />
+                        </div>
+                    </div>
+
+                    {/* Download Links */}
+                    <div>
+                        <h4 className="font-bold text-white mb-2">Download Links</h4>
+                        <div className="space-y-3">
+                            {links.map((link, index) => (
+                                <div key={index} className="flex flex-col sm:flex-row gap-2 items-start">
+                                    <input type="text" value={link.label} onChange={e => updateLink(index, 'label', e.target.value)} placeholder="Label (e.g., 1080p WEB-DL)" className="flex-grow bg-primary border border-glass-border rounded-md p-2 text-white w-full sm:w-auto"/>
+                                    <div className="flex w-full sm:w-auto sm:flex-grow-[2]">
+                                        <input type="url" value={link.url} onChange={e => updateLink(index, 'url', e.target.value)} placeholder="URL" className="flex-grow bg-primary border-r-0 border border-glass-border rounded-l-md p-2 text-white"/>
+                                        <button type="button" onClick={() => handleAutomate(link.url, index)} className="p-2 bg-primary border border-glass-border text-cyan hover:bg-cyan/20 rounded-r-md">Automate</button>
+                                    </div>
+                                    <button type="button" onClick={() => removeLink(index)} className="p-2 text-muted hover:text-danger"><TrashIcon className="h-5 w-5"/></button>
+                                </div>
+                            ))}
+                        </div>
+                        <button type="button" onClick={addLink} className="mt-2 text-cyan font-semibold text-sm">+ Add Link</button>
+                    </div>
+                </div>
+
+                <div className="bg-primary/50 px-6 py-4 flex justify-end gap-2 rounded-b-lg">
+                    <button type="button" onClick={onClose} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70">Cancel</button>
+                    <button type="submit" className="px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125">Save</button>
+                </div>
+             </form>
+        </div>
+    </div>
+  );
+};

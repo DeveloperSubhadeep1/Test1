@@ -32,6 +32,7 @@ import CollectionDetailsPage from './pages/CollectionDetailsPage';
 import ContributePage from './pages/ContributePage';
 import WatchTrailerPage from './pages/WatchTrailerPage';
 import WatchOnlinePage from './pages/WatchOnlinePage';
+import UrlParserPage from './pages/UrlParserPage';
 
 const AppLayout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -89,6 +90,7 @@ const AppLayout: React.FC = () => {
             <Route path="/support" element={<SupportPage />} />
             <Route path="/contribute" element={<ProtectedRoute><ContributePage /></ProtectedRoute>} />
             <Route path="/genres" element={<GenresPage />} />
+            <Route path="/url-parser" element={<UrlParserPage />} />
             <Route path="/search/:query" element={<SearchResultsPage />} />
             <Route path="/movie/:slug" element={<DetailsPage type="movie" />} />
             <Route path="/tv/:slug" element={<DetailsPage type="tv" />} />

@@ -166,3 +166,11 @@ export interface Video {
 export interface VideosResponse {
   results: Video[];
 }
+
+export interface ParsedUrlData {
+    movieName: string;
+    year: number | null;
+    languages: string[];
+    quality: string | null;
+    size: string | null;
+}
