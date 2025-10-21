@@ -311,18 +311,21 @@ router.post('/utils/parse-url', async (req, res) => {
         const decodedFilename = decodeURIComponent(filenameWithExt);
         let { movieName, year, languages, quality, season, episode } = parseFilename(decodedFilename);
 
-        // If year is not found in filename, try to get it from TMDb
+        // If year is not found in filename, try to get it from TMDb, using the correct content type
         if (!year && movieName) {
+            const searchType = (season !== null && episode !== null) ? 'tv' : 'movie';
             try {
                 const searchParams = new URLSearchParams({
                     api_key: TMDB_API_KEY,
                     query: movieName,
                 });
-                const tmdbRes = await fetch(`https://api.themoviedb.org/3/search/movie?${searchParams.toString()}`);
+                const tmdbRes = await fetch(`https://api.themoviedb.org/3/search/${searchType}?${searchParams.toString()}`);
                 if (tmdbRes.ok) {
                     const tmdbData = await tmdbRes.json();
                     if (tmdbData.results && tmdbData.results.length > 0) {
-                        const releaseDate = tmdbData.results[0].release_date;
+                        const releaseDate = searchType === 'movie' 
+                            ? tmdbData.results[0].release_date 
+                            : tmdbData.results[0].first_air_date;
                         if (releaseDate) {
                             year = new Date(releaseDate).getFullYear().toString();
                         }

@@ -916,26 +916,37 @@ const ContentModal: React.FC<{
   };
   
   const handleAutomate = async (url: string, index: number) => {
-        try {
-            const { movieName, year, languages, quality, size, season, episode } = await apiParseUrl(url);
-            
-            // Search TMDB with parsed title and year
-            const searchRes = await searchContentByType(`${movieName} ${year || ''}`, contentType);
-            if (searchRes.results.length > 0) {
-                handleSelectSearchResult(searchRes.results[0] as TMDBSearchResult); // Assuming the first result is correct
-            } else {
-                addToast(`Could not find a match for "${movieName}" on TMDB.`, 'info');
-                // Even if no match, we can still set the title field
-                setTitle(movieName);
-                setTmdbId(null);
-            }
-            
-            const newLabel = generateLinkLabel({ quality, languages, size, season, episode });
-            updateLink(index, 'label', newLabel);
+    try {
+        const { movieName, year, languages, quality, size, season, episode } = await apiParseUrl(url);
+        
+        // Determine content type based on parsed data (e.g., presence of season/episode)
+        const detectedType: ContentType = (season !== null && episode !== null) ? 'tv' : 'movie';
+        
+        // This is crucial: update the modal's internal state for content type
+        setContentType(detectedType);
 
-        } catch (error) {
-            addToast(error instanceof Error ? error.message : "Automation failed.", 'error');
+        // Search TMDB with parsed title, year, and the now-correct type
+        const searchRes = await searchContentByType(`${movieName} ${year || ''}`, detectedType);
+        
+        if (searchRes.results.length > 0) {
+            // The result from searchContentByType doesn't include media_type, so we add it back
+            // for handleSelectSearchResult to work correctly.
+            const firstResult = searchRes.results[0];
+            const resultAsTMDBSearch = { ...firstResult, media_type: detectedType } as TMDBSearchResult;
+            handleSelectSearchResult(resultAsTMDBSearch);
+        } else {
+            addToast(`Could not find a match for "${movieName}" on TMDB.`, 'info');
+            // Even if no match, we can still set the title field and clear the ID
+            setTitle(movieName);
+            setTmdbId(null);
         }
+        
+        const newLabel = generateLinkLabel({ quality, languages, size, season, episode });
+        updateLink(index, 'label', newLabel);
+
+    } catch (error) {
+        addToast(error instanceof Error ? error.message : "Automation failed.", 'error');
+    }
   };
 
 
