@@ -945,7 +945,7 @@ const ContentModal: React.FC<{
     try {
         const { movieName, year, languages, quality, size, season, episode } = await apiParseUrl(url);
         
-        const detectedType: ContentType = (season !== null && episode !== null) ? 'tv' : 'movie';
+        const detectedType: ContentType = (season !== null) ? 'tv' : 'movie';
         
         setContentType(detectedType);
 

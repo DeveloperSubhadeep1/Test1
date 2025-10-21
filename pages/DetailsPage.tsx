@@ -39,11 +39,15 @@ const DownloadLinkButton: React.FC<{ link: DownloadLink; title: string; year: st
 
             const parts = [title];
     
-            if (details.season !== null && details.episode !== null) {
+            if (details.season !== null) {
                 const seasonStr = String(details.season).padStart(2, '0');
-                const episodeStr = String(details.episode).padStart(2, '0');
-                parts.push(`S${seasonStr}E${episodeStr}`);
-            } else {
+                if (details.episode !== null) {
+                    const episodeStr = String(details.episode).padStart(2, '0');
+                    parts.push(`S${seasonStr}E${episodeStr}`);
+                } else {
+                    parts.push(`Season ${seasonStr}`);
+                }
+            } else if (year && year !== 'N/A') {
                 parts.push(`(${year})`);
             }
 

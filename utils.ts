@@ -196,10 +196,14 @@ export function parseMediaFilename(source: string): { languages: string[]; quali
  */
 export function generateLinkLabel(details: { quality?: string | null; languages?: string[]; size?: string | null; season?: number | null; episode?: number | null }): string {
     const parts: string[] = [];
-    if (details.season && details.episode) {
+    if (details.season !== null) {
         const seasonStr = String(details.season).padStart(2, '0');
-        const episodeStr = String(details.episode).padStart(2, '0');
-        parts.push(`S${seasonStr}E${episodeStr}`);
+        if (details.episode !== null) {
+            const episodeStr = String(details.episode).padStart(2, '0');
+            parts.push(`S${seasonStr}E${episodeStr}`);
+        } else {
+            parts.push(`Season ${seasonStr}`);
+        }
     }
     if (details.quality) {
         parts.push(details.quality);
