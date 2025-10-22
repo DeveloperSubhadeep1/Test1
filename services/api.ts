@@ -234,7 +234,7 @@ export const getSupportTickets = async (): Promise<SupportTicket[]> => {
     return data || [];
 };
 export const deleteSupportTicket = (id: string): Promise<void> => dbFetch(`/support-tickets/${id}`, { method: 'DELETE' });
-export const addSupportTicket = (ticketData: Omit<SupportTicket, '_id' | 'timestamp'>, turnstileToken: string): Promise<SupportTicket> => dbFetch('/support-tickets', { method: 'POST', body: JSON.stringify({ ...ticketData, turnstileToken }) });
+export const addSupportTicket = (ticketData: Omit<SupportTicket, '_id' | 'timestamp'> & { tmdbId?: number; type?: ContentType }, turnstileToken: string): Promise<SupportTicket> => dbFetch('/support-tickets', { method: 'POST', body: JSON.stringify({ ...ticketData, turnstileToken }) });
 export const getMetrics = (): Promise<Metrics> => dbFetch('/metrics');
 export const getDbStats = (): Promise<DbStats> => dbFetch('/db-stats');
 export const incrementDownloadCount = (movieId: string): Promise<void> => dbFetch(`/stored-movies/${movieId}/increment`, { method: 'PATCH' });

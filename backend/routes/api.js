@@ -209,7 +209,7 @@ const FULL_BLOCKLIST_REGEX = new RegExp(`(${CHANNEL_NAMES_FOR_REGEX.join('|')})`
 
 // A list of generic "bad words" to strip from titles after initial parsing.
 const GENERIC_BAD_WORDS_LIST = [...new Set([
-    'ads', 'admin', 'area', 'arena', 'at', 'audio', 'autobot', 'autofilter', 'bazaar', 'bdrip', 'bluray', 'bolly4u', 'bot', 'bott', 'by', 'center', 'channel', 'chanel', 'chnl', 'cine', 'cinebot', 'cinehub', 'cinemaz', 'club', 'com', 'comment', 'community', 'compressed', 'compressedby', 'coolmoviez', 'core', 'corner', 'daily', 'dl', 'dot', 'download', 'dvdrip', 'dm', 'empire', 'enc', 'encode', 'encoded', 'exclusive', 'factory', 'fast', 'fastdl', 'fb', 'facebook', 'filebot', 'filmhubbot', 'flix', 'flixbot', 'follow', 'followus', 'free', 'fresh', 'from', 'galaxy', 'group', 'grp', 'hdprint', 'hdrip', 'hevc', 'hell_king', 'hellking', 'house', 'http', 'https', 'hub', 'in', 'insta', 'instagram', 'join', 'king', 'latest', 'lite', 'link', 'market', 'max', 'mediahub', 'mini', 'mirror', 'mix', 'mod', 'moviebot', 'movierip', 'msg', 'nation', 'net', 'network', 'new', 'official', 'on', 'org', 'orgnl', 'pack', 'planet', 'plus', 'pm', 'post', 'posted', 'premium', 'pro', 'reel', 'release', 'repack', 'reshare', 'reupload', 'rip', 'share', 'shared', 'short', 'shorts', 'site', 'space', 'spot', 'store', 'studio', 'subs', 'subscribe', 't.me', 'team', 'tele', 'telegram', 'telegrm', 'telegran', 'tg', 'tgbot', 'tgbots', 'tgchannel', 'tggroup', 'tglgrm', 'tlg', 'tlgm', 'tlgmovies', 'tlgram', 'tlgrm', 'tlgrmbot', 'top', 'tgram', 'trending', 'twitter', 'ultra', 'update', 'updates', 'upload', 'uploadbot', 'uploaded', 'uploadedby', 'uploadedon', 'uploadedto', 'uploader', 'url', 'vault', 'verse', 'vip', 'web', 'web-dl', 'webdl', 'webhd', 'world', 'www', 'x264', 'x265', 'xpress', 'xyz', 'yt', 'youtube', 'zone'
+    '10bit', 'ads', 'admin', 'area', 'arena', 'at', 'audio', 'autobot', 'autofilter', 'bazaar', 'bdrip', 'bluray', 'bolly4u', 'bot', 'bott', 'by', 'center', 'channel', 'chanel', 'chnl', 'cine', 'cinebot', 'cinehub', 'cinemaz', 'club', 'com', 'comment', 'community', 'compressed', 'compressedby', 'coolmoviez', 'core', 'corner', 'daily', 'dl', 'dot', 'download', 'dvdrip', 'dm', 'empire', 'enc', 'encode', 'encoded', 'exclusive', 'factory', 'fast', 'fastdl', 'fb', 'facebook', 'filebot', 'filmhubbot', 'flix', 'flixbot', 'follow', 'followus', 'free', 'fresh', 'from', 'galaxy', 'group', 'grp', 'hdprint', 'hdrip', 'hevc', 'hell_king', 'hellking', 'house', 'http', 'https', 'hub', 'in', 'insta', 'instagram', 'join', 'king', 'latest', 'lite', 'link', 'market', 'max', 'mediahub', 'mini', 'mirror', 'mix', 'mod', 'moviebot', 'movierip', 'msg', 'nation', 'net', 'network', 'new', 'official', 'on', 'org', 'orgnl', 'pack', 'planet', 'plus', 'pm', 'post', 'posted', 'premium', 'pro', 'reel', 'release', 'repack', 'reshare', 'reupload', 'rip', 'share', 'shared', 'short', 'shorts', 'site', 'space', 'spot', 'store', 'studio', 'subs', 'subscribe', 't.me', 'team', 'tele', 'telegram', 'telegrm', 'telegran', 'tg', 'tgbot', 'tgbots', 'tgchannel', 'tggroup', 'tglgrm', 'tlg', 'tlgm', 'tlgmovies', 'tlgram', 'tlgrm', 'tlgrmbot', 'top', 'tgram', 'trending', 'twitter', 'ultra', 'update', 'updates', 'upload', 'uploadbot', 'uploaded', 'uploadedby', 'uploadedon', 'uploadedto', 'uploader', 'url', 'vault', 'verse', 'vip', 'web', 'web-dl', 'webdl', 'webhd', 'world', 'www', 'x264', 'x265', 'xpress', 'xyz', 'yt', 'youtube', 'zone'
 ]).values()].sort();
 const BAD_WORDS_REGEX = new RegExp(`\\b(${GENERIC_BAD_WORDS_LIST.join('|')})\\b`, 'gi');
 
@@ -291,8 +291,8 @@ function parseFilename(filename) {
         movieName = normalized.substring(0, titleEndIndex).trim();
     } else {
         // Fallback: If no metadata found, find where quality/language keywords start
-        const parts = normalized.split(' ');
         const keywords = ['4k', '2160p', '1080p', '720p', '480p', 'web-dl', 'webdl', 'webrip', 'bluray', 'hdtv', 'hdrip', 'x264', 'hindi', 'english', 'eng', 'dual', 'audio'];
+        const parts = normalized.split(' ');
         let firstMetaIndex = -1;
         for (let i = 1; i < parts.length; i++) { // Start from 1 to avoid matching if title itself is a keyword
             if (keywords.includes(parts[i].toLowerCase())) {
@@ -313,11 +313,6 @@ function parseFilename(filename) {
         .replace(/[^a-z0-9\s]/g, ' ')   // remove all non-alphanumeric chars, replacing with a space
         .replace(/\s+/g, ' ')           // collapse multiple spaces into one
         .trim();
-
-    // If the cleaning process results in an empty string, return an empty title.
-    if (!movieName) {
-        return { movieName: '', year, languages: [], quality: null, size: null, season: null, episode: null };
-    }
 
     // --- Step 4: Parse quality and languages from the whole normalized string
     const lowerNormalized = normalized.toLowerCase();
@@ -354,7 +349,7 @@ function parseFilename(filename) {
         'german': 'German', 'ger': 'German', 'de': 'German', 'ge': 'German',
         'italian': 'Italian', 'ita': 'Italian', 'it': 'Italian',
         'russian': 'Russian', 'rus': 'Russian', 'ru': 'Russian',
-        'japanese': 'Japanese', 'jpn': 'Japanese', 'ja': 'Japanese', 'jp': 'Japanese',
+        'japanese': 'Japanese', 'jap': 'Japanese', 'jpn': 'Japanese', 'ja': 'Japanese', 'jp': 'Japanese',
         'korean': 'Korean', 'kor': 'Korean', 'ko': 'Korean', 'kr': 'Korean',
         'chinese': 'Chinese', 'chi': 'Chinese', 'zh': 'Chinese', 'cn': 'Chinese',
         'arabic': 'Arabic', 'ara': 'Arabic', 'ar': 'Arabic',
@@ -978,7 +973,7 @@ router.get('/support-tickets', getUserId, requireAdmin, async (req, res) => {
 
 router.post('/support-tickets', verifyTurnstile, async (req, res) => {
     try {
-        const { subject, contentTitle, message } = req.body;
+        const { subject, contentTitle, message, tmdbId, type } = req.body;
         const userId = req.headers['x-user-id']; // Optional
         let username = 'Guest';
 
@@ -999,15 +994,31 @@ router.post('/support-tickets', verifyTurnstile, async (req, res) => {
         
         await newTicket.save();
 
-        if (subject === 'Link Suggestion' && userId) {
+        // If the ticket is a link suggestion from a logged-in user and targets existing content,
+        // automatically add the link to the database for admin review.
+        if (subject === 'Link Suggestion' && userId && tmdbId && type) {
             const user = await User.findById(userId);
-            if (user) {
-                const updatedLinks = [{ label: 'Pending Review', url: message, suggestedBy: user.username }];
-                await StoredMovie.findOneAndUpdate(
-                    { tmdb_id: req.body.tmdbId, type: req.body.type },
-                    { $push: { download_links: { $each: updatedLinks } } },
-                    { upsert: false } // Don't create if not found, admin must add movie first
-                );
+            const movieToUpdate = await StoredMovie.findOne({ tmdb_id: tmdbId, type: type });
+
+            if (user && movieToUpdate) {
+                // Correctly parse the label and URL from the message body
+                const labelMatch = message.match(/Label: (.*)/);
+                const urlMatch = message.match(/URL: (.*)/);
+
+                if (labelMatch && labelMatch[1] && urlMatch && urlMatch[1]) {
+                    const label = labelMatch[1].trim();
+                    const url = urlMatch[1].trim();
+                    
+                    // To avoid duplicates, check if a link with the exact same URL already exists
+                    const linkExists = movieToUpdate.download_links.some(link => link.url === url);
+
+                    if (!linkExists) {
+                        // Add a prefix to the label to indicate it's a user suggestion needing review
+                        const newLink = { label: `[SUGGESTED] ${label}`, url, suggestedBy: user.username };
+                        movieToUpdate.download_links.push(newLink);
+                        await movieToUpdate.save();
+                    }
+                }
             }
         }
         

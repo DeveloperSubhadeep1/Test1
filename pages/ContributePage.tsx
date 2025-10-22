@@ -53,6 +53,8 @@ const ContributePage: React.FC = () => {
         subject: 'Link Suggestion',
         contentTitle,
         message: `Label: ${linkLabel}\nURL: ${linkUrl}`,
+        tmdbId,
+        type,
       }, turnstileToken);
       
       addToast('Thank you for your contribution! The link has been submitted for approval.', 'success');
