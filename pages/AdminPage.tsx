@@ -425,6 +425,7 @@ const ContentManagementTab: React.FC = () => {
     const [confirmDelete, setConfirmDelete] = useState<StoredMovie | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const debouncedSearch = useDebounce(searchQuery, 300);
+    const [searchParams] = useSearchParams();
 
     const { addToast } = useToast();
     const { fetchNotifications } = useContext(NotificationsContext);
@@ -443,12 +444,11 @@ const ContentManagementTab: React.FC = () => {
     }, [addToast]);
 
     useEffect(() => {
-        const [query] = useSearchParams();
-        const prefillSearch = query.get('search');
+        const prefillSearch = searchParams.get('search');
         if(prefillSearch) {
             setSearchQuery(prefillSearch);
         }
-    }, [useSearchParams]);
+    }, [searchParams]);
     
     useEffect(fetchMovies, [fetchMovies]);
 
