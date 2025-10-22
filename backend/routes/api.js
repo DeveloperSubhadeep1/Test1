@@ -385,7 +385,15 @@ router.post('/utils/parse-url', async (req, res) => {
         // Fetch file size via HEAD request, falling back to parsed size
         let finalSize = parsedInfo.size;
         try {
-            const headRes = await fetch(url, { method: 'HEAD', timeout: 4000 }); // 4 second timeout
+            // Increased timeout to 8 seconds to handle redirects more reliably.
+            // Added a standard User-Agent header as some servers may block requests without it.
+            const headRes = await fetch(url, {
+                method: 'HEAD',
+                timeout: 8000, // 8 seconds
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                }
+            });
             if (headRes.ok) {
                 const contentLength = headRes.headers.get('content-length');
                 if (contentLength) {
