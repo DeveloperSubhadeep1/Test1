@@ -204,6 +204,13 @@ const CHANNEL_NAMES_FOR_REGEX = RAW_CHANNEL_NAMES.map(name =>
 );
 const FULL_BLOCKLIST_REGEX = new RegExp(`(${CHANNEL_NAMES_FOR_REGEX.join('|')})`, 'gi');
 
+// A list of generic "bad words" to strip from titles after initial parsing.
+const GENERIC_BAD_WORDS_LIST = [
+    'pro', 'encode', 'mix', 'plus', 'xpress', 'fast', 'daily', 'trending', 'top', 'new', 'fresh', 'exclusive', 'premium', 'vip', 'mod', 'reel', 'max', 'ultra', 'lite', 'mini', 'zone', 'spot', 'core', 'pack', 'verse', 'area', 'hub', 'official', 'updates', 'store', 'world', 'team', 'club', 'group', 'network', 'channel', 'factory', 'house', 'planet', 'space', 'galaxy', 'nation', 'empire', 'studio', 'vault', 'arena', 'community', 'corner', 'center', 'market', 'bazaar', 'tg', 'telegram', 'tgbot', 'tgbots', 'tgram', 'tlgram', 'tlgrm', 'tlgrmbot', 'hellking', 'cinebot', 'moviebot', 'filmhubbot', 'flixbot', 'autofilter', 'autobot', 'filebot', 'mediahub'
+];
+const GENERIC_BAD_WORDS = [...new Set(GENERIC_BAD_WORDS_LIST)]; // Ensure unique words
+const BAD_WORDS_REGEX = new RegExp(`\\b(${GENERIC_BAD_WORDS.join('|')})\\b`, 'gi');
+
 
 function parseFilename(filename) {
     // --- Step 1: Extract size BEFORE normalization, as normalization can break the format (e.g., "1.23 GB").
@@ -295,6 +302,9 @@ function parseFilename(filename) {
         }
     }
     
+    // --- NEW Step: Clean bad words from the extracted movie name
+    movieName = movieName.replace(BAD_WORDS_REGEX, '').replace(/\s+/g, ' ').trim();
+
     if (!movieName.trim()) {
       throw new Error("Could not extract a valid title from the filename. The name may only contain channel tags or release info.");
     }

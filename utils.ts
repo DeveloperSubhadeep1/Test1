@@ -31,6 +31,13 @@ const CHANNEL_NAMES_FOR_REGEX = RAW_CHANNEL_NAMES.map(name =>
 );
 const FULL_BLOCKLIST_REGEX = new RegExp(`(${CHANNEL_NAMES_FOR_REGEX.join('|')})`, 'gi');
 
+// A list of generic "bad words" to strip from titles after initial parsing.
+const GENERIC_BAD_WORDS_LIST = [
+    'pro', 'encode', 'mix', 'plus', 'xpress', 'fast', 'daily', 'trending', 'top', 'new', 'fresh', 'exclusive', 'premium', 'vip', 'mod', 'reel', 'max', 'ultra', 'lite', 'mini', 'zone', 'spot', 'core', 'pack', 'verse', 'area', 'hub', 'official', 'updates', 'store', 'world', 'team', 'club', 'group', 'network', 'channel', 'factory', 'house', 'planet', 'space', 'galaxy', 'nation', 'empire', 'studio', 'vault', 'arena', 'community', 'corner', 'center', 'market', 'bazaar', 'tg', 'telegram', 'tgbot', 'tgbots', 'tgram', 'tlgram', 'tlgrm', 'tlgrmbot', 'hellking', 'cinebot', 'moviebot', 'filmhubbot', 'flixbot', 'autofilter', 'autobot', 'filebot', 'mediahub',"tg", "t.me", "telegram", "telegrm", "telegran", "tele", "tlgrm", "tlg", "tlgm", "tlggrm", "tgram", "tlgchannel", "tlgmovies", "tlggroup", "channel", "chanel", "chnl", "grp", "group", "team", "official", "admin", "join", "follow", "subs", "subscribe", "update", "updates", "upload", "uploader", "uploaded", "by", "from", "movieverse", "filmyworld", "filmyzilla", "filmywap", "filmyhit", "filmymeet", "bolly4u", "bollyflix", "moviesverse", "moviesflix", "movieshub", "moviesadda", "moviesmod", "mlwbd", "katmovie", "katmovies", "extramovies", "vegamovies", "coolmoviez", "hdhub", "hdhub4u", "cine", "cinehub", "cineverse", "cineprime", "cineadda", "cineworld", "cinemaz", "cinemahub", "cineclub", "desiflix", "desimovies", "movierulz", "movieadda", "movieflix", "moviehub", "skymovies", "9xmovies", "world4ufree", "world4u", "primeflix", "primehub", "movieking", "king", "hellking", "hell_king", "hdprint", "movierip", "cinezone", "flix", "flixhub", "com", "in", "net", "org", "xyz", "site", "web", "dot", "https", "http", "www", "link", "url", "reupload", "repack", "rip", "hdrip", "webdl", "web-dl", "webhd", "dvdrip", "bluray", "bdrip", "x264", "x265", "hevc", "encode", "encoded", "enc", "compressed", "compressedby", "uploadedby", "insta", "instagram", "yt", "youtube", "fb", "facebook", "twitter", "followus", "dm", "msg", "pm", "comment", "free", "download", "dl", "on", "at", "new", "exclusive", "release", "orgnl", "official", "premium", "latest", "fastdl", "mirror", "short", "shorts", "ads", "bot", "bott", "uploadbot", "post", "posted", "share", "shared", "reshare", "uploadedon", "uploadedto"
+];
+const GENERIC_BAD_WORDS = [...new Set(GENERIC_BAD_WORDS_LIST)]; // Ensure unique words
+const BAD_WORDS_REGEX = new RegExp(`\\b(${GENERIC_BAD_WORDS.join('|')})\\b`, 'gi');
+
 
 /**
  * A robust, shared function to parse metadata from a filename string.
@@ -124,6 +131,13 @@ function coreFilenameParser(filename: string): { moviename: string; year: string
         } else {
             moviename = normalized; // Assume the whole thing is the title
         }
+    }
+
+    // --- NEW Step: Clean bad words from the extracted movie name
+    moviename = moviename.replace(BAD_WORDS_REGEX, '').replace(/\s+/g, ' ').trim();
+
+    if (!moviename) {
+        throw new Error("Could not extract a valid title from the filename. The name may only contain channel tags or release info.");
     }
 
     // --- Step 4: Parse quality and languages from the whole normalized string
