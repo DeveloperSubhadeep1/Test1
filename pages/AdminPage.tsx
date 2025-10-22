@@ -626,7 +626,7 @@ const ContentModal: React.FC<ContentModalProps> = ({ movie, onClose, onSave }) =
     const [formData, setFormData] = useState<ContentFormData>(
         movie 
         ? { tmdb_id: movie.tmdb_id, type: movie.type, title: movie.title, download_links: movie.download_links } 
-        : { tmdb_id: 0, type: 'movie', title: '', download_links: [] }
+        : { tmdb_id: 0, type: 'movie', title: '', download_links: [{ label: '', url: '' }] }
     );
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -793,11 +793,11 @@ const ContentModal: React.FC<ContentModalProps> = ({ movie, onClose, onSave }) =
                         )}
                         
                         <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
-                            <div className="sm:col-span-2">
+                            <div className="sm:col-span-3">
                                 <label className="block text-sm font-medium text-muted mb-1">TMDB ID</label>
                                 <input type="text" value={formData.tmdb_id || ''} className={inputClass} disabled />
                             </div>
-                            <div className="sm:col-span-3">
+                            <div className="sm:col-span-2">
                                 <label className="block text-sm font-medium text-muted mb-1">Type</label>
                                 <input type="text" value={formData.type} className={inputClass} disabled />
                             </div>
@@ -830,7 +830,7 @@ const ContentModal: React.FC<ContentModalProps> = ({ movie, onClose, onSave }) =
                                         <button 
                                             type="button" 
                                             onClick={() => handleAutomateLink(index)} 
-                                            className="px-3 py-2 text-sm bg-purple rounded-md text-white hover:brightness-125 disabled:opacity-50 h-full"
+                                            className="text-sm font-semibold text-cyan hover:brightness-125 disabled:opacity-50 disabled:cursor-not-allowed"
                                             disabled={automatingIndex === index}
                                             title="Auto-generate label from URL"
                                         >
