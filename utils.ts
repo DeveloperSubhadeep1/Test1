@@ -139,8 +139,12 @@ function coreFilenameParser(filename: string): { moviename: string; year: string
         }
     }
 
-    // --- NEW Step: Clean bad words from the extracted movie name
-    moviename = moviename.replace(BAD_WORDS_REGEX, '').replace(/\s+/g, ' ').trim();
+    // --- Final cleaning of the extracted title
+    moviename = moviename
+        .replace(BAD_WORDS_REGEX, '')      // remove common spammy words
+        .replace(/[^a-z0-9\s]/g, ' ')   // remove all non-alphanumeric chars, replacing with a space
+        .replace(/\s+/g, ' ')           // collapse multiple spaces into one
+        .trim();
 
     if (!moviename) {
         throw new Error("Could not extract a valid title from the filename. The name may only contain channel tags or release info.");
