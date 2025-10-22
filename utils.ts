@@ -146,10 +146,6 @@ function coreFilenameParser(filename: string): { moviename: string; year: string
         .replace(/\s+/g, ' ')           // collapse multiple spaces into one
         .trim();
 
-    if (!moviename) {
-        throw new Error("Could not extract a valid title from the filename. The name may only contain channel tags or release info.");
-    }
-
     // --- Step 4: Parse quality and languages from the whole normalized string
     const lowerNormalized = normalized.toLowerCase();
     
