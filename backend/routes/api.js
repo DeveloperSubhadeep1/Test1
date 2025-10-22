@@ -1060,16 +1060,23 @@ router.get('/metrics', getUserId, requireAdmin, async (req, res) => {
 router.get('/db-stats', getUserId, requireAdmin, async (req, res) => {
     try {
         const stats = await mongoose.connection.db.stats();
-        const dataSize = stats.storageSize;
-        const indexSize = stats.totalIndexSize;
-        const totalDiskSize = stats.totalSize; // This is typically storageSize + indexSize + some overhead
+        const dataSize = stats.dataSize;
+        const indexSize = stats.indexSize;
+        const totalDiskSize = stats.totalSize;
         const totalBytes = 512 * 1024 * 1024; // 512 MB
 
         const dbName = mongoose.connection.name;
         const clientUrl = new URL(mongoose.connection.client.s.url);
         const clusterHost = clientUrl.hostname;
 
-        res.json({ dataSize, indexSize, totalDiskSize, totalBytes, dbName, clusterHost });
+        res.json({ 
+            dataSize: dataSize || 0, 
+            indexSize: indexSize || 0, 
+            totalDiskSize: totalDiskSize || 0, 
+            totalBytes, 
+            dbName, 
+            clusterHost 
+        });
     } catch (error) {
         console.error("Error fetching DB stats:", error);
         res.status(500).json({ message: 'Server error fetching DB stats.' });

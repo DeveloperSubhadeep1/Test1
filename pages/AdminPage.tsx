@@ -1063,6 +1063,11 @@ const DatabaseTab: React.FC = () => {
   const visualPercent = (totalUsedPercent > 0 && totalUsedPercent < 1) ? 1 : totalUsedPercent;
 
   const formatSize = (bytes: number) => {
+    // FIX: Add a robust check to handle cases where 'bytes' might be undefined, null, or NaN.
+    // This prevents the entire component from crashing and displaying "NaN".
+    if (typeof bytes !== 'number' || !isFinite(bytes) || bytes < 0) {
+        return '0 Bytes';
+    }
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
