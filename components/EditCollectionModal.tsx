@@ -42,8 +42,8 @@ const EditCollectionModal: React.FC<EditCollectionModalProps> = ({ collection, o
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-      <div className="glass-panel rounded-lg shadow-xl w-full max-w-md border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex justify-center p-4 animate-fade-in overflow-y-auto" onClick={onClose}>
+      <div className="glass-panel rounded-xl shadow-xl w-full max-w-md border-cyan mt-32 mb-8 md:mt-[55px] md:mb-84" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
         <form onSubmit={handleSubmit}>
           <div className="p-5 border-b border-glass-border flex justify-between items-center">
             <h3 className="text-lg font-bold text-white">Edit Collection</h3>

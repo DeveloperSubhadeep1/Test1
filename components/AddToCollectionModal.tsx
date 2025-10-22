@@ -49,8 +49,8 @@ const AddToCollectionModal: React.FC<AddToCollectionModalProps> = ({ item, onClo
   const itemTitle = 'title' in item ? item.title : item.name;
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-      <div className="glass-panel rounded-lg shadow-xl w-full max-w-md border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex justify-center p-4 animate-fade-in overflow-y-auto" onClick={onClose}>
+      <div className="glass-panel rounded-xl shadow-xl w-full max-w-md border-cyan mt-32 mb-8 md:mt-[55px] md:mb-84" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
         <div className="p-5 border-b border-glass-border flex justify-between items-center">
           <h3 className="text-lg font-bold text-white">Add "{itemTitle}" to a collection</h3>
           <button onClick={onClose} className="group p-1 rounded-full hover:bg-white/10 transition-colors">

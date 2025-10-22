@@ -197,7 +197,7 @@ const ContentModal: React.FC<ContentModalProps> = ({ movie, onClose, onSave }) =
     const inputClass = "w-full bg-secondary border border-glass-border rounded-md p-2 text-sm text-white focus:ring-2 focus:ring-cyan focus:outline-none";
     
     return (
-        <div className="glass-panel rounded-lg shadow-xl w-full max-w-3xl border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
+        <div className="glass-panel rounded-xl shadow-xl w-full max-w-3xl border-cyan mt-32 mb-8 md:mt-[55px] md:mb-84" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
             <form onSubmit={handleSubmit}>
                 <div className="p-5 border-b border-glass-border flex justify-between items-center">
                     <h3 className="text-lg font-bold text-white">{isNew ? 'Add New Content' : `Editing "${formData.title}"`}</h3>
