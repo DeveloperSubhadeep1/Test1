@@ -1060,9 +1060,9 @@ router.get('/metrics', getUserId, requireAdmin, async (req, res) => {
 router.get('/db-stats', getUserId, requireAdmin, async (req, res) => {
     try {
         const stats = await mongoose.connection.db.stats();
-        const dataSize = stats.dataSize;
-        const indexSize = stats.indexSize;
-        const totalDiskSize = stats.totalSize;
+        const dataSize = stats.dataSize || 0;
+        const indexSize = stats.indexSize || 0;
+        const totalDiskSize = dataSize + indexSize;
         const totalBytes = 512 * 1024 * 1024; // 512 MB
 
         const dbName = mongoose.connection.name;
@@ -1070,9 +1070,9 @@ router.get('/db-stats', getUserId, requireAdmin, async (req, res) => {
         const clusterHost = clientUrl.hostname;
 
         res.json({ 
-            dataSize: dataSize || 0, 
-            indexSize: indexSize || 0, 
-            totalDiskSize: totalDiskSize || 0, 
+            dataSize,
+            indexSize,
+            totalDiskSize,
             totalBytes, 
             dbName, 
             clusterHost 
