@@ -1050,11 +1050,15 @@ const DatabaseTab: React.FC = () => {
   if (loading) return <DatabaseSkeleton />;
   if (!dbStats) return <p className="text-center text-muted">Could not load database statistics.</p>;
   
-  const usedPercent = dbStats ? (dbStats.usedBytes / dbStats.totalBytes) * 100 : 0;
-  // To prevent the progress ring from being just a dot, set a minimum visual percentage.
-  // This ensures that even for very small usage, a small arc is visible.
-  const visualPercent = usedPercent > 0 && usedPercent < 1.5 ? 1.5 : usedPercent;
-  const displayPercent = usedPercent > 0 && usedPercent < 0.1 ? '< 0.1' : usedPercent.toFixed(1);
+  const usedPercent = dbStats.totalBytes > 0 ? (dbStats.usedBytes / dbStats.totalBytes) * 100 : 0;
+
+  // Round to 2 decimal places for better precision, falling back to '< 0.01' for tiny values.
+  const percentWithPrecision = parseFloat(usedPercent.toFixed(2));
+  const displayPercent = (usedPercent > 0 && percentWithPrecision === 0) ? '< 0.01' : percentWithPrecision.toFixed(2);
+  
+  // To prevent the progress ring from looking like a 'dot' for small values,
+  // we set a minimum visual size for the arc. This is a small compromise for better visual clarity.
+  const visualPercent = (usedPercent > 0 && usedPercent < 1) ? 1 : usedPercent;
 
   const formatSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
