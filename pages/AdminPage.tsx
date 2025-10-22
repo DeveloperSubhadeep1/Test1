@@ -1098,6 +1098,13 @@ const DatabaseTab: React.FC = () => {
         <p className="text-white font-semibold mt-4">
             {formatSize(dbStats.usedBytes)} / {formatSize(dbStats.totalBytes)}
         </p>
+        {dbStats.clusterHost && (
+            <div className="text-center mt-6 pt-4 border-t border-glass-border w-full max-w-sm">
+                <p className="text-xs text-muted uppercase tracking-wider">Connected To</p>
+                <p className="font-mono text-sm text-cyan break-all">{dbStats.clusterHost}</p>
+                {dbStats.dbName && <p className="text-xs text-muted">Database: <span className="font-semibold text-gray-300">{dbStats.dbName}</span></p>}
+            </div>
+        )}
     </div>
   );
 };

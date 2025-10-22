@@ -99,6 +99,8 @@ export interface Metrics {
 export interface DbStats {
     usedBytes: number;
     totalBytes: number;
+    dbName?: string;
+    clusterHost?: string;
 }
 
 export interface CastMember {

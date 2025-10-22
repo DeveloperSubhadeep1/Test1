@@ -93,7 +93,7 @@ Now, let's get your server live. We recommend the UI-based method for simplicity
     *   Scroll down to the "Environment variables" section.
     *   Click **"Add Variable"** and select **"Secret"** for each of the following. Secrets are encrypted and not visible after creation.
     *   **Name:** `MONGODB_URI`
-        *   **Value:** `mongodb+srv://hellking2:hellking2@cluster0.u3ibvlt.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`
+        *   **Value:** `mongodb+srv://movie:movie@cluster0.bcaisdq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`
     *   **Name:** `EMAIL_USER`
         *   **Value:** `cinestream2006@gmail.com`
     *   **Name:** `EMAIL_PASS`
