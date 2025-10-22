@@ -15,9 +15,9 @@ import {
   searchTMDB,
   apiTestEmail,
   getDbStats,
-  // FIX: Imported missing functions from the api service.
   apiParseUrl,
   searchContentByType,
+  getDetails, // Import getDetails for direct fetching
 } from '../services/api';
 import {
   Metrics,
@@ -602,6 +602,18 @@ const ContentManagementTab: React.FC = () => {
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Content Modal
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+interface LinkFormData {
+    url: string;
+    quality: string;
+    languages: string;
+    size: string;
+    customLabel: string;
+}
+
+interface StoredMovieFormData extends Omit<StoredMovie, 'download_links'> {
+    download_links: LinkFormData[];
+}
+
 interface ContentModalProps {
     movie: StoredMovie | null;
     onClose: () => void;
@@ -609,128 +621,156 @@ interface ContentModalProps {
 }
 
 const ContentModal: React.FC<ContentModalProps> = ({ movie, onClose, onSave }) => {
-    const [formData, setFormData] = useState<StoredMovie>(
-        movie || { _id: '', tmdb_id: 0, type: 'movie', title: '', download_links: [], download_count: 0 }
+    const emptyFormData: StoredMovieFormData = {
+        _id: '', tmdb_id: 0, type: 'movie', title: '', download_count: 0,
+        download_links: []
+    };
+    
+    const convertStoredLinksToFormLinks = (links: DownloadLink[]): LinkFormData[] => {
+        return links.map(link => ({
+            url: link.url,
+            // Simple reverse-engineering of the label. This won't be perfect.
+            quality: link.label.match(/\b(4K|2160p|1080p|720p|480p|WEB-DL|BluRay)\b/i)?.[0] || '',
+            languages: link.label, // Fallback to full label
+            size: link.label.match(/\[(.*?)\]/)?.[1] || '',
+            customLabel: link.label,
+        }));
+    };
+    
+    const [formData, setFormData] = useState<StoredMovieFormData>(
+        movie ? { ...movie, download_links: convertStoredLinksToFormLinks(movie.download_links) } : emptyFormData
     );
+    
     const [isNew, setIsNew] = useState(!movie);
-    const [tmdbSearchResults, setTmdbSearchResults] = useState<TMDBSearchResult[]>([]);
-    const [tmdbSearchQuery, setTmdbSearchQuery] = useState('');
-    const debouncedTmdbSearch = useDebounce(tmdbSearchQuery, 300);
-    const [isAutomating, setIsAutomating] = useState(false);
+    
+    const [tmdbSearchResults, setTmdbSearchResults] = useState<(TMDBSearchResult & { poster_path: string })[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+
+    // Search States
     const [urlForAutomate, setUrlForAutomate] = useState('');
+    const [isAutomating, setIsAutomating] = useState(false);
+
+    const [manualSearch, setManualSearch] = useState({ title: '', year: '', type: 'all' as 'all' | 'movie' | 'tv' });
+
+    const [directId, setDirectId] = useState({ id: '', type: 'movie' as ContentType });
+    const [isFetchingDirect, setIsFetchingDirect] = useState(false);
+    
     const { addToast } = useToast();
 
-    useEffect(() => {
-        const search = async () => {
-            if (debouncedTmdbSearch.trim().length > 1 && isNew) {
-                try {
-                    const res = await searchTMDB(debouncedTmdbSearch);
-                    setTmdbSearchResults(res.results.slice(0, 5));
-                } catch {
-                    addToast('Failed to search TMDB.', 'error');
-                }
-            } else {
-                setTmdbSearchResults([]);
-            }
-        };
-        search();
-    }, [debouncedTmdbSearch, isNew, addToast]);
+    const handleSelectContent = (result: (TMDBSearchResult | MovieSummary | TVSummary) & { media_type?: ContentType }) => {
+        const type = result.media_type || ('title' in result ? 'movie' : 'tv');
+        const title = 'title' in result ? result.title : result.name;
 
+        setFormData(prev => ({
+            ...prev,
+            tmdb_id: result.id,
+            title: title,
+            type: type,
+        }));
+        
+        setTmdbSearchResults([]);
+    };
+    
     const handleAutomate = async () => {
-        if (!urlForAutomate.trim()) {
-            addToast('Please paste a URL to automate.', 'error');
-            return;
-        }
+        if (!urlForAutomate.trim()) { addToast('Please paste a URL.', 'error'); return; }
         setIsAutomating(true);
         try {
             const parsedData = await apiParseUrl(urlForAutomate);
             const searchType = parsedData.season === null ? 'movie' : 'tv';
-            const { results } = await searchContentByType(parsedData.movieName, searchType, parsedData.year);
+            const { results } = await searchContentByType(parsedData.movieName, searchType, parsedData.year || undefined);
 
             if (results.length > 0) {
-                const bestMatch = results[0];
+                handleSelectContent(results[0] as TMDBSearchResult);
                 
-                const newLink: DownloadLink = {
-                    label: generateLinkLabel(parsedData),
+                const newLink: LinkFormData = {
                     url: urlForAutomate,
+                    quality: parsedData.quality || '',
+                    languages: parsedData.languages.join(', '),
+                    size: parsedData.size || '',
+                    customLabel: ''
                 };
-
-                // FIX: Refactored to be type-safe and avoid a state update race condition.
-                // This logic now correctly identifies the content type from the search and
-                // combines all state updates into a single `setFormData` call.
-                if (searchType === 'movie') {
-                    const match = bestMatch as MovieSummary;
-                    setFormData(prev => ({
-                        ...prev,
-                        tmdb_id: match.id,
-                        title: match.title,
-                        type: 'movie',
-                        download_links: [newLink],
-                    }));
-                } else {
-                    const match = bestMatch as TVSummary;
-                    setFormData(prev => ({
-                        ...prev,
-                        tmdb_id: match.id,
-                        title: match.name,
-                        type: 'tv',
-                        download_links: [newLink],
-                    }));
-                }
                 
-                setTmdbSearchQuery('');
-                setTmdbSearchResults([]);
-                addToast('Automation successful!', 'success');
+                setFormData(prev => ({ ...prev, download_links: [newLink] }));
+                addToast('Automation successful! Content selected and link pre-filled.', 'success');
             } else {
                 addToast(`Could not find a match on TMDB for "${parsedData.movieName}". Please search manually.`, 'error');
             }
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'An unexpected error occurred during automation.';
-            addToast(message, 'error');
+            addToast(error instanceof Error ? error.message : 'Automation failed.', 'error');
         } finally {
             setIsAutomating(false);
         }
     };
     
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+    const handleManualSearch = async () => {
+        if (!manualSearch.title.trim()) { addToast('Please enter a title to search.', 'error'); return; }
+        setIsSearching(true);
+        try {
+            const res = await searchTMDB(manualSearch.title);
+            let results = res.results.filter(r => r.poster_path);
+            if (manualSearch.type !== 'all') {
+                results = results.filter(r => r.media_type === manualSearch.type);
+            }
+            setTmdbSearchResults(results as any);
+        } catch {
+            addToast('Failed to search TMDB.', 'error');
+        } finally {
+            setIsSearching(false);
+        }
     };
 
-    const handleLinkChange = (index: number, field: keyof DownloadLink, value: string) => {
+    const handleDirectFetch = async () => {
+        if (!directId.id.trim()) { addToast('Please enter a TMDB ID.', 'error'); return; }
+        setIsFetchingDirect(true);
+        try {
+            const id = parseInt(directId.id, 10);
+            if (isNaN(id)) { addToast('Invalid ID format.', 'error'); return; }
+            const details = await getDetails(directId.type, id);
+            handleSelectContent({ ...details, media_type: directId.type });
+            addToast('Details fetched successfully!', 'success');
+        } catch {
+            addToast('Could not fetch details for this ID and Type.', 'error');
+        } finally {
+            setIsFetchingDirect(false);
+        }
+    };
+
+    const handleLinkChange = (index: number, field: keyof LinkFormData, value: string) => {
         const newLinks = [...formData.download_links];
         newLinks[index] = { ...newLinks[index], [field]: value };
         setFormData(prev => ({ ...prev, download_links: newLinks }));
     };
 
     const addLink = () => {
-        setFormData(prev => ({ ...prev, download_links: [...prev.download_links, { label: '', url: '' }] }));
+        setFormData(prev => ({ ...prev, download_links: [...prev.download_links, { url: '', quality: '', languages: '', size: '', customLabel: '' }] }));
     };
 
     const removeLink = (index: number) => {
-        const newLinks = formData.download_links.filter((_, i) => i !== index);
-        setFormData(prev => ({ ...prev, download_links: newLinks }));
+        setFormData(prev => ({ ...prev, download_links: prev.download_links.filter((_, i) => i !== index) }));
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (formData.tmdb_id === 0 || !formData.title) {
-            addToast('Please select a movie or TV show from TMDB.', 'error');
+            addToast('Please select a movie or TV show.', 'error');
             return;
         }
-        onSave(formData, isNew);
-        onClose();
-    };
 
-    const handleSelectTmdbResult = (result: TMDBSearchResult) => {
-        setFormData(prev => ({
-            ...prev,
-            tmdb_id: result.id,
-            title: result.media_type === 'movie' ? (result as MovieSummary).title : (result as TVSummary).name,
-            type: result.media_type,
-        }));
-        setTmdbSearchQuery('');
-        setTmdbSearchResults([]);
+        const finalLinks = formData.download_links.map(link => {
+            const generatedLabel = [link.quality, `(${link.languages})`, link.size ? `[${link.size}]` : ''].filter(Boolean).join(' ').trim();
+            return {
+                label: link.customLabel.trim() || generatedLabel || link.url,
+                url: link.url
+            };
+        });
+
+        const finalMovieData: StoredMovie = {
+            ...formData,
+            download_links: finalLinks,
+        };
+        
+        onSave(finalMovieData, isNew);
+        onClose();
     };
     
     const resetSelection = () => {
@@ -741,120 +781,136 @@ const ContentModal: React.FC<ContentModalProps> = ({ movie, onClose, onSave }) =
         }));
     };
     
-    const renderTmdbSelection = () => {
-        if (formData.tmdb_id && formData.title) {
-            return (
-                <div className="flex items-center justify-between p-2 bg-secondary rounded-lg">
-                    <p className="font-semibold text-white">Selected: <span className="text-cyan">{formData.title}</span></p>
-                    <button type="button" onClick={resetSelection} className="p-1 text-muted hover:text-white">
-                        <XIcon className="h-4 w-4" />
-                    </button>
-                </div>
-            );
-        }
-        
-        return (
-            <div className="relative">
-                <input
-                    type="text"
-                    value={tmdbSearchQuery}
-                    onChange={e => setTmdbSearchQuery(e.target.value)}
-                    placeholder="Search TMDB for a movie or TV show..."
-                    className="w-full bg-secondary border border-glass-border rounded-md p-2 text-white placeholder-muted focus:outline-none focus:ring-2 focus:ring-cyan"
-                />
-                {tmdbSearchResults.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-secondary border border-glass-border rounded-lg shadow-lg">
-                        <ul>
-                            {tmdbSearchResults.map(result => {
-                                const title = result.media_type === 'movie' ? (result as MovieSummary).title : (result as TVSummary).name;
-                                const releaseDate = result.media_type === 'movie' ? (result as MovieSummary).release_date : (result as TVSummary).first_air_date;
-                                const year = releaseDate ? new Date(releaseDate).getFullYear() : 'N/A';
-                                return (
-                                <li key={result.id} onClick={() => handleSelectTmdbResult(result)} className="flex items-center gap-3 p-2 hover:bg-cyan/10 cursor-pointer">
-                                    <img src={`${TMDB_IMAGE_BASE_URL_SMALL}${result.poster_path}`} alt={title} className="w-8 h-12 rounded object-cover" />
-                                    <div className="min-w-0">
-                                        <p className="font-semibold text-white truncate">{title}</p>
-                                        <p className="text-sm text-muted">{year}</p>
-                                    </div>
-                                </li>
-                            )})}
-                        </ul>
-                    </div>
-                )}
-            </div>
-        );
-    };
-
     return (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-            <div className="glass-panel rounded-lg shadow-xl w-full max-w-2xl border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
+            <div className="glass-panel rounded-lg shadow-xl w-full max-w-3xl border-cyan" style={{boxShadow: '0 0 30px rgba(8, 217, 214, 0.4)'}} onClick={e => e.stopPropagation()}>
                 <form onSubmit={handleSubmit}>
                     <div className="p-5 border-b border-glass-border flex justify-between items-center">
                         <h3 className="text-lg font-bold text-white">{isNew ? 'Add New Content' : `Editing "${formData.title}"`}</h3>
                         <button onClick={onClose} type="button" className="p-1 rounded-full hover:bg-white/10"><XIcon className="h-5 w-5 text-muted" /></button>
                     </div>
                     
-                    <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-                        {isNew && (
-                            <>
-                                <div className="space-y-2">
+                    <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+                        <fieldset className="border border-glass-border p-4 rounded-md disabled:opacity-50" disabled={!isNew || !!formData.tmdb_id}>
+                            <legend className="px-2 text-sm font-semibold text-cyan">Step 1: Select Content</legend>
+                            <div className="space-y-4">
+                                <div>
                                     <label className="block text-sm font-medium text-muted">Automate from URL</label>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="url"
-                                            placeholder="Paste a download link to auto-fill details..."
-                                            value={urlForAutomate}
-                                            onChange={e => setUrlForAutomate(e.target.value)}
-                                            className="w-full bg-secondary border border-glass-border rounded-md p-2 text-white placeholder-muted focus:outline-none focus:ring-2 focus:ring-cyan"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={handleAutomate}
-                                            disabled={isAutomating}
-                                            className="w-32 flex-shrink-0 flex items-center justify-center gap-2 bg-purple text-white font-bold py-2 px-3 rounded-md hover:brightness-125 transition-all disabled:bg-muted"
-                                        >
+                                    <div className="flex gap-2 mt-1">
+                                        <input type="url" placeholder="Paste a download link to auto-fill..." value={urlForAutomate} onChange={e => setUrlForAutomate(e.target.value)} className="w-full bg-secondary border border-glass-border rounded-md p-2 text-sm text-white focus:ring-2 focus:ring-cyan" />
+                                        <button type="button" onClick={handleAutomate} disabled={isAutomating} className="w-32 flex-shrink-0 flex items-center justify-center gap-2 bg-purple text-white font-bold py-2 px-3 text-sm rounded-md hover:brightness-125 disabled:bg-muted">
                                             {isAutomating ? <SpinnerIcon className="animate-spin h-5 w-5" /> : 'Automate'}
                                         </button>
                                     </div>
                                 </div>
+
                                 <div className="text-center text-xs text-muted">OR</div>
-                                {renderTmdbSelection()}
-                            </>
-                        )}
-                        {!isNew && (
-                            <div className="space-y-2">
-                                <label className="block text-sm font-medium text-muted">TMDB ID</label>
-                                <input type="number" name="tmdb_id" value={formData.tmdb_id} onChange={handleInputChange} disabled className="w-full bg-secondary border-glass-border rounded-md p-2" />
+
+                                <div>
+                                    <label className="block text-sm font-medium text-muted">Search Manually</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-1">
+                                        <input type="text" placeholder="Title" value={manualSearch.title} onChange={e => setManualSearch({...manualSearch, title: e.target.value})} className="sm:col-span-2 w-full bg-secondary border border-glass-border rounded-md p-2 text-sm text-white focus:ring-2 focus:ring-cyan" />
+                                        <input type="text" placeholder="Year (Optional)" value={manualSearch.year} onChange={e => setManualSearch({...manualSearch, year: e.target.value})} className="w-full bg-secondary border border-glass-border rounded-md p-2 text-sm text-white focus:ring-2 focus:ring-cyan" />
+                                    </div>
+                                     <div className="flex items-center justify-between gap-2 mt-2">
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <label className="text-muted">Type:</label>
+                                            <input type="radio" id="type_all" name="type" value="all" checked={manualSearch.type === 'all'} onChange={() => setManualSearch({...manualSearch, type: 'all'})} className="hidden peer" />
+                                            <label htmlFor="type_all" className="px-2 py-0.5 rounded-full cursor-pointer peer-checked:bg-cyan peer-checked:text-primary bg-secondary">All</label>
+                                            <input type="radio" id="type_movie" name="type" value="movie" checked={manualSearch.type === 'movie'} onChange={() => setManualSearch({...manualSearch, type: 'movie'})} className="hidden peer" />
+                                            <label htmlFor="type_movie" className="px-2 py-0.5 rounded-full cursor-pointer peer-checked:bg-cyan peer-checked:text-primary bg-secondary">Movie</label>
+                                             <input type="radio" id="type_tv" name="type" value="tv" checked={manualSearch.type === 'tv'} onChange={() => setManualSearch({...manualSearch, type: 'tv'})} className="hidden peer" />
+                                            <label htmlFor="type_tv" className="px-2 py-0.5 rounded-full cursor-pointer peer-checked:bg-cyan peer-checked:text-primary bg-secondary">TV</label>
+                                        </div>
+                                        <button type="button" onClick={handleManualSearch} disabled={isSearching} className="w-32 flex items-center justify-center gap-2 bg-cyan text-primary font-bold py-2 px-3 text-sm rounded-md hover:brightness-125 disabled:bg-muted">
+                                            {isSearching ? <SpinnerIcon className="animate-spin h-5 w-5" /> : <><SearchIcon className="h-4 w-4"/> Search</>}
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div className="text-center text-xs text-muted">OR</div>
+                                
+                                 <div>
+                                    <label className="block text-sm font-medium text-muted">Fetch by Direct TMDB ID</label>
+                                    <div className="flex gap-2 mt-1">
+                                        <input type="text" placeholder="TMDB ID" value={directId.id} onChange={e => setDirectId({...directId, id: e.target.value})} className="w-full bg-secondary border border-glass-border rounded-md p-2 text-sm text-white focus:ring-2 focus:ring-cyan" />
+                                        <select value={directId.type} onChange={e => setDirectId({...directId, type: e.target.value as ContentType})} className="bg-secondary border border-glass-border rounded-md p-2 text-sm text-white focus:ring-2 focus:ring-cyan">
+                                            <option value="movie">Movie</option>
+                                            <option value="tv">TV</option>
+                                        </select>
+                                        <button type="button" onClick={handleDirectFetch} disabled={isFetchingDirect} className="w-32 flex-shrink-0 flex items-center justify-center gap-2 bg-cyan text-primary font-bold py-2 px-3 text-sm rounded-md hover:brightness-125 disabled:bg-muted">
+                                            {isFetchingDirect ? <SpinnerIcon className="animate-spin h-5 w-5" /> : 'Fetch'}
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
-                        )}
-                        
-                        <div>
-                            <h4 className="text-sm font-medium text-muted mb-2">Download Links</h4>
-                            <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-                                {formData.download_links.map((link, index) => (
-                                    <div key={index} className="flex items-center gap-2">
-                                        <input type="text" placeholder="Label (e.g., 1080p WEB-DL)" value={link.label} onChange={e => handleLinkChange(index, 'label', e.target.value)} className="w-1/3 bg-secondary border border-glass-border rounded-md p-2 text-sm" />
-                                        <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className="flex-grow bg-secondary border border-glass-border rounded-md p-2 text-sm" required/>
-                                        <button type="button" onClick={() => removeLink(index)} className="p-2 text-muted hover:text-danger"><TrashIcon className="h-4 w-4" /></button>
+                        </fieldset>
+
+                        {isNew && (formData.tmdb_id ? (
+                            <div className="flex items-center gap-3 p-2 bg-highlight/20 rounded-lg border border-highlight">
+                                <img src={`${TMDB_IMAGE_BASE_URL_SMALL}${tmdbSearchResults.find(r => r.id === formData.tmdb_id)?.poster_path || ''}`} alt="" className="w-10 h-14 rounded object-cover" />
+                                <div className="flex-grow min-w-0">
+                                    <p className="font-semibold text-white truncate">Selected: {formData.title}</p>
+                                    <p className="text-sm text-muted">{formData.type.toUpperCase()} / ID: {formData.tmdb_id}</p>
+                                </div>
+                                <button type="button" onClick={resetSelection} className="p-2 text-muted hover:text-white rounded-full"><XIcon className="h-5 w-5" /></button>
+                            </div>
+                        ) : tmdbSearchResults.length > 0 && (
+                             <div className="space-y-2 max-h-64 overflow-y-auto">
+                                {tmdbSearchResults.map(result => (
+                                    <div key={result.id} onClick={() => handleSelectContent(result)} className="flex items-center gap-3 p-2 hover:bg-cyan/10 cursor-pointer rounded-md">
+                                        <img src={`${TMDB_IMAGE_BASE_URL_SMALL}${result.poster_path}`} alt="" className="w-10 h-14 rounded object-cover" />
+                                        <div className="min-w-0">
+                                            <p className="font-semibold text-white truncate">{result.media_type === 'movie' ? (result as MovieSummary).title : (result as TVSummary).name}</p>
+                                            <p className="text-sm text-muted">{new Date(result.media_type === 'movie' ? (result as MovieSummary).release_date : (result as TVSummary).first_air_date).getFullYear() || 'N/A'}</p>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
-                             <button type="button" onClick={addLink} className="group mt-2 flex items-center gap-2 text-sm text-cyan font-semibold hover:brightness-125">
-                                <PlusCircleIcon className="h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
-                                <span>Add Link</span>
+                        ))}
+                        
+                        <fieldset className="border border-glass-border p-4 rounded-md disabled:opacity-50" disabled={!formData.tmdb_id}>
+                            <legend className="px-2 text-sm font-semibold text-cyan">Step 2: Add Download Links</legend>
+                             <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
+                                {formData.download_links.map((link, index) => (
+                                    <fieldset key={index} className="border border-glass-border p-3 rounded-md">
+                                        <legend className="px-2 text-xs text-muted">Link #{index + 1}</legend>
+                                        <div className="space-y-2">
+                                            <input type="url" placeholder="URL" value={link.url} onChange={e => handleLinkChange(index, 'url', e.target.value)} className="w-full bg-secondary border border-glass-border rounded-md p-2 text-sm text-white" required />
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                <select value={link.quality} onChange={e => handleLinkChange(index, 'quality', e.target.value)} className="w-full bg-secondary border border-glass-border rounded-md p-2 text-sm text-white">
+                                                    <option value="">Quality</option>
+                                                    <option>4K</option><option>2160p</option><option>1080p</option><option>720p</option><option>480p</option>
+                                                    <option>WEB-DL</option><option>BluRay</option><option>HDRip</option>
+                                                </select>
+                                                <input type="text" placeholder="Languages (e.g., Hindi, Eng)" value={link.languages} onChange={e => handleLinkChange(index, 'languages', e.target.value)} className="w-full bg-secondary border border-glass-border rounded-md p-2 text-sm text-white" />
+                                                <input type="text" placeholder="Size (e.g., 1.5GB)" value={link.size} onChange={e => handleLinkChange(index, 'size', e.target.value)} className="w-full bg-secondary border border-glass-border rounded-md p-2 text-sm text-white" />
+                                            </div>
+                                            <div className="relative">
+                                                <input type="text" placeholder="Custom Label (Optional)" value={link.customLabel} onChange={e => handleLinkChange(index, 'customLabel', e.target.value)} className="w-full bg-secondary border border-glass-border rounded-md p-2 text-sm text-white" />
+                                                <button type="button" onClick={() => removeLink(index)} className="absolute top-1/2 right-2 -translate-y-1/2 p-1 text-muted hover:text-danger"><TrashIcon className="h-4 w-4" /></button>
+                                            </div>
+                                        </div>
+                                    </fieldset>
+                                ))}
+                            </div>
+                             <button type="button" onClick={addLink} className="group mt-3 flex items-center gap-2 text-sm text-cyan font-semibold hover:brightness-125">
+                                <PlusCircleIcon className="h-5 w-5" />
+                                <span>Add Another Link</span>
                             </button>
-                        </div>
+                        </fieldset>
                     </div>
                     
                     <div className="bg-primary/50 px-6 py-4 flex justify-end gap-2 rounded-b-lg">
                         <button type="button" onClick={onClose} className="px-4 py-2 rounded-md bg-muted/50 text-white hover:bg-muted/70">Cancel</button>
-                        <button type="submit" className="px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125">Save</button>
+                        <button type="submit" className="px-4 py-2 rounded-md bg-cyan text-primary font-bold hover:brightness-125">Save Content</button>
                     </div>
                 </form>
             </div>
         </div>
     );
 };
+
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Users Tab
