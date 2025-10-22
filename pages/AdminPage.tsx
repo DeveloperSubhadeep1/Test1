@@ -568,11 +568,16 @@ const ContentManagementTab: React.FC = () => {
             {renderContent()}
 
             {(editingMovie || showAddModal) && (
-                <ContentModal
-                    movie={editingMovie}
-                    onClose={() => { setEditingMovie(null); setShowAddModal(false); }}
-                    onSave={handleSave}
-                />
+                <div 
+                    className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
+                    onClick={() => { setEditingMovie(null); setShowAddModal(false); }}
+                >
+                    <ContentModal
+                        movie={editingMovie}
+                        onClose={() => { setEditingMovie(null); setShowAddModal(false); }}
+                        onSave={handleSave}
+                    />
+                </div>
             )}
             {confirmDelete && (
                 <ConfirmationModal
