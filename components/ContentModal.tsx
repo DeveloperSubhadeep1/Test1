@@ -94,6 +94,15 @@ const ContentModal: React.FC<ContentModalProps> = ({ movie, onClose, onSave }) =
         setSearchResults([]);
     };
 
+    const handleClearContent = () => {
+        setFormData(prev => ({
+            ...prev,
+            tmdb_id: 0,
+            title: '',
+            type: 'movie', // Reset to a default
+        }));
+    };
+
     const handleLinkChange = (index: number, field: keyof LinkFormData, value: string) => {
         const newLinks = [...formData.download_links];
         newLinks[index] = { ...newLinks[index], [field]: value };
@@ -251,7 +260,18 @@ const ContentModal: React.FC<ContentModalProps> = ({ movie, onClose, onSave }) =
                     </div>
                     <div>
                          <label className="block text-sm font-medium text-muted mb-1">Title</label>
-                         <input type="text" value={formData.title} className={inputClass} disabled />
+                         <div className="flex items-center gap-2">
+                            <input type="text" value={formData.title} className={inputClass} disabled />
+                            {isNew && formData.tmdb_id > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={handleClearContent}
+                                    className="flex-shrink-0 text-sm text-cyan font-semibold hover:brightness-125"
+                                >
+                                    Change
+                                </button>
+                            )}
+                         </div>
                     </div>
                     
                     <div className="pt-4 border-t border-glass-border">
