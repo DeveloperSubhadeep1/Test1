@@ -50,6 +50,8 @@ import {
   DatabaseIcon,
   CheckCircleIcon,
   AlertTriangleIcon,
+  LayersIcon,
+  GridIcon,
 } from '../components/Icons';
 import { useDebounce } from '../hooks/useDebounce';
 import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
@@ -1050,15 +1052,15 @@ const DatabaseTab: React.FC = () => {
   if (loading) return <DatabaseSkeleton />;
   if (!dbStats) return <p className="text-center text-muted">Could not load database statistics.</p>;
   
-  const usedPercent = dbStats.totalBytes > 0 ? (dbStats.usedBytes / dbStats.totalBytes) * 100 : 0;
+  const totalUsedPercent = dbStats.totalBytes > 0 ? (dbStats.totalDiskSize / dbStats.totalBytes) * 100 : 0;
 
   // Round to 2 decimal places for better precision, falling back to '< 0.01' for tiny values.
-  const percentWithPrecision = parseFloat(usedPercent.toFixed(2));
-  const displayPercent = (usedPercent > 0 && percentWithPrecision === 0) ? '< 0.01' : percentWithPrecision.toFixed(2);
+  const percentWithPrecision = parseFloat(totalUsedPercent.toFixed(2));
+  const displayPercent = (totalUsedPercent > 0 && percentWithPrecision === 0) ? '< 0.01' : percentWithPrecision.toFixed(2);
   
   // To prevent the progress ring from looking like a 'dot' for small values,
   // we set a minimum visual size for the arc. This is a small compromise for better visual clarity.
-  const visualPercent = (usedPercent > 0 && usedPercent < 1) ? 1 : usedPercent;
+  const visualPercent = (totalUsedPercent > 0 && totalUsedPercent < 1) ? 1 : totalUsedPercent;
 
   const formatSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -1094,10 +1096,37 @@ const DatabaseTab: React.FC = () => {
         <p className="text-4xl font-bold text-white mt-2">
             {displayPercent}%
         </p>
-        <p className="text-muted text-lg">Used</p>
+        <p className="text-muted text-lg">Plan Usage</p>
         <p className="text-white font-semibold mt-4">
-            {formatSize(dbStats.usedBytes)} / {formatSize(dbStats.totalBytes)}
+            {formatSize(dbStats.totalDiskSize)} / {formatSize(dbStats.totalBytes)}
         </p>
+
+        <div className="mt-8 pt-6 border-t border-glass-border w-full max-w-md text-left space-y-3">
+            <h4 className="text-lg font-bold text-white text-center mb-4">Storage Breakdown</h4>
+            <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3 text-muted">
+                    <LayersIcon className="h-5 w-5" />
+                    <span>Storage Size (data)</span>
+                </div>
+                <span className="font-mono text-white">{formatSize(dbStats.dataSize)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3 text-muted">
+                    <GridIcon className="h-5 w-5" />
+                    <span>Index Size</span>
+                </div>
+                <span className="font-mono text-white">{formatSize(dbStats.indexSize)}</span>
+            </div>
+            <div className="border-t border-glass-border !my-3"></div>
+            <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3 text-muted font-bold">
+                    <DatabaseIcon className="h-5 w-5" />
+                    <span>Total Disk Usage</span>
+                </div>
+                <span className="font-mono text-white font-bold">{formatSize(dbStats.totalDiskSize)}</span>
+            </div>
+        </div>
+
         {dbStats.clusterHost && (
             <div className="text-center mt-6 pt-4 border-t border-glass-border w-full max-w-sm">
                 <p className="text-xs text-muted uppercase tracking-wider">Connected To</p>

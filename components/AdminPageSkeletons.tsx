@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 
 const SkeletonCard: React.FC<{ className?: string }> = ({ className }) => <div className={`glass-panel p-4 rounded-lg animate-pulse ${className}`} />;
@@ -80,7 +81,25 @@ export const TicketSkeleton: React.FC = () => (
 export const DatabaseSkeleton: React.FC = () => (
     <div className="glass-panel p-6 rounded-lg flex flex-col items-center justify-center min-h-[50vh] animate-pulse">
         <div className="h-8 bg-secondary rounded w-64 mb-4"></div>
-        <div className="h-56 w-56 bg-secondary rounded-full mb-4"></div>
-        <div className="h-7 bg-secondary rounded w-48"></div>
+        <div className="h-52 w-52 bg-secondary rounded-full mb-4"></div>
+        <div className="h-7 bg-secondary rounded w-48 mb-2"></div>
+        <div className="h-5 bg-secondary rounded w-40"></div>
+
+        <div className="mt-8 pt-6 border-t border-glass-border w-full max-w-md space-y-4">
+            <div className="h-6 bg-secondary rounded w-48 mx-auto mb-4"></div>
+            <div className="flex justify-between items-center">
+                <div className="h-5 bg-secondary rounded w-40"></div>
+                <div className="h-5 bg-secondary rounded w-20"></div>
+            </div>
+            <div className="flex justify-between items-center">
+                <div className="h-5 bg-secondary rounded w-32"></div>
+                <div className="h-5 bg-secondary rounded w-20"></div>
+            </div>
+             <div className="border-t border-glass-border my-2 !mt-4 !mb-2"></div>
+            <div className="flex justify-between items-center">
+                <div className="h-6 bg-secondary rounded w-44"></div>
+                <div className="h-6 bg-secondary rounded w-24"></div>
+            </div>
+        </div>
     </div>
 );

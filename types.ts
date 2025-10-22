@@ -97,7 +97,9 @@ export interface Metrics {
 }
 
 export interface DbStats {
-    usedBytes: number;
+    dataSize: number;
+    indexSize: number;
+    totalDiskSize: number;
     totalBytes: number;
     dbName?: string;
     clusterHost?: string;

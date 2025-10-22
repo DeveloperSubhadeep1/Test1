@@ -1060,17 +1060,16 @@ router.get('/metrics', getUserId, requireAdmin, async (req, res) => {
 router.get('/db-stats', getUserId, requireAdmin, async (req, res) => {
     try {
         const stats = await mongoose.connection.db.stats();
-        const usedBytes = stats.storageSize;
-        // For free tier MongoDB Atlas, total storage is 512MB. This is not available from db.stats().
+        const dataSize = stats.storageSize;
+        const indexSize = stats.totalIndexSize;
+        const totalDiskSize = stats.totalSize; // This is typically storageSize + indexSize + some overhead
         const totalBytes = 512 * 1024 * 1024; // 512 MB
 
-        // Get connection info to display in the UI
         const dbName = mongoose.connection.name;
-        // Safely parse the URL without exposing credentials in logs/errors
         const clientUrl = new URL(mongoose.connection.client.s.url);
         const clusterHost = clientUrl.hostname;
 
-        res.json({ usedBytes, totalBytes, dbName, clusterHost });
+        res.json({ dataSize, indexSize, totalDiskSize, totalBytes, dbName, clusterHost });
     } catch (error) {
         console.error("Error fetching DB stats:", error);
         res.status(500).json({ message: 'Server error fetching DB stats.' });
@@ -1126,7 +1125,7 @@ router.post('/admin/test-email', getUserId, requireAdmin, async (req, res) => {
         if (error.code === 'EAUTH' || error.responseCode === 535) {
              errorMessage += `1. **Authentication Failed:** The \`EMAIL_USER\` or \`EMAIL_PASS\` environment variables are incorrect.\n2. **Check your password:** Ensure you are using a 16-character **Google App Password**, not your regular Gmail password.\n3. **Check for spaces:** Make sure there are no spaces in the password you pasted into your environment variables.`;
         } else if (error.code === 'ETIMEDOUT') {
-             errorMessage += `1. **Connection Timed Out:** The server could not connect to the SMTP host (\`smtp.gmail.com\`).\n2. **Check for Security Alerts:** Sign in to the \`${process.env.EMAIL_USER}\` Gmail account and look for any "Security Alert" or "Sign-in attempt blocked" emails. You **MUST** approve the sign-in from your server's location.\n3. **Firewall Issues:** A firewall on your hosting provider (less likely on Render/Koyeb) might be blocking outbound connections on port 465.`;
+             errorMessage += `1. **Connection Timed Out:** The server could not connect to the SMTP host (\`smtp.gmail.com\`).\n2. **Check for Security Alerts:** Sign in to the \`${process.env.EMAIL_USER}\` Gmail account and look for any "Security Alert" or "Sign-in attempt blocked" emails. You **MUST** approve the sign-in from your server's location. This is the most common cause of this error.\n3. **Firewall Issues:** A firewall on your hosting provider (less likely on Render/Koyeb) might be blocking outbound connections on port 465.`;
         } else {
              errorMessage += `An unexpected error occurred. Please check the server logs for more details.`;
         }
