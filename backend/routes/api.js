@@ -415,6 +415,27 @@ router.post('/utils/parse-url', async (req, res) => {
         
         const decodedFilename = decodeURIComponent(filenameWithExt);
         let { movieName, year, languages, quality, size, season, episode } = parseFilename(decodedFilename);
+        
+        // Try to get the file size from the Content-Length header for more accuracy.
+        // This will override any size found in the filename itself.
+        try {
+            const headResponse = await fetch(url, { method: 'HEAD' });
+            if (headResponse.ok) {
+                const contentLength = headResponse.headers.get('content-length');
+                if (contentLength) {
+                    const fileSize = parseInt(contentLength, 10);
+                    if (!isNaN(fileSize)) {
+                        const formattedSize = formatBytes(fileSize);
+                        if (formattedSize) {
+                             size = formattedSize;
+                        }
+                    }
+                }
+            }
+        } catch (fetchError) {
+            console.warn(`Could not perform HEAD request for size on URL: ${url}. Falling back to filename parsing. Error: ${fetchError.message}`);
+        }
+
 
         // If year is not found in filename, try to get it from TMDb, using the correct content type
         if (!year && movieName) {
