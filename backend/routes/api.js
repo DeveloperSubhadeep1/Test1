@@ -1,3 +1,4 @@
+
 const express = require('express');
 const router = express.Router();
 const nodemailer = require('nodemailer');
@@ -217,27 +218,31 @@ const BAD_WORDS_REGEX = new RegExp(`\\b(${GENERIC_BAD_WORDS_LIST.join('|')})\\b`
 function parseFilename(filename) {
     const lowerFilename = filename.toLowerCase();
 
-    // --- Step 1: Extract size and clean the base filename ---
+    // --- Step 1: Extract size ---
     let size = null;
-    // FIX: More flexible size regex to catch '1.4G' or '350M'
     const sizeMatch = lowerFilename.match(/(\d+(\.\d+)?\s?(g|m)b?)/i);
     if (sizeMatch) {
-      // Normalize to always end in 'B' for consistency
       size = sizeMatch[0].replace(/\s/g, '').toUpperCase().replace(/B?$/, 'B');
     }
 
+    // --- Step 2: Pre-cleaning ---
     let nameWithoutExt = lowerFilename.replace(/\.[^/.]+$/, "");
-    // FIX: Strip release group (e.g., -CPTN5D) from the end before further processing.
-    nameWithoutExt = nameWithoutExt.replace(/-[a-z0-9]+$/i, '');
+    nameWithoutExt = nameWithoutExt.replace(/-[a-z0-9]+$/i, ''); // Remove release group (e.g., -CPTN5D)
 
     let cleanedName = nameWithoutExt
-        .replace(/\[.*?\]/g, '')
-        .replace(FULL_BLOCKLIST_REGEX, '');
-    let normalized = cleanedName.replace(/[._()+-]/g, " ").replace(/\s+/g, ' ').trim();
+        .replace(/\[.*?\]/g, '') // Remove bracketed content
+        .replace(FULL_BLOCKLIST_REGEX, ''); // Remove known channel names
+
+    // --- Step 3: Specific technical metadata removal (BEFORE normalization) ---
+    let preProcessedName = cleanedName
+        .replace(/\b(h\.?26[45])\b/gi, ' ')
+        .replace(/\b(dd\+?\d\.\d|ddp\d\.\d)\b/gi, ' ');
     
+    // --- Step 4: Normalization ---
+    let normalized = preProcessedName.replace(/[._()+-]/g, " ").replace(/\s+/g, ' ').trim();
     let titleCandidate = ` ${normalized} `; // Pad for safe replacement
 
-    // --- Step 2: Extract all metadata and remove it from the title candidate string ---
+    // --- Step 5: Extract metadata and remove from title candidate ---
     let year = null;
     let season = null;
     let episode = null;
@@ -357,12 +362,7 @@ function parseFilename(filename) {
         }
     }
     
-    // --- Step 3: Final cleanup of the title ---
-    // FIX: Add a specific cleanup step for complex patterns before the generic one.
-    titleCandidate = titleCandidate
-        .replace(/\b(ddp?(\s)?\d(\s)?\d)\b/gi, ' ')
-        .replace(/\b(h(\s)?26[45])\b/gi, ' ');
-        
+    // --- Step 6: Final cleanup of the title ---
     let movieName = titleCandidate
         .replace(BAD_WORDS_REGEX, ' ')
         .replace(/[^a-z0-9\s]/g, ' ')
