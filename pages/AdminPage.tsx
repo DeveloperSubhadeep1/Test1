@@ -13,6 +13,7 @@ import {
   updateStoredMovie,
   addStoredMovie,
   searchTMDB,
+  searchContentByType,
   apiTestEmail,
   getDbStats,
   apiParseUrl,
@@ -692,12 +693,44 @@ const ContentModal: React.FC<ContentModalProps> = ({ movie, onClose, onSave }) =
         try {
             const parsedData = await apiParseUrl(linkUrl);
             const newLabel = generateLinkLabel(parsedData);
-            
+    
             const newLinks = [...formData.download_links];
             newLinks[index].label = newLabel;
-            setFormData(prev => ({ ...prev, download_links: newLinks }));
-
-            addToast('Label automated successfully!', 'success');
+            
+            let contentFound = false;
+    
+            // If content is not already selected (for a new entry), try to find it on TMDB
+            if (isNew && !formData.tmdb_id && parsedData.movieName) {
+                addToast(`Searching TMDB for "${parsedData.movieName}"...`, 'info');
+                const searchType = parsedData.season !== null ? 'tv' : 'movie';
+                const searchResults = await searchContentByType(parsedData.movieName, searchType, parsedData.year || undefined);
+                
+                if (searchResults.results && searchResults.results.length > 0) {
+                    const topResult = searchResults.results[0];
+                    
+                    setFormData(prev => ({
+                        ...prev,
+                        download_links: newLinks,
+                        tmdb_id: topResult.id,
+                        title: 'title' in topResult ? topResult.title : topResult.name,
+                        type: searchType,
+                    }));
+                    contentFound = true;
+                    addToast('Content found and filled automatically!', 'success');
+                }
+            }
+    
+            if (!contentFound) {
+                // If no content was found (or if not applicable), just update the link label
+                setFormData(prev => ({ ...prev, download_links: newLinks }));
+                addToast(
+                    isNew && parsedData.movieName 
+                    ? `Label automated, but no TMDB match found for "${parsedData.movieName}". Please search manually.`
+                    : 'Label automated successfully!',
+                    'info'
+                );
+            }
+    
         } catch (error) {
             addToast(error instanceof Error ? error.message : 'Automation failed.', 'error');
         } finally {
