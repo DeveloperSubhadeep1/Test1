@@ -79,7 +79,7 @@ const AppLayout: React.FC = () => {
       <div className="flex flex-col min-h-screen">
         {showHeader && <Header onMenuClick={() => setIsSidebarOpen(true)} />}
         
-        <main className={useStandardContainer ? "flex-grow container py-8" : "flex-grow"}>
+        <main className={useStandardContainer ? "flex-grow container py-4 md:py-8" : "flex-grow"}>
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/favorites" element={<ProtectedRoute><FavoritesPage /></ProtectedRoute>} />

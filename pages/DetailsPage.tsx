@@ -368,7 +368,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
                         </div>
                         </div>
 
-                        <div className="flex items-center gap-4 my-6">
+                        <div className="flex items-center gap-2 sm:gap-4 my-6">
                           <div>
                             <div className="flex items-center gap-4">
                               <ScoreRing score={details.vote_average} />
@@ -380,19 +380,19 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
                                 <span className="text-muted text-sm">/ 10</span>
                             </div>
                           </div>
-                          <div className="h-10 w-px bg-gray-700"></div>
-                          <div className="flex items-center gap-2">
-                              <button onClick={handleOpenCollectionModal} title="Add to collection" className="group h-11 w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Add to collection">
-                                  <PlusCircleIcon className="h-6 w-6 text-white transition-transform duration-300 group-hover:scale-110" />
+                          <div className="h-10 w-px bg-gray-700 hidden sm:block"></div>
+                          <div className="flex items-center gap-1 sm:gap-2">
+                              <button onClick={handleOpenCollectionModal} title="Add to collection" className="group h-10 w-10 sm:h-11 sm:w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Add to collection">
+                                  <PlusCircleIcon className="h-5 w-5 sm:h-6 sm:w-6 text-white transition-transform duration-300 group-hover:scale-110" />
                               </button>
-                              <button onClick={handleWatchlistToggle} title={onWl ? 'Remove from watchlist' : 'Add to watchlist'} className="group h-11 w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Toggle Watchlist">
-                                  <BookmarkIcon className={`h-6 w-6 transition-all group-hover:scale-110 ${onWl ? 'fill-accent stroke-accent' : 'text-white'}`} />
+                              <button onClick={handleWatchlistToggle} title={onWl ? 'Remove from watchlist' : 'Add to watchlist'} className="group h-10 w-10 sm:h-11 sm:w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Toggle Watchlist">
+                                  <BookmarkIcon className={`h-5 w-5 sm:h-6 sm:w-6 transition-all group-hover:scale-110 ${onWl ? 'fill-accent stroke-accent' : 'text-white'}`} />
                               </button>
-                              <button onClick={handleFavoriteToggle} title={isFav ? 'Remove from favorites' : 'Add to favorites'} className="group h-11 w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Toggle Favorite">
-                                  <HeartIcon className={`h-6 w-6 transition-all group-hover:scale-110 ${isFav ? 'fill-red-500 stroke-red-500' : 'text-white'}`} />
+                              <button onClick={handleFavoriteToggle} title={isFav ? 'Remove from favorites' : 'Add to favorites'} className="group h-10 w-10 sm:h-11 sm:w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Toggle Favorite">
+                                  <HeartIcon className={`h-5 w-5 sm:h-6 sm:w-6 transition-all group-hover:scale-110 ${isFav ? 'fill-red-500 stroke-red-500' : 'text-white'}`} />
                               </button>
-                              <button onClick={handleShare} title="Share" className="group h-11 w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Share this content">
-                                  <ShareIcon className="h-6 w-6 text-white transition-transform duration-300 group-hover:scale-110" />
+                              <button onClick={handleShare} title="Share" className="group h-10 w-10 sm:h-11 sm:w-11 flex items-center justify-center bg-black/20 rounded-full hover:bg-white/20 transition-colors" aria-label="Share this content">
+                                  <ShareIcon className="h-5 w-5 sm:h-6 sm:w-6 text-white transition-transform duration-300 group-hover:scale-110" />
                               </button>
                           </div>
                         </div>
@@ -400,7 +400,7 @@ const DetailsPage: React.FC<DetailsPageProps> = ({ type }) => {
                         <h2 className="text-xl font-semibold mt-6 mb-2">Overview</h2>
                         <ExpandableText text={details.overview} />
                         
-                        <div className="grid grid-cols-2 gap-4 mt-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
                         {crew.director && (
                             <div>
                                 <p className="font-bold">{crew.director.name}</p>

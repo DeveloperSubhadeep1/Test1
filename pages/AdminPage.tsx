@@ -844,39 +844,41 @@ const ContentModal: React.FC<ContentModalProps> = ({ movie, onClose, onSave }) =
                             <h4 className="text-base font-semibold text-white mb-2">Download Links</h4>
                             <div className="space-y-3">
                                 {formData.download_links.map((link, index) => (
-                                    <div key={index} className="grid grid-cols-[1fr_2fr_auto_auto] gap-2 items-center">
+                                    <div key={index} className="flex flex-wrap items-center gap-2 rounded-md bg-primary/40 p-2 md:p-0 md:bg-transparent md:flex-nowrap">
                                         <input
                                             type="text"
                                             placeholder="Label (e.g., 1080p WEB-DL)"
                                             value={link.label}
                                             onChange={e => handleLinkChange(index, 'label', e.target.value)}
-                                            className={inputClass}
+                                            className={inputClass + " w-full md:w-auto md:flex-1"}
                                         />
                                         <input
                                             type="url"
                                             placeholder="URL"
                                             value={link.url}
                                             onChange={e => handleLinkChange(index, 'url', e.target.value)}
-                                            className={inputClass}
+                                            className={inputClass + " w-full md:w-auto md:flex-[2]"}
                                             required
                                         />
-                                        <button 
-                                            type="button" 
-                                            onClick={() => handleAutomateLink(index)} 
-                                            className="text-sm font-semibold text-cyan hover:brightness-125 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            disabled={automatingIndex === index}
-                                            title="Auto-generate label from URL"
-                                        >
-                                            {automatingIndex === index ? <SpinnerIcon className="animate-spin h-5 w-5" /> : 'Automate'}
-                                        </button>
-                                        <button 
-                                            type="button" 
-                                            onClick={() => removeLink(index)}
-                                            className="p-2 text-muted hover:text-danger hover:bg-danger/20 rounded-full"
-                                            title="Delete link"
-                                        >
-                                            <TrashIcon className="h-5 w-5" />
-                                        </button>
+                                        <div className="flex items-center gap-2 ml-auto md:ml-0">
+                                            <button 
+                                                type="button" 
+                                                onClick={() => handleAutomateLink(index)} 
+                                                className="text-sm font-semibold text-cyan hover:brightness-125 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                disabled={automatingIndex === index}
+                                                title="Auto-generate label from URL"
+                                            >
+                                                {automatingIndex === index ? <SpinnerIcon className="animate-spin h-5 w-5" /> : 'Automate'}
+                                            </button>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => removeLink(index)}
+                                                className="p-2 text-muted hover:text-danger hover:bg-danger/20 rounded-full"
+                                                title="Delete link"
+                                            >
+                                                <TrashIcon className="h-5 w-5" />
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -914,38 +916,77 @@ const UsersTab: React.FC = () => {
             .finally(() => setLoading(false));
     }, [addToast]);
 
-    if (loading) return <TableSkeleton cols={6} />;
+    if (loading) return (
+      <>
+        <TableSkeleton cols={5} />
+        <CardListSkeleton />
+      </>
+    );
 
     return (
-        <div className="glass-panel rounded-lg shadow overflow-x-auto">
-            <table className="w-full text-sm text-left border-collapse">
-                <thead className="text-xs uppercase text-muted">
-                    <tr>
-                        <th scope="col" className="px-6 py-4 border-b border-glass-border">User</th>
-                        <th scope="col" className="px-6 py-4 border-b border-glass-border">Email</th>
-                        <th scope="col" className="px-6 py-4 border-b border-glass-border text-center">Favorites</th>
-                        <th scope="col" className="px-6 py-4 border-b border-glass-border text-center">Watchlist</th>
-                        <th scope="col" className="px-6 py-4 border-b border-glass-border">Joined</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {users.map(user => (
-                         <tr key={user._id} className="hover:bg-cyan/10 transition-colors border-b border-glass-border">
-                            <td className="px-6 py-4 font-semibold text-white">
-                                <div className="flex items-center gap-3">
-                                    <Avatar avatar={user.avatar} className="w-8 h-8 rounded-full" />
-                                    <span>{user.username}</span>
-                                </div>
-                            </td>
-                            <td className="px-6 py-4">{user.email}</td>
-                            <td className="px-6 py-4 text-center">{user.favoritesCount}</td>
-                            <td className="px-6 py-4 text-center">{user.watchlistCount}</td>
-                            <td className="px-6 py-4">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</td>
+        <>
+            {/* Desktop Table View */}
+            <div className="hidden md:block glass-panel rounded-lg shadow overflow-x-auto">
+                <table className="w-full text-sm text-left border-collapse">
+                    <thead className="text-xs uppercase text-muted">
+                        <tr>
+                            <th scope="col" className="px-6 py-4 border-b border-glass-border">User</th>
+                            <th scope="col" className="px-6 py-4 border-b border-glass-border">Email</th>
+                            <th scope="col" className="px-6 py-4 border-b border-glass-border text-center">Favorites</th>
+                            <th scope="col" className="px-6 py-4 border-b border-glass-border text-center">Watchlist</th>
+                            <th scope="col" className="px-6 py-4 border-b border-glass-border">Joined</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
+                    </thead>
+                    <tbody>
+                        {users.map(user => (
+                            <tr key={user._id} className="hover:bg-cyan/10 transition-colors border-b border-glass-border">
+                                <td className="px-6 py-4 font-semibold text-white">
+                                    <div className="flex items-center gap-3">
+                                        <Avatar avatar={user.avatar} className="w-8 h-8 rounded-full" />
+                                        <span>{user.username}</span>
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4">{user.email}</td>
+                                <td className="px-6 py-4 text-center">{user.favoritesCount}</td>
+                                <td className="px-6 py-4 text-center">{user.watchlistCount}</td>
+                                <td className="px-6 py-4">{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="space-y-4 md:hidden">
+                {users.map(user => (
+                    <div key={user._id} className="glass-panel p-4 rounded-lg shadow-lg">
+                        <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <Avatar avatar={user.avatar} className="w-10 h-10 rounded-full flex-shrink-0" />
+                                <div className="min-w-0">
+                                    <h3 className="font-bold text-white truncate">{user.username}</h3>
+                                    <p className="text-sm text-muted break-all">{user.email}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-glass-border text-sm text-center">
+                            <div>
+                                <span className="text-xs text-muted">Favorites</span>
+                                <p className="font-bold text-white">{user.favoritesCount}</p>
+                            </div>
+                            <div>
+                                <span className="text-xs text-muted">Watchlist</span>
+                                <p className="font-bold text-white">{user.watchlistCount}</p>
+                            </div>
+                            <div>
+                                <span className="text-xs text-muted">Joined</span>
+                                <p className="font-bold text-white text-xs">{user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-CA') : 'N/A'}</p>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </>
     );
 };
 

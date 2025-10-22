@@ -19,7 +19,7 @@ const CollectionsListPage: React.FC = () => {
     return (
       <div>
         <div className="h-9 w-64 bg-light-secondary dark:bg-secondary rounded-md animate-pulse mb-6"></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {Array.from({ length: 3 }).map((_, index) => (
             <div key={index} className="bg-light-secondary dark:bg-secondary rounded-lg shadow-lg overflow-hidden animate-pulse">
                 <div className="h-48 w-full bg-light-border dark:bg-gray-700"></div>
@@ -42,7 +42,7 @@ const CollectionsListPage: React.FC = () => {
       </div>
 
       {collections.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
           {collections.map(collection => (
             <Link 
                 to={`/collection/${collection._id}`} 
