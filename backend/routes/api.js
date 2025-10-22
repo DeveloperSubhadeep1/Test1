@@ -185,10 +185,10 @@ const transporter = nodemailer.createTransport({
 
 // --- Helper Functions ---
 function formatBytes(bytes, decimals = 2) {
-    if (!+bytes || bytes === 0) return null;
+    if (!+bytes || bytes === 0) return '0 Bytes';
     const k = 1024;
     const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
@@ -215,114 +215,28 @@ const BAD_WORDS_REGEX = new RegExp(`\\b(${GENERIC_BAD_WORDS_LIST.join('|')})\\b`
 
 
 function parseFilename(filename) {
-    // --- Step 0: Force to lowercase to ensure all subsequent regex is case-insensitive
     const lowerFilename = filename.toLowerCase();
 
-    // --- Step 1: Extract size BEFORE normalization, as normalization can break the format (e.g., "1.23 GB").
+    // --- Step 1: Extract size and clean the base filename ---
     let size = null;
     const sizeMatch = lowerFilename.match(/(\d+(\.\d+)?\s?(gb|mb))/i);
     if (sizeMatch) {
       size = sizeMatch[0].replace(/\s/g, '').toUpperCase();
     }
 
-    // --- Step 2: Clean and normalize the string for title extraction.
     const nameWithoutExt = lowerFilename.replace(/\.[^/.]+$/, "");
-    
-    // UPDATED: Clean the filename in multiple stages for robustness.
     let cleanedName = nameWithoutExt
-        .replace(/\[.*?\]/g, '')              // Stage 1: Remove bracketed content like [TGx].
-        .replace(FULL_BLOCKLIST_REGEX, '');   // Stage 2: Remove any known channel/group name from the comprehensive list.
-      
+        .replace(/\[.*?\]/g, '')
+        .replace(FULL_BLOCKLIST_REGEX, '');
     let normalized = cleanedName.replace(/[._()+-]/g, " ").replace(/\s+/g, ' ').trim();
+    
+    let titleCandidate = ` ${normalized} `; // Pad for safe replacement
 
-
-    // --- Step 3: Parse metadata from the normalized string.
+    // --- Step 2: Extract all metadata and remove it from the title candidate string ---
     let year = null;
     let season = null;
     let episode = null;
-    let movieName = '';
-
-    const matchIndices = [];
-
-    // Find Year
-    const yearMatch = normalized.match(/\b(19\d{2}|20\d{2})\b/);
-    if (yearMatch) {
-        const potentialYear = parseInt(yearMatch[0], 10);
-        if (potentialYear > 1900 && potentialYear < new Date().getFullYear() + 5) {
-            year = yearMatch[0];
-            matchIndices.push(normalized.indexOf(yearMatch[0]));
-        }
-    }
-
-    // Find Season/Episode using comprehensive regex patterns
-    // Pattern 1: Combined formats like S01E01, Season 01 Episode 01, S01x01
-    let seMatch = normalized.match(/(?:Season|S|Series|Part)[\s._-]?(\d{1,2})(?:[\s._-x](?:E|Ep|Episode|EP)?[\s._-]?)(\d{1,3})\b/i);
-    // Pattern 2: Fallback for formats like 1x02
-    if (!seMatch) {
-        seMatch = normalized.match(/\b(\d{1,2})x(\d{1,3})\b/i);
-    }
-    
-    if (seMatch) {
-        season = parseInt(seMatch[1], 10);
-        episode = parseInt(seMatch[2], 10);
-        matchIndices.push(normalized.indexOf(seMatch[0]));
-    } else {
-        // If no combined match, look for season and episode independently
-        const seasonMatch = normalized.match(/(?:Season|S|Series|Part)[\s._-]?(\d{1,2})\b/i);
-        if (seasonMatch) {
-            season = parseInt(seasonMatch[1], 10);
-            matchIndices.push(normalized.indexOf(seasonMatch[0]));
-        }
-
-        const episodeMatch = normalized.match(/(?:Episode|Ep|E|EP)[\s._-]?(\d{1,3})\b/i);
-        if (episodeMatch) {
-            episode = parseInt(episodeMatch[1], 10);
-            matchIndices.push(normalized.indexOf(episodeMatch[0]));
-        }
-    }
-    
-    // Determine where the title ends. It's the first occurrence of any metadata.
-    let titleEndIndex = -1;
-    if (matchIndices.length > 0) {
-        titleEndIndex = Math.min(...matchIndices);
-    }
-
-    if (titleEndIndex !== -1) {
-        movieName = normalized.substring(0, titleEndIndex).trim();
-    } else {
-        // Fallback: If no metadata found, find where quality/language keywords start
-        const keywords = ['4k', '2160p', '1080p', '720p', '480p', 'web-dl', 'webdl', 'webrip', 'bluray', 'hdtv', 'hdrip', 'x264', 'hindi', 'english', 'eng', 'dual', 'audio'];
-        const parts = normalized.split(' ');
-        let firstMetaIndex = -1;
-        for (let i = 1; i < parts.length; i++) { // Start from 1 to avoid matching if title itself is a keyword
-            if (keywords.includes(parts[i].toLowerCase())) {
-                firstMetaIndex = i;
-                break;
-            }
-        }
-        if (firstMetaIndex !== -1) {
-            movieName = parts.slice(0, firstMetaIndex).join(' ');
-        } else {
-            movieName = normalized; // Assume the whole thing is the title
-        }
-    }
-    
-    // --- Final cleaning of the extracted title
-    movieName = movieName
-        .replace(BAD_WORDS_REGEX, '')      // remove common spammy words
-        .replace(/[^a-z0-9\s]/g, ' ')   // remove all non-alphanumeric chars, replacing with a space
-        .replace(/\s+/g, ' ')           // collapse multiple spaces into one
-        .trim();
-
-    // --- Step 4: Parse quality and languages from the whole normalized string
-    const lowerNormalized = normalized.toLowerCase();
-    
     let quality = null;
-    const qualityMatch = lowerNormalized.match(/\b(4k|2160p|1080p|720p|480p)\b/i);
-    if (qualityMatch) {
-      quality = qualityMatch[0].toUpperCase().replace('P', 'p');
-    }
-    
     const languages = [];
     const languageMap = {
         // Indic
@@ -387,36 +301,71 @@ function parseFilename(filename) {
         'georgian': 'Georgian', 'geo': 'Georgian', 'ka': 'Georgian',
         'tatar': 'Tatar', 'tat': 'Tatar', 'tt': 'Tatar',
     };
-    
-    const parts = normalized.split(' ');
-    const lowerParts = parts.map(p => p.toLowerCase());
 
-    for (let i = 0; i < lowerParts.length; i++) {
-        const pKey = lowerParts[i];
-
-        // Handle 'eng' to differentiate audio from subtitles
-        if (pKey === 'eng' && (i + 1 < lowerParts.length) && (lowerParts[i + 1] === 'sub' || lowerParts[i + 1] === 'subs')) {
-            i++; // Skip 'eng' and also skip 'sub(s)' on the next iteration
-            continue;
-        }
-        
-        // Handle 'esub(s)' which are clearly subtitles
-        if (pKey === 'esub' || pKey === 'esubs') {
-            continue;
-        }
-
-        const lang = languageMap[pKey];
-        if (lang && !languages.includes(lang)) {
-            languages.push(lang);
+    // Year
+    const yearMatch = normalized.match(/\b(19\d{2}|20\d{2})\b/);
+    if (yearMatch) {
+        const potentialYear = parseInt(yearMatch[0], 10);
+        if (potentialYear > 1900 && potentialYear < new Date().getFullYear() + 5) {
+            year = yearMatch[0];
+            titleCandidate = titleCandidate.replace(` ${year} `, ' ');
         }
     }
+
+    // Season/Episode
+    const seRegex = /(?:season|s|series|part)[\s._-]?(\d{1,2})(?:[\s._-x]?(?:e|ep|episode|ep)?[\s._-]?)(\d{1,3})\b|\b(\d{1,2})x(\d{1,3})\b/i;
+    const seMatch = normalized.match(seRegex);
+    if (seMatch) {
+        season = parseInt(seMatch[1] || seMatch[3], 10);
+        episode = parseInt(seMatch[2] || seMatch[4], 10);
+        titleCandidate = titleCandidate.replace(seMatch[0], ' ');
+    } else {
+        const seasonMatch = normalized.match(/(?:season|s|series|part)[\s._-]?(\d{1,2})\b/i);
+        if (seasonMatch) {
+            season = parseInt(seasonMatch[1], 10);
+            titleCandidate = titleCandidate.replace(seasonMatch[0], ' ');
+        }
+        const episodeMatch = normalized.match(/(?:episode|ep|e|ep)[\s._-]?(\d{1,3})\b/i);
+        if (episodeMatch) {
+            episode = parseInt(episodeMatch[1], 10);
+            titleCandidate = titleCandidate.replace(episodeMatch[0], ' ');
+        }
+    }
+
+    // Quality
+    const qualityMatch = normalized.match(/\b(4k|2160p|1080p|720p|480p)\b/i);
+    if (qualityMatch) {
+      quality = qualityMatch[0].toUpperCase().replace('P', 'p');
+      titleCandidate = titleCandidate.replace(new RegExp(`\\b${qualityMatch[0]}\\b`, 'i'), ' ');
+    }
+
+    // Languages
+    const langKeys = Object.keys(languageMap).sort((a, b) => b.length - a.length); // Longer keys first
+    for (const key of langKeys) {
+        const regex = new RegExp(`\\b${key}\\b`, 'i');
+        if (regex.test(normalized)) {
+            const lang = languageMap[key];
+            if (lang && !languages.includes(lang)) {
+                languages.push(lang);
+            }
+            titleCandidate = titleCandidate.replace(new RegExp(`\\b${key}\\b`, 'gi'), ' ');
+        }
+    }
+    
+    // --- Step 3: Final cleanup of the title ---
+    let movieName = titleCandidate
+        .replace(BAD_WORDS_REGEX, ' ')
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    
+    // Capitalize first letter of each word
+    movieName = movieName.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
     return { movieName, year, languages, quality, size, season, episode };
 }
 
 // --- Util Routes ---
-// PERF: Removed slow external network calls (HEAD request for size, TMDB fetch for year).
-// The parser now relies exclusively on fast, internal string manipulation for maximum performance.
 router.post('/utils/parse-url', async (req, res) => {
     try {
         const { url } = req.body;
@@ -431,16 +380,26 @@ router.post('/utils/parse-url', async (req, res) => {
         }
         
         const decodedFilename = decodeURIComponent(filenameWithExt);
-        const { movieName, year, languages, quality, size, season, episode } = parseFilename(decodedFilename);
+        const parsedInfo = parseFilename(decodedFilename);
+
+        // Fetch file size via HEAD request, falling back to parsed size
+        let finalSize = parsedInfo.size;
+        try {
+            const headRes = await fetch(url, { method: 'HEAD', timeout: 4000 }); // 4 second timeout
+            if (headRes.ok) {
+                const contentLength = headRes.headers.get('content-length');
+                if (contentLength) {
+                    finalSize = formatBytes(parseInt(contentLength, 10));
+                }
+            }
+        } catch (e) {
+            console.log(`Could not fetch file size for ${url}:`, e.message, '(Using parsed size as fallback)');
+        }
 
         res.json({
-            movieName,
-            year: year ? parseInt(year, 10) : null,
-            languages,
-            quality,
-            size,
-            season,
-            episode,
+            ...parsedInfo,
+            year: parsedInfo.year ? parseInt(parsedInfo.year, 10) : null,
+            size: finalSize,
         });
 
     } catch (error) {

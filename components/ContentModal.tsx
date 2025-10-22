@@ -16,7 +16,6 @@ import {
 import { useDebounce } from '../hooks/useDebounce';
 import { searchTMDB, searchContentByType, apiParseUrl } from '../services/api';
 import { TMDB_IMAGE_BASE_URL_SMALL } from '../constants';
-import { generateLinkLabel } from '../utils';
 
 // Interfaces specific to this modal
 interface LinkFormData {
@@ -118,7 +117,29 @@ const ContentModal: React.FC<ContentModalProps> = ({ movie, onClose, onSave }) =
         setAutomatingIndex(index);
         try {
             const parsedData = await apiParseUrl(linkUrl);
-            const newLabel = generateLinkLabel(parsedData);
+            
+            const labelParts = [];
+            if (parsedData.movieName) {
+                // The parser now capitalizes, but we can ensure it here too.
+                const capitalizedTitle = parsedData.movieName.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+                labelParts.push(capitalizedTitle);
+            }
+
+            if (parsedData.season !== null) {
+                const seasonStr = String(parsedData.season).padStart(2, '0');
+                if (parsedData.episode !== null) {
+                    const episodeStr = String(parsedData.episode).padStart(2, '0');
+                    labelParts.push(`S${seasonStr}E${episodeStr}`);
+                } else {
+                    labelParts.push(`Season ${seasonStr}`);
+                }
+            }
+            
+            if(parsedData.quality) labelParts.push(parsedData.quality);
+            if(parsedData.languages && parsedData.languages.length > 0) labelParts.push(parsedData.languages.join('+'));
+            if(parsedData.size) labelParts.push(`[${parsedData.size}]`);
+            
+            const newLabel = labelParts.join(' ').trim() || 'Download';
     
             const newLinks = [...formData.download_links];
             newLinks[index].label = newLabel;
@@ -142,6 +163,8 @@ const ContentModal: React.FC<ContentModalProps> = ({ movie, onClose, onSave }) =
                     }));
                     contentFound = true;
                     addToast('Content found and filled automatically!', 'success');
+                } else if(parsedData.movieName) {
+                    setFormData(prev => ({ ...prev, title: parsedData.movieName, type: searchType }));
                 }
             }
     
