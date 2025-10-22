@@ -314,6 +314,11 @@ function parseFilename(filename) {
         .replace(/\s+/g, ' ')           // collapse multiple spaces into one
         .trim();
 
+    // If the cleaning process results in an empty string, return an empty title.
+    if (!movieName) {
+        return { movieName: '', year, languages: [], quality: null, size: null, season: null, episode: null };
+    }
+
     // --- Step 4: Parse quality and languages from the whole normalized string
     const lowerNormalized = normalized.toLowerCase();
     
@@ -415,6 +420,8 @@ function parseFilename(filename) {
 }
 
 // --- Util Routes ---
+// PERF: Removed slow external network calls (HEAD request for size, TMDB fetch for year).
+// The parser now relies exclusively on fast, internal string manipulation for maximum performance.
 router.post('/utils/parse-url', async (req, res) => {
     try {
         const { url } = req.body;
@@ -429,53 +436,7 @@ router.post('/utils/parse-url', async (req, res) => {
         }
         
         const decodedFilename = decodeURIComponent(filenameWithExt);
-        let { movieName, year, languages, quality, size, season, episode } = parseFilename(decodedFilename);
-        
-        // Try to get the file size from the Content-Length header for more accuracy.
-        // This will override any size found in the filename itself.
-        try {
-            const headResponse = await fetch(url, { method: 'HEAD' });
-            if (headResponse.ok) {
-                const contentLength = headResponse.headers.get('content-length');
-                if (contentLength) {
-                    const fileSize = parseInt(contentLength, 10);
-                    if (!isNaN(fileSize)) {
-                        const formattedSize = formatBytes(fileSize);
-                        if (formattedSize) {
-                             size = formattedSize;
-                        }
-                    }
-                }
-            }
-        } catch (fetchError) {
-            console.warn(`Could not perform HEAD request for size on URL: ${url}. Falling back to filename parsing. Error: ${fetchError.message}`);
-        }
-
-
-        // If year is not found in filename, try to get it from TMDb, using the correct content type
-        if (!year && movieName) {
-            const searchType = (season !== null) ? 'tv' : 'movie';
-            try {
-                const searchParams = new URLSearchParams({
-                    api_key: TMDB_API_KEY,
-                    query: movieName,
-                });
-                const tmdbRes = await fetch(`https://api.themoviedb.org/3/search/${searchType}?${searchParams.toString()}`);
-                if (tmdbRes.ok) {
-                    const tmdbData = await tmdbRes.json();
-                    if (tmdbData.results && tmdbData.results.length > 0) {
-                        const releaseDate = searchType === 'movie' 
-                            ? tmdbData.results[0].release_date 
-                            : tmdbData.results[0].first_air_date;
-                        if (releaseDate) {
-                            year = new Date(releaseDate).getFullYear().toString();
-                        }
-                    }
-                }
-            } catch (tmdbError) {
-                console.warn(`TMDb fallback search failed for "${movieName}":`, tmdbError.message);
-            }
-        }
+        const { movieName, year, languages, quality, size, season, episode } = parseFilename(decodedFilename);
 
         res.json({
             movieName,
@@ -489,10 +450,6 @@ router.post('/utils/parse-url', async (req, res) => {
 
     } catch (error) {
         console.error('Error parsing URL:', error);
-        // FIX: Catch the specific error for empty titles and return a 400 Bad Request.
-        if (error.message && error.message.includes("Could not extract a valid title")) {
-            return res.status(400).json({ message: error.message });
-        }
         res.status(500).json({ message: 'Server error while parsing URL.' });
     }
 });
