@@ -4,12 +4,16 @@ import { useToast } from '../hooks/useToast';
 import { getNotifications } from '../services/api';
 
 const LAST_SEEN_NOTIFICATION_KEY = 'cineStreamLastSeenNotificationId';
+const DISMISSED_NOTIFICATIONS_KEY = 'cineStreamDismissedNotifications';
 
 interface NotificationsContextType {
   notifications: Notification[];
   unreadCount: number;
   loading: boolean;
   markAsRead: () => void;
+  dismissNotification: (notificationId: string) => void;
+  clearAllNotifications: () => void;
+  fetchNotifications: () => Promise<void>;
 }
 
 export const NotificationsContext = createContext<NotificationsContextType>({
@@ -17,6 +21,9 @@ export const NotificationsContext = createContext<NotificationsContextType>({
   unreadCount: 0,
   loading: true,
   markAsRead: () => {},
+  dismissNotification: () => {},
+  clearAllNotifications: () => {},
+  fetchNotifications: async () => {},
 });
 
 interface NotificationsProviderProps {
@@ -29,24 +36,35 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
   const [loading, setLoading] = useState(true);
   const { addToast } = useToast();
 
+  const getDismissedIds = (): string[] => {
+    try {
+      const stored = localStorage.getItem(DISMISSED_NOTIFICATIONS_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      localStorage.removeItem(DISMISSED_NOTIFICATIONS_KEY);
+      return [];
+    }
+  };
+
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
     try {
       const fetchedNotifications = await getNotifications();
-      setNotifications(fetchedNotifications);
+      const dismissedIds = getDismissedIds();
+      const visibleNotifications = fetchedNotifications.filter(n => !dismissedIds.includes(n._id));
+      
+      setNotifications(visibleNotifications);
 
       const lastSeenId = localStorage.getItem(LAST_SEEN_NOTIFICATION_KEY);
-      if (fetchedNotifications.length > 0) {
+      if (visibleNotifications.length > 0) {
         if (!lastSeenId) {
-          // If user has never seen any notification, all are unread
-          setUnreadCount(fetchedNotifications.length);
+          setUnreadCount(visibleNotifications.length);
         } else {
-          const lastSeenIndex = fetchedNotifications.findIndex(n => n._id === lastSeenId);
+          const lastSeenIndex = visibleNotifications.findIndex(n => n._id === lastSeenId);
           if (lastSeenIndex !== -1) {
             setUnreadCount(lastSeenIndex);
           } else {
-            // If the last seen ID isn't in the new list, assume all are new
-            setUnreadCount(fetchedNotifications.length);
+            setUnreadCount(visibleNotifications.length);
           }
         }
       } else {
@@ -62,7 +80,7 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 5 * 60 * 1000); // Refresh every 5 minutes
+    const interval = setInterval(fetchNotifications, 60 * 1000); // Refresh every 1 minute
     return () => clearInterval(interval);
   }, [fetchNotifications]);
   
@@ -74,8 +92,32 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
     }
   }, [notifications]);
 
+  const dismissNotification = useCallback((notificationId: string) => {
+    const dismissedIds = getDismissedIds();
+    const newDismissedIds = [...dismissedIds, notificationId];
+    localStorage.setItem(DISMISSED_NOTIFICATIONS_KEY, JSON.stringify(newDismissedIds));
+    
+    setNotifications(prev => prev.filter(n => n._id !== notificationId));
+  }, []);
+
+  const clearAllNotifications = useCallback(() => {
+    const currentIds = notifications.map(n => n._id);
+    if (currentIds.length === 0) return;
+
+    const dismissedIds = getDismissedIds();
+    const newDismissedIds = [...new Set([...dismissedIds, ...currentIds])];
+    localStorage.setItem(DISMISSED_NOTIFICATIONS_KEY, JSON.stringify(newDismissedIds));
+    
+    if (notifications.length > 0) {
+      localStorage.setItem(LAST_SEEN_NOTIFICATION_KEY, notifications[0]._id);
+    }
+
+    setNotifications([]);
+    setUnreadCount(0);
+  }, [notifications]);
+
   return (
-    <NotificationsContext.Provider value={{ notifications, unreadCount, loading, markAsRead }}>
+    <NotificationsContext.Provider value={{ notifications, unreadCount, loading, markAsRead, dismissNotification, clearAllNotifications, fetchNotifications }}>
       {children}
     </NotificationsContext.Provider>
   );

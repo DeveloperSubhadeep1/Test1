@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import SearchBar from './SearchBar';
 import { FilmIcon, MenuIcon, SunIcon, MoonIcon } from './Icons';
 import { ThemeContext } from '../context/ThemeContext';
+import { AuthContext } from '../context/AuthContext';
 import Notifications from './Notifications';
 
 interface HeaderProps {
@@ -11,6 +12,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const { theme, toggleTheme } = useContext(ThemeContext);
+  const { isAuthenticated } = useContext(AuthContext);
 
   return (
     <header className="bg-light-secondary/80 dark:bg-secondary/80 backdrop-blur-sm sticky top-0 z-40 border-b border-light-border dark:border-gray-800">
@@ -51,7 +53,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               )}
             </button>
             
-            <Notifications />
+            {isAuthenticated && <Notifications />}
           </div>
         </div>
       </div>

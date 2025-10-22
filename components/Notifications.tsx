@@ -1,11 +1,11 @@
 import React, { useContext, useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { NotificationsContext } from '../context/NotificationsContext';
-import { BellIcon, FilmIcon } from './Icons';
+import { BellIcon, FilmIcon, XIcon } from './Icons';
 import { generateSlug } from '../utils';
 
 const Notifications: React.FC = () => {
-  const { notifications, unreadCount, markAsRead } = useContext(NotificationsContext);
+  const { notifications, unreadCount, markAsRead, dismissNotification, clearAllNotifications } = useContext(NotificationsContext);
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -43,7 +43,7 @@ const Notifications: React.FC = () => {
       </button>
 
       {isOpen && (
-        <div className="absolute z-30 w-72 mt-2 right-0 origin-top-right glass-panel rounded-lg shadow-lg animate-fade-in">
+        <div className="absolute z-30 w-80 mt-2 right-0 origin-top-right glass-panel rounded-lg shadow-lg animate-fade-in">
           <div className="p-3 border-b border-glass-border">
             <h4 className="font-bold text-white text-sm">Notifications</h4>
           </div>
@@ -53,19 +53,27 @@ const Notifications: React.FC = () => {
                 {notifications.map(notif => {
                   const slug = generateSlug(notif.title);
                   return (
-                    <li key={notif._id}>
+                    <li key={notif._id} className="group/item flex items-center justify-between p-3 hover:bg-cyan/10 transition-colors">
                       <Link
                         to={`/${notif.type}/${notif.tmdb_id}-${slug}`}
                         onClick={() => setIsOpen(false)}
-                        className="flex items-center gap-3 p-3 hover:bg-cyan/10 transition-colors"
+                        className="flex items-center gap-3 flex-grow min-w-0"
                       >
                         <div className="flex-shrink-0 bg-secondary p-1.5 rounded-full">
                            <FilmIcon className="h-4 w-4 text-cyan" />
                         </div>
-                        <p className="text-sm text-gray-300">
+                        <p className="text-sm text-gray-300 truncate">
                            Link added for <span className="font-bold text-white">{notif.title}</span>
                         </p>
                       </Link>
+                       <button 
+                        onClick={(e) => { e.stopPropagation(); dismissNotification(notif._id); }} 
+                        className="p-1 rounded-full text-muted opacity-0 group-hover/item:opacity-100 hover:bg-secondary hover:text-white flex-shrink-0 ml-2"
+                        aria-label="Dismiss notification"
+                        title="Dismiss"
+                      >
+                        <XIcon className="h-4 w-4" />
+                      </button>
                     </li>
                   );
                 })}
@@ -74,6 +82,11 @@ const Notifications: React.FC = () => {
               <p className="p-4 text-center text-sm text-muted">No new notifications.</p>
             )}
           </div>
+          {notifications.length > 0 && (
+              <div className="p-2 border-t border-glass-border text-center">
+                  <button onClick={clearAllNotifications} className="w-full text-xs text-muted hover:text-cyan p-1 rounded-md transition-colors">Clear All</button>
+              </div>
+          )}
         </div>
       )}
     </div>

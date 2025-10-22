@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { NotificationsContext } from '../context/NotificationsContext';
 import { usePageMetadata } from '../hooks/usePageMetadata';
 import {
   getMetrics,
@@ -419,6 +420,7 @@ const ContentManagementTab: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [editingMovie, setEditingMovie] = useState<StoredMovie | null>(null);
     const { addToast } = useToast();
+    const { fetchNotifications } = useContext(NotificationsContext);
     const [movieToDelete, setMovieToDelete] = useState<StoredMovie | null>(null);
     
     const [searchParams, setSearchParams] = useSearchParams();
@@ -455,6 +457,7 @@ const ContentManagementTab: React.FC = () => {
     const handleSave = () => {
         handleModalClose();
         fetchMovies();
+        fetchNotifications();
     };
 
     const handleDelete = async () => {
