@@ -1,4 +1,5 @@
 
+
 const express = require('express');
 const router = express.Router();
 const nodemailer = require('nodemailer');
@@ -185,14 +186,50 @@ const transporter = nodemailer.createTransport({
 });
 
 // --- Helper Functions ---
-function formatBytes(bytes, decimals = 2) {
-    if (!+bytes || bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+function formatBytes(bytes) {
+  if (bytes === 0) return '0.00 B';
+  // Check for invalid inputs like null, undefined, NaN, or negative numbers
+  if (!bytes || !Number.isFinite(bytes) || bytes < 0) return null;
+
+  const units = ["B", "KB", "MB", "GB", "TB", "PB"];
+  let i = 0;
+  while (bytes >= 1024 && i < units.length - 1) {
+    bytes /= 1024;
+    i++;
+  }
+  return `${bytes.toFixed(2)} ${units[i]}`;
 }
+
+async function getFileSizeFromServer(url) {
+  try {
+    const response = await fetch(url, {
+        method: 'HEAD',
+        timeout: 8000,
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+    });
+
+    if (!response.ok) {
+      console.log(`HEAD request failed for ${url} with status ${response.status}`);
+      return null;
+    }
+
+    const size = response.headers.get("content-length");
+
+    if (!size) {
+      console.log(`Couldn't detect file size from headers for ${url}.`);
+      return null;
+    }
+
+    const bytes = parseInt(size, 10);
+    return formatBytes(bytes);
+  } catch (err) {
+    console.log(`Could not fetch file size for ${url}:`, err.message);
+    return null;
+  }
+}
+
 
 const RAW_CHANNEL_NAMES = [...new Set([
     // Specific Channel Names (with and without @)
@@ -393,26 +430,8 @@ router.post('/utils/parse-url', async (req, res) => {
         const parsedInfo = parseFilename(decodedFilename);
 
         // Fetch file size via HEAD request, falling back to parsed size
-        let finalSize = parsedInfo.size;
-        try {
-            // Increased timeout to 8 seconds to handle redirects more reliably.
-            // Added a standard User-Agent header as some servers may block requests without it.
-            const headRes = await fetch(url, {
-                method: 'HEAD',
-                timeout: 8000, // 8 seconds
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                }
-            });
-            if (headRes.ok) {
-                const contentLength = headRes.headers.get('content-length');
-                if (contentLength) {
-                    finalSize = formatBytes(parseInt(contentLength, 10));
-                }
-            }
-        } catch (e) {
-            console.log(`Could not fetch file size for ${url}:`, e.message, '(Using parsed size as fallback)');
-        }
+        const serverSize = await getFileSizeFromServer(url);
+        const finalSize = serverSize || parsedInfo.size;
 
         res.json({
             ...parsedInfo,
